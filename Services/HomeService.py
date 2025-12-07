@@ -37,18 +37,22 @@ class HomeService:
 
         return {
             "home name": home_name,
-            "home id": str(new_home.id),
-            "join code": new_home.join_code,
+            "home id": str(new_home.__id),
+            "join code": new_home.__join_code,
             "message": "Home created successfully."
         }
 
 
     async def view_home_code(self, user_id: UUID, home_id: UUID) -> str:
         """Retrieves the home join code (Admin only)."""
+        # Authentication session should provide user_id
+
+        # Check if home exists
         home: Home = await self.__i_home_repository.get_by_id(home_id)
         if home is None:
             raise ValueError("Home not found.")
-        return home.join_code
+        
+        return self.__management_service.view_home_code(user_id, home)
 
 
     async def join_home(self, user_id: UUID, home_code: str) -> bool:
@@ -56,7 +60,15 @@ class HomeService:
         User requests to join a home using a code.
         Creates a 'join request' waiting for approval.
         """
-        raise NotImplementedError("join_home not implemented yet")
+        # Authentication session should provide user_id
+
+        # Check if home exists
+        home: Home = await self.__i_home_repository.get_by_code(home_code)
+        if home is None:
+            raise ValueError("Invalid home code.")
+        
+        return self.__management_service.join_home(user_id, home)
+
 
     async def answer_join_request(self, head_user_id: UUID, request_id: UUID, approved: bool) -> bool:
         """Head of House approves or denies a join request."""
