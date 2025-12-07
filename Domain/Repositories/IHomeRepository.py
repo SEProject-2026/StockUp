@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Optional
 from Domain.SmartHome.Home import Home
 

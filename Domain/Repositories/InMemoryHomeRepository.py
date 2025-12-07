@@ -1,5 +1,5 @@
 from typing import Dict, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from Domain.Repositories.IHomeRepository import IHomeRepository
 from Domain.SmartHome.Home import Home
 

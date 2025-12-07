@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
 from Domain.Repositories.IHomeRepository import IHomeRepository
@@ -30,22 +30,26 @@ class HomeService:
             raise ValueError("Home name already exists.")
         
         # Create Home instance
-        new_home: Home = self.__management_service.create_new_home(home_name)
-        join_code: str = new_home.join_code
+        new_home: Home = self.__management_service.create_new_home(user_id,home_name)
 
         # Save to repository
         await self.__i_home_repository.save(new_home)
 
         return {
-            "name": home_name,
-            "join code": join_code,
+            "home name": home_name,
+            "home id": str(new_home.id),
+            "join code": new_home.join_code,
             "message": "Home created successfully."
         }
 
 
     async def view_home_code(self, user_id: UUID, home_id: UUID) -> str:
         """Retrieves the home join code (Admin only)."""
-        raise NotImplementedError("view_home_code not implemented yet")
+        home: Home = await self.__i_home_repository.get_by_id(home_id)
+        if home is None:
+            raise ValueError("Home not found.")
+        return home.join_code
+
 
     async def join_home(self, user_id: UUID, home_code: str) -> bool:
         """
