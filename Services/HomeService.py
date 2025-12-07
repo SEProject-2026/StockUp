@@ -1,10 +1,19 @@
 from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
+from Domain.Repositories.IHomeRepository import IHomeRepository
+from Domain.DomainServices.ManagementService import ManagementService
+from Domain.SmartHome.Home import Home
 
 
 
 class HomeService:
+
+    def __init__(self,
+                 i_home_repository: IHomeRepository,
+                 management_service: ManagementService):
+        self.__i_home_repository: IHomeRepository = i_home_repository
+        self.__management_service: ManagementService = management_service
 
 
     # ==========================================
@@ -13,7 +22,26 @@ class HomeService:
 
     async def create_home(self, user_id: UUID, home_name: str) -> Dict:
         """Creates a new home and sets the creator as ADMIN."""
-        raise NotImplementedError("create_home not implemented yet")
+        # Authentication session should provide user_id
+        
+        # Validation of home_name can be added with home repository checks
+        home: Home = await self.__i_home_repository.get_by_name(home_name)
+        if home is not None:
+            raise ValueError("Home name already exists.")
+        
+        # Create Home instance
+        new_home: Home = self.__management_service.create_new_home(home_name)
+        join_code: str = new_home.join_code
+
+        # Save to repository
+        await self.__i_home_repository.save(new_home)
+
+        return {
+            "name": home_name,
+            "join code": join_code,
+            "message": "Home created successfully."
+        }
+
 
     async def view_home_code(self, user_id: UUID, home_id: UUID) -> str:
         """Retrieves the home join code (Admin only)."""
