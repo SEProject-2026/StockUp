@@ -9,7 +9,7 @@ class IUserRepository(ABC):
     """
 
     @abstractmethod
-    async def create(self, user_data: Dict) -> Dict:
+    async def add(self, user_data: Dict) -> Dict:
         """
         Save a new user to the storage.
         Should assign a new unique ID to the user.
