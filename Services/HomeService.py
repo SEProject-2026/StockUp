@@ -2,10 +2,21 @@ from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
 
+from Domain import DomainException
+import Response
+import Domain
+from Domain.SmartHome import Product
+
 
 
 class HomeService:
+    def __init__(self, IHomeRepo, IUserRepo, IInventoryRepo, IShoppingListRepo, StockService):
+        self.home_repo = IHomeRepo
+        self.user_repo = IUserRepo
+        self.inventory_repo = IInventoryRepo
+        self.StockService = StockService
 
+    
 
     # ==========================================
     # 1. Home Management (House & Members)
@@ -54,11 +65,29 @@ class HomeService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
+    ################################ should date be a list of dates?
     async def add_product(self, user_id: UUID, home_id: UUID, product_name: str, quantity: int, 
-                          expiration_date: Optional[date], location_id: Optional[UUID]) -> Dict:
-        """Manually adds a product to the inventory."""
-        raise NotImplementedError("Not implemented yet")
-
+                          expiration_date: Optional[date], location_id: Optional[UUID]) -> Response:
+        is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        user = self.user_repo.get_user_by_id(user_id)                            #check user exists in system
+        if user is None:
+            return Response(isOk = False, error_message = "User not found in system")
+        home = self.home_repo.get_home_by_id(home_id)
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found in system")     #check home exists in system
+        product_to_add = Product(self.inventory_repo.get_next_id(), name = product_name, quantity = quantity, 
+                                expiration_date = expiration_date, location_id = location_id)
+        try:
+            self.StockService.add_product(home, product_to_add)
+        except DomainException as de:                               # catch domain logic error 
+            return Response(isOk = False, error_message = str(de))
+        except Exception as e:                                      # catch unexpected error
+            return Response(isOk = False, error_message = "An internal error occurred while adding the product.")
+        self.home_repo.save(home)
+        return Response(isOk = True, data = home.inventory)
+        
     async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:
         """Processes a receipt image (OCR) and returns detected items for verification."""
         raise NotImplementedError("Not implemented yet")
