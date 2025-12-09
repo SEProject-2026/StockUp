@@ -4,8 +4,8 @@ from datetime import date
 
 from authentication.auth_provider import IAuthProvider
 from authentication.password_encoder import PasswordEncoder
-from Domain import user
-from Domain.user import User
+from domain import user
+from domain.user import User
 from repositories.user_repository import IUserRepository
 
 class UserService:
@@ -59,4 +59,42 @@ class UserService:
         }
 
     async def logout(self, user_id: UUID) -> bool:
+        return True
+    
+    async def update_name(self, user_id: UUID, new_name: str) -> Dict:
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        user.update_name(new_name)
+
+        await self.user_repo.save(user)
+
+        return {
+            "status": "success",
+            "data": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name
+            }
+        }
+
+
+    async def change_password(self, user_id: UUID, current_password: str, new_password: str) -> bool:
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        if not PasswordEncoder.validate(current_password, user.hashed_password):
+            raise ValueError("Incorrect current password")
+
+        if len(new_password) < 8:
+            raise ValueError("New password is too short")
+
+        new_hashed_pw = PasswordEncoder.encode(new_password)
+
+        user.change_password(new_hashed_pw)
+    
+        await self.user_repo.save(user)
+
         return True
