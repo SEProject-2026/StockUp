@@ -2,6 +2,7 @@ from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
 
+from Authentication.auth_provider import IAuthProvider
 from Authentication.password_encoder import PasswordEncoder
 from Domain import user
 from Domain.user import User
@@ -11,8 +12,9 @@ class UserService:
     """
     Manages user lifecycle and authentication (independent of specific homes).
     """
-    def __init__(self, user_repo: IUserRepository):
+    def __init__(self, user_repo: IUserRepository, auth_provider: IAuthProvider):
         self.user_repo = user_repo
+        self.auth_provider = auth_provider
     
     async def register(self, email: str, password: str, name: str) -> Dict:
         """
@@ -48,11 +50,12 @@ class UserService:
         user = await self.user_repo.get_by_email(email)
         if not user or not PasswordEncoder.validate(password, user.hashed_password):
             raise ValueError("Invalid email or password")
-        # For simplicity, returning user info directly. In real scenario, generate JWT token.
+        token = self.auth_provider.create_token(user.id)
         return {
-            "user_id": user['id'],
-            "email": user['email'],
-            "name": user['name']
+            "user_id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "access_token": token
         }
 
     async def logout(self, user_id: UUID) -> bool:
