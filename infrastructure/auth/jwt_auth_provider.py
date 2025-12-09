@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 from jose import jwt, JWTError
-from Authentication.auth_provider import IAuthProvider
+from authentication.auth_provider import IAuthProvider
 
 #settings will be moved to config file later
 SECRET_KEY = "MY_SUPER_SECRET_KEY"

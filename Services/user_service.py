@@ -2,11 +2,11 @@ from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
 
-from Authentication.auth_provider import IAuthProvider
-from Authentication.password_encoder import PasswordEncoder
+from authentication.auth_provider import IAuthProvider
+from authentication.password_encoder import PasswordEncoder
 from Domain import user
 from Domain.user import User
-from Repositories.user_repository import IUserRepository
+from repositories.user_repository import IUserRepository
 
 class UserService:
     """
