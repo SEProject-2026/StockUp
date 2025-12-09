@@ -7,4 +7,3 @@ class User:
         self.email = email
         self.name = name
         self.hashed_password = hashed_password
-        self.is_active = True
