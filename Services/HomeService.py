@@ -1,6 +1,9 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
+from Domain.Repositories.IHomeRepository import IHomeRepository
+from Domain.DomainServices.ManagementService import ManagementService
+from Domain.SmartHome.Home import Home
 
 from Domain import DomainException
 import Response
@@ -10,13 +13,13 @@ from Domain.SmartHome import Product
 
 
 class HomeService:
-    def __init__(self, IHomeRepo, IUserRepo, IInventoryRepo, IShoppingListRepo, StockService):
-        self.home_repo = IHomeRepo
-        self.user_repo = IUserRepo
-        self.inventory_repo = IInventoryRepo
-        self.StockService = StockService
+ 
+    def __init__(self,
+                 i_home_repository: IHomeRepository,
+                 management_service: ManagementService):
+        self.__i_home_repository: IHomeRepository = i_home_repository
+        self.__management_service: ManagementService = management_service
 
-    
 
     # ==========================================
     # 1. Home Management (House & Members)
@@ -24,18 +27,53 @@ class HomeService:
 
     async def create_home(self, user_id: UUID, home_name: str) -> Dict:
         """Creates a new home and sets the creator as ADMIN."""
-        raise NotImplementedError("create_home not implemented yet")
+        # Authentication session should provide user_id
+        
+        # Validation of home_name can be added with home repository checks
+        home: Home = await self.__i_home_repository.get_by_name(home_name)
+        if home is not None:
+            raise ValueError("Home name already exists.")
+        
+        # Create Home instance
+        new_home: Home = self.__management_service.create_new_home(user_id,home_name)
+
+        # Save to repository
+        await self.__i_home_repository.save(new_home)
+
+        return {
+            "home name": home_name,
+            "home id": str(new_home.__id),
+            "join code": new_home.__join_code,
+            "message": "Home created successfully."
+        }
+
 
     async def view_home_code(self, user_id: UUID, home_id: UUID) -> str:
         """Retrieves the home join code (Admin only)."""
-        raise NotImplementedError("view_home_code not implemented yet")
+        # Authentication session should provide user_id
+
+        # Check if home exists
+        home: Home = await self.__i_home_repository.get_by_id(home_id)
+        if home is None:
+            raise ValueError("Home not found.")
+        
+        return self.__management_service.view_home_code(user_id, home)
+
 
     async def join_home(self, user_id: UUID, home_code: str) -> bool:
         """
         User requests to join a home using a code.
         Creates a 'join request' waiting for approval.
         """
-        raise NotImplementedError("join_home not implemented yet")
+        # Authentication session should provide user_id
+
+        # Check if home exists
+        home: Home = await self.__i_home_repository.get_by_code(home_code)
+        if home is None:
+            raise ValueError("Invalid home code.")
+        
+        return self.__management_service.join_home(user_id, home)
+
 
     async def answer_join_request(self, head_user_id: UUID, request_id: UUID, approved: bool) -> bool:
         """Head of House approves or denies a join request."""
