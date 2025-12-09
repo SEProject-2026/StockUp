@@ -3,6 +3,7 @@ from typing import List, Optional, Dict
 from datetime import date
 from Domain.Repositories.IHomeRepository import IHomeRepository
 from Domain.DomainServices.ManagementService import ManagementService
+from Domain.DomainServices.StockService import StockService
 from Domain.SmartHome.Home import Home
 
 from Domain import DomainException
@@ -16,88 +17,346 @@ class HomeService:
  
     def __init__(self,
                  i_home_repository: IHomeRepository,
-                 management_service: ManagementService):
-        self.__i_home_repository: IHomeRepository = i_home_repository
-        self.__management_service: ManagementService = management_service
+                 management_service: ManagementService,
+                 stock_service: StockService):
+        self._i_home_repository: IHomeRepository = i_home_repository
+        self._management_service: ManagementService = management_service
+        self._stock_service: StockService = stock_service
 
 
     # ==========================================
     # 1. Home Management (House & Members)
     # ==========================================
 
-    async def create_home(self, user_id: UUID, home_name: str) -> Dict:
+    async def create_home(self, user_id: UUID, home_name: str) -> Response:
         """Creates a new home and sets the creator as ADMIN."""
         # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An error occurred while checking user login status: ")
         
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
         # Validation of home_name can be added with home repository checks
-        home: Home = await self.__i_home_repository.get_by_name(home_name)
+        try:
+            home: Home = await self._i_home_repository.get_by_name(home_name)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking home name uniqueness.")
+        
         if home is not None:
-            raise ValueError("Home name already exists.")
+            return Response(isOk = False, error_message = "Home with the same name already exists.")
         
         # Create Home instance
-        new_home: Home = self.__management_service.create_new_home(user_id,home_name)
+        try:
+            new_home: Home = self._management_service.create_new_home(user_id,home_name)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while creating the home.")
 
         # Save to repository
-        await self.__i_home_repository.save(new_home)
+        try:
+            await self._i_home_repository.save(new_home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while saving the home.")
+        
+        return Response(
+            isOk = True,
+            data = {
+                "home name": home_name,
+                "home id": str(new_home.get_id()),
+                "join code": new_home.get_join_code(),
+                "message": "Home created successfully."
+            }
+        )
 
-        return {
-            "home name": home_name,
-            "home id": str(new_home.__id),
-            "join code": new_home.__join_code,
-            "message": "Home created successfully."
-        }
-
-
-    async def view_home_code(self, user_id: UUID, home_id: UUID) -> str:
+    async def view_home_code(self, user_id: UUID, home_id: UUID) -> Response:
         """Retrieves the home join code (Admin only)."""
         # Authentication session should provide user_id
-
-        # Check if home exists
-        home: Home = await self.__i_home_repository.get_by_id(home_id)
-        if home is None:
-            raise ValueError("Home not found.")
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id) 
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
         
-        return self.__management_service.view_home_code(user_id, home)
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        # Check if home exists
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            join_code = self._management_service.view_home_code(user_id, home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while viewing the home code.")
+        
+        return Response(
+            isOk = True,
+            data = {
+                "home id": str(home_id),
+                "join code": join_code
+            }
+        )
 
-
-    async def join_home(self, user_id: UUID, home_code: str) -> bool:
+    async def join_home(self, user_id: UUID, home_code: str) -> Response:
         """
         User requests to join a home using a code.
         Creates a 'join request' waiting for approval.
         """
         # Authentication session should provide user_id
-
-        # Check if home exists
-        home: Home = await self.__i_home_repository.get_by_code(home_code)
-        if home is None:
-            raise ValueError("Invalid home code.")
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
         
-        return self.__management_service.join_home(user_id, home)
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        # Check if home exists
+        try:
+            home: Home = await self._i_home_repository.get_by_code(home_code)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            self._management_service.join_home(user_id, home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while joining the home.")
+        
+        try:
+            await self._i_home_repository.update(home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
+        
+        return Response(isOk = True, data = {"message": "Join request sent successfully."})
 
-
-    async def answer_join_request(self, head_user_id: UUID, request_id: UUID, approved: bool) -> bool:
+    async def answer_join_request(self, home_id: UUID, head_user_id: UUID, user_id: UUID, approved: bool) -> Response:
         """Head of House approves or denies a join request."""
-        raise NotImplementedError("answer_join_request not implemented yet")
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(head_user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            self._management_service.answer_join_request(head_user_id, home, user_id, approved)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while answering the join request.")
+        
+        try:
+            await self._i_home_repository.update(home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
+        
+        return Response(isOk = True, data = {"message": "Join request answered successfully."})
 
-    async def remove_user(self, head_user_id: UUID, home_id: UUID, target_user_id: UUID) -> bool:
-        """Head of House removes a user from the home."""
-        raise NotImplementedError("remove_user not implemented yet")
+    async def remove_member(self, head_user_id: UUID, home_id: UUID, target_user_id: UUID) -> Response:
+        """Head of House removes a member from the home."""
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(head_user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            self._management_service.remove_member(head_user_id, home, target_user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while removing the user.")
+        
+        try:
+            await self._i_home_repository.update(home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
+        
+        return Response(isOk = True, data = {"message": "User removed successfully."})
 
-    async def switch_home(self, user_id: UUID, target_home_id: UUID) -> Dict:
+    async def switch_home(self, user_id: UUID, target_home_id: UUID) -> Response:
         """Switches user context to a different home (returns new home details)."""
-        raise NotImplementedError("switch_home not implemented yet")
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            target_home: Home = await self._i_home_repository.get_by_id(target_home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if target_home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        try:
+            self._management_service.can_switch_home(user_id, target_home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while switching homes.")
+        
+        return Response(
+            isOk = True,
+            data = {
+                "home id": str(target_home.get_id()),
+                "home name": target_home.get_name(),
+                "message": "Switched home successfully."
+            }
+        )
 
-    async def leave_home(self, user_id: UUID, home_id: UUID) -> bool:
+    async def leave_home(self, user_id: UUID, home_id: UUID) -> Response:
         """User voluntarily leaves a home."""
-        raise NotImplementedError("leave_home not implemented yet")
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            self._management_service.leave_home(user_id, home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while leaving the home.")
+        
+        try:
+            await self._i_home_repository.update(home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
+        
+        return Response(isOk = True, data = {"message": "Left home successfully."})
 
-    async def switch_home_head(self, current_head_id: UUID, home_id: UUID, new_head_id: UUID) -> bool:
+    async def switch_home_head(self, current_head_id: UUID, home_id: UUID, new_head_id: UUID) -> Response:
         """Transfers 'Head of House' role to another member."""
-        raise NotImplementedError("switch_home_head not implemented yet")
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(current_head_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            self._management_service.switch_home_head(current_head_id, home, new_head_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while switching home head.")
+        
+        try:
+            await self._i_home_repository.update(home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
+        
+        return Response(isOk = True, data = {"message": "Home head switched successfully."})
 
-    async def delete_home(self, head_user_id: UUID, home_id: UUID) -> bool:
+    async def delete_home(self, head_user_id: UUID, home_id: UUID) -> Response:
         """Permanently deletes the home and all associated data (Admin only)."""
-        raise NotImplementedError("delete_home not implemented yet")
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(head_user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            self._management_service.can_delete_home(head_user_id, home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking delete permissions.")
+        
+        try:
+            self._i_home_repository.delete(home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while deleting the home.")
+        
+        return Response(isOk = True, data = {"message": "Home deleted successfully."})
 
     # ==========================================
     # 2. Stock Management (Inventory)
