@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict
+from Domain.SmartHome.Product import Product
+from uuid import UUID
 
 class IInventoryRepository(ABC):
     """
@@ -7,7 +9,7 @@ class IInventoryRepository(ABC):
     """
 
     @abstractmethod
-    def save(self, item_data: Dict) -> int:
+    def save(self, product: Product) -> UUID:
         """
         Creates a new inventory item.
         Returns: The ID of the new item.
@@ -15,7 +17,7 @@ class IInventoryRepository(ABC):
         pass
 
     @abstractmethod
-    def get_by_id(self, item_id: int) -> Optional[Dict]:
+    def get_by_id(self, item_id: UUID) -> Optional[Product]:
         """
         Retrieves a single item by its ID.
         Returns: The item data if found, or None.
@@ -23,7 +25,7 @@ class IInventoryRepository(ABC):
         pass
 
     
-    def list_all(self) -> List[Dict]:
+    def list_all(self) -> List[Product]:
         """
         Retrieves all items in the inventory.
         Returns: A list of items (can be empty).
@@ -31,7 +33,7 @@ class IInventoryRepository(ABC):
         pass
 
     @abstractmethod
-    def update(self, item_id: int, updates: Dict) -> bool:
+    def update(self, item_id: UUID, updates: Dict) -> bool:
         """
         Updates an existing item.
         Returns: True if successful, False if item not found.
@@ -39,7 +41,7 @@ class IInventoryRepository(ABC):
         pass
 
     @abstractmethod
-    def delete(self, item_id: int) -> None:
+    def delete(self, item_id: UUID) -> None:
         """
         Removes an item from the repository.
         Returns: None (Raises an exception if deletion fails).

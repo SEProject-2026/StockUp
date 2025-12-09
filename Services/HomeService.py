@@ -1,25 +1,27 @@
 from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
+from Domain.DomainServices import DomainException, StockService
+from Domain.Repositories import IProductRepository
 from Domain.Repositories.IHomeRepository import IHomeRepository
 from Domain.DomainServices.ManagementService import ManagementService
 from Domain.SmartHome.Home import Home
 
-from Domain import DomainException
+from Domain import User
 import Response
-import Domain
 from Domain.SmartHome import Product
 
 
 
 class HomeService:
  
-    def __init__(self,
-                 i_home_repository: IHomeRepository,
-                 management_service: ManagementService):
-        self.__i_home_repository: IHomeRepository = i_home_repository
-        self.__management_service: ManagementService = management_service
-
+    def __init__(self, home_repository: IHomeRepository, user_repository: IUserRepository, product_repository: IProductRepository,
+                  management_service: ManagementService, stock_service: StockService):
+        self._home_repository = home_repository
+        self._user_repository = user_repository
+        self._management_service = management_service
+        self._stock_service = stock_service
+        self._product_repository = product_repository
 
     # ==========================================
     # 1. Home Management (House & Members)
@@ -105,66 +107,173 @@ class HomeService:
 
     ################################ should date be a list of dates?
     async def add_product(self, user_id: UUID, home_id: UUID, product_name: str, quantity: int, 
-                          expiration_date: Optional[date], location_id: Optional[UUID]) -> Response:
+                          expiration_date: Optional[date], location_id: Optional[UUID]) -> Response[str]:
         is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
         if not is_logged_in:
             return Response(isOk = False, error_message = "User not logged in")
-        user = self.user_repo.get_user_by_id(user_id)                            #check user exists in system
-        if user is None:
-            return Response(isOk = False, error_message = "User not found in system")
-        home = self.home_repo.get_home_by_id(home_id)
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found in system")     #check home exists in system
-        product_to_add = Product(self.inventory_repo.get_next_id(), name = product_name, quantity = quantity, 
+        user = self._user_repository.get_user_by_id(user_id)                            
+        home = self._home_repository.get_home_by_id(home_id)
+        product_to_add = Product(self._product_repository.get_next_id(), name = product_name, quantity = quantity, 
                                 expiration_date = expiration_date, location_id = location_id)
         try:
-            self.StockService.add_product(home, product_to_add)
+            self._stock_service.add_product(user, home, product_to_add)
         except DomainException as de:                               # catch domain logic error 
             return Response(isOk = False, error_message = str(de))
         except Exception as e:                                      # catch unexpected error
             return Response(isOk = False, error_message = "An internal error occurred while adding the product.")
-        self.home_repo.save(home)
-        return Response(isOk = True, data = home.inventory)
+        self._product_repository.save(product_to_add)
+        self._home_repository.update(home)
+        return Response(isOk = True, data = "Product added successfully.")
         
+    ##########################################################################################
     async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:
         """Processes a receipt image (OCR) and returns detected items for verification."""
         raise NotImplementedError("Not implemented yet")
+    ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, product_id: UUID) -> bool:
-        """Removes a product from inventory."""
-        raise NotImplementedError("Not implemented yet")
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response[str]:
+        is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        user = self._user_repository.get_user_by_id(user_id)                            
+        home = self._home_repository.get_home_by_id(home_id)
+        try:
+            product_to_remove = self._product_repository.get_by_id(product_id)
+            if product_to_remove is None:
+                return Response(isOk = False, error_message = "Product not found in system")
+            self._stock_service.remove_product(user, home, product_to_remove)
+        except DomainException as de:                              
+            return Response(isOk = False, error_message = str(de))
+        except Exception as e:                                      
+            return Response(isOk = False, error_message = "An internal error occurred while removing the product.")
+        self._home_repository.update(home, {"inventory": home.inventory})
+        return Response(isOk = True, data = "Product removed successfully.")
 
-    async def update_stock_quantity(self, user_id: UUID, product_id: UUID, new_quantity: int) -> Dict:
-        """Updates the quantity of an existing inventory item."""
-        raise NotImplementedError("Not implemented yet")
 
-    async def update_expiration_date(self, user_id: UUID, product_id: UUID, new_date: date) -> Dict:
-        """Updates the expiration date of an item."""
-        raise NotImplementedError("Not implemented yet")
+    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response[str]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        product = self._product_repository.get_by_id(product_id)
+        checks_response = await self.checks_before_update(user, home, product)
+        if checks_response.isError():
+            return checks_response
+        try:
+            self._stock_service.update_quantity(user_id, home, product_id, new_quantity)
+            self._product_repository.update(product, {"quantity": new_quantity})
+        except DomainException as de:                            
+            return Response(isOk = False, error_message = str(de))
+        except Exception as e:                                     
+            return Response(isOk = False, error_message = "An internal error occurred while updating the quantity.")
+        return Response(isOk = True, data = "Product quantity updated successfully.")
 
-    async def update_nickname(self, user_id: UUID, product_id: UUID, new_nickname: str) -> Dict:
-        """Updates the item's nickname/display name."""
-        raise NotImplementedError("Not implemented yet")
 
-    async def filter_by_expiration_type(self, home_id: UUID, filter_type: str) -> List[Dict]:
-        """
-        Filters inventory by expiration status.
-        filter_type expected values: 'expired', 'soon', 'ok'.
-        """
-        raise NotImplementedError("Not implemented yet")
+    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        product = self._product_repository.get_by_id(product_id)
+        checks_response = await self.checks_before_update(user, home, product)
+        if checks_response.isError():
+            return checks_response
+        try:
+            self._stock_service.update_expiration_date(user_id, home, product_id, new_date)
+            self._product_repository.update(product, {"expiration_date": new_date})
+        except DomainException as de:                              
+            return Response(isOk = False, error_message = str(de))
+        except Exception as e:                                     
+            return Response(isOk = False, error_message = "An internal error occurred while updating the expiration date.")
+        return Response(isOk = True, data = "Product expiration date updated successfully.")
+    
+    async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        product = self._product_repository.get_by_id(product_id)
+        checks_response = await self.checks_before_update(user, home, product)
+        if checks_response.isError():
+            return checks_response
+        try:
+            self._stock_service.update_nickname(user_id, home, product_id, new_nickname)
+            self._product_repository.update(product, {"nickname": new_nickname})
+        except DomainException as de:                              
+            return Response(isOk = False, error_message = str(de))
+        except Exception as e:                                     
+            return Response(isOk = False, error_message = "An internal error occurred while updating product nickname.")
+        return Response(isOk = True, data = "Product nickname updated successfully.")
 
-    async def filter_by_location(self, home_id: UUID, location_id: UUID) -> List[Dict]:
-        """Filters inventory by storage location (e.g., Fridge, Pantry)."""
-        raise NotImplementedError("Not implemented yet")
+    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: str) -> Response[List[Dict]]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        checks_response = await self.checks_before_filter(user, home)
+        if checks_response.isError():
+            return checks_response
+        try:
+            res_filtered_items = self._stock_service.filter_by_expiration_type(user_id, home, filter_type)
+        except DomainException as de:
+            return Response(isOk = False, error_message = str(de))
+        except Exception as e:
+            return Response(isOk = False, error_message = "An internal error occurred while filtering by expiration type.")
+        return res_filtered_items
 
-    async def filter_by_category(self, home_id: UUID, category_name: str) -> List[Dict]:
-        """Filters inventory by product category."""
-        raise NotImplementedError("Not implemented yet")
+    async def filter_by_location(self, user_id: UUID, home_id: UUID, location_id: int) -> Response[List[Dict]]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        checks_response = await self.checks_before_filter(user, home)
+        if checks_response.isError():
+            return checks_response
+        try:
+            filtered_items = self._stock_service.filter_by_location(user_id, home, location_id)
+        except DomainException as de:
+            return Response(isOk = False, error_message = str(de))  
+        except Exception as e:
+            return Response(isOk = False, error_message = "An internal error occurred while filtering by location.")
+        return filtered_items
 
-    async def search_product(self, home_id: UUID, query: str) -> List[Dict]:
-        """Free text search in inventory."""
-        raise NotImplementedError("Not implemented yet")
+    async def filter_by_category(self,user_id: UUID, home_id: UUID, category_name: str) -> Response[List[Dict]]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        checks_response = await self.checks_before_filter(user, home)
+        if checks_response.isError():
+            return checks_response
+        try:
+            filtered_items = self._stock_service.filter_by_category(user_id, home, category_name)
+        except DomainException as de:
+            return Response(isOk = False, error_message = str(de))  
+        except Exception as e:
+            return Response(isOk = False, error_message = "An internal error occurred while filtering by category.")
+        return filtered_items
 
+    """searches for products based on product name or nickname."""
+    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response[List[Dict]]:
+        user = self._user_repository.get_user_by_id(user_id)                        
+        home = self._home_repository.get_home_by_id(home_id)
+        checks_response = await self.checks_before_filter(user, home)
+        if checks_response.isError():
+            return checks_response
+        try:
+            search_results = self._stock_service.search_product(user_id, home, query)
+        except DomainException as de:
+            return Response(isOk = False, error_message = str(de))  
+        except Exception as e:
+            return Response(isOk = False, error_message = "An internal error occurred while searching for products.")
+        return search_results
+
+    async def checks_before_update(self, user: User, home: Home , product: Product) -> Response:
+        res = await self.checks_before_filter(user, home)
+        if res.isError():
+            return res
+        if product is None:
+            return Response(isOk = False, error_message = "Product not found in system")  #check product exists in system
+        return Response(isOk = True)
+    
+    async def checks_before_filter(self, user: User, home: Home) -> Response:
+        is_logged_in = self.Authentication_Adapter.is_logged_in(user.get_id())      #check user is logged in 
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        if user is None:
+            return Response(isOk = False, error_message = "User not found in system")
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found in system")     #check home exists in system
+        return Response(isOk = True)
+    
     # ==========================================
     # 3. Shopping List (Active & Base Mode)
     # ==========================================
