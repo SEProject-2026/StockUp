@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
 from Domain.DomainServices import DomainException, StockService
-from Domain.Repositories import IProductRepository
+from Domain.Repositories.IProductRepository import IProductRepository
 from Domain.Repositories.IHomeRepository import IHomeRepository
 from Domain.DomainServices.ManagementService import ManagementService
 from Domain.DomainServices.StockService import StockService
@@ -41,7 +41,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         # Validation of home_name can be added with home repository checks
         try:
-            home: Home = await self._i_home_repository.get_by_name(home_name)
+            home: Home = await self._home_repository.get_by_name(home_name)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while checking home name uniqueness.")
@@ -58,7 +58,7 @@ class HomeService:
 
         # Save to repository
         try:
-            await self._i_home_repository.save(new_home)
+            await self._home_repository.save(new_home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while saving the home.")
@@ -87,7 +87,7 @@ class HomeService:
         
         # Check if home exists
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -126,7 +126,7 @@ class HomeService:
         
         # Check if home exists
         try:
-            home: Home = await self._i_home_repository.get_by_code(home_code)
+            home: Home = await self._home_repository.get_by_code(home_code)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -141,7 +141,7 @@ class HomeService:
             return Response(isOk = False, error_message = "An internal error occurred while joining the home.")
         
         try:
-            await self._i_home_repository.update(home)
+            await self._home_repository.update(home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
@@ -161,7 +161,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -176,7 +176,7 @@ class HomeService:
             return Response(isOk = False, error_message = "An internal error occurred while answering the join request.")
         
         try:
-            await self._i_home_repository.update(home)
+            await self._home_repository.update(home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
@@ -196,7 +196,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -211,7 +211,7 @@ class HomeService:
             return Response(isOk = False, error_message = "An internal error occurred while removing the user.")
         
         try:
-            await self._i_home_repository.update(home)
+            await self._home_repository.update(home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
@@ -231,7 +231,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            target_home: Home = await self._i_home_repository.get_by_id(target_home_id)
+            target_home: Home = await self._home_repository.get_by_id(target_home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -266,7 +266,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -281,7 +281,7 @@ class HomeService:
             return Response(isOk = False, error_message = "An internal error occurred while leaving the home.")
         
         try:
-            await self._i_home_repository.update(home)
+            await self._home_repository.update(home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
@@ -301,7 +301,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -316,7 +316,7 @@ class HomeService:
             return Response(isOk = False, error_message = "An internal error occurred while switching home head.")
         
         try:
-            await self._i_home_repository.update(home)
+            await self._home_repository.update(home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
@@ -336,7 +336,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -351,7 +351,7 @@ class HomeService:
             return Response(isOk = False, error_message = "An internal error occurred while checking delete permissions.")
         
         try:
-            self._i_home_repository.delete(home)
+            await self._home_repository.delete(home)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while deleting the home.")
@@ -369,7 +369,7 @@ class HomeService:
         if not is_logged_in:
             return Response(isOk = False, error_message = "User not logged in")
         user = self._user_repository.get_user_by_id(user_id)                            
-        home = self._home_repository.get_home_by_id(home_id)
+        home = self._home_repository.get_by_id(home_id)
         product_to_add = Product(self._product_repository.get_next_id(), name = product_name, quantity = quantity, 
                                 expiration_date = expiration_date, location_id = location_id)
         try:
@@ -392,8 +392,8 @@ class HomeService:
         is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
         if not is_logged_in:
             return Response(isOk = False, error_message = "User not logged in")
-        user = self._user_repository.get_user_by_id(user_id)                            
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                            
+        home = self._home_repository.get_by_id(home_id)
         try:
             product_to_remove = self._product_repository.get_by_id(product_id)
             if product_to_remove is None:
@@ -408,8 +408,8 @@ class HomeService:
 
 
     async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response[str]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         product = self._product_repository.get_by_id(product_id)
         checks_response = await self.checks_before_update(user, home, product)
         if checks_response.isError():
@@ -425,8 +425,8 @@ class HomeService:
 
 
     async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         product = self._product_repository.get_by_id(product_id)
         checks_response = await self.checks_before_update(user, home, product)
         if checks_response.isError():
@@ -441,8 +441,8 @@ class HomeService:
         return Response(isOk = True, data = "Product expiration date updated successfully.")
     
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         product = self._product_repository.get_by_id(product_id)
         checks_response = await self.checks_before_update(user, home, product)
         if checks_response.isError():
@@ -457,8 +457,8 @@ class HomeService:
         return Response(isOk = True, data = "Product nickname updated successfully.")
 
     async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: str) -> Response[List[Dict]]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         checks_response = await self.checks_before_filter(user, home)
         if checks_response.isError():
             return checks_response
@@ -471,8 +471,8 @@ class HomeService:
         return res_filtered_items
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location_id: int) -> Response[List[Dict]]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         checks_response = await self.checks_before_filter(user, home)
         if checks_response.isError():
             return checks_response
@@ -485,8 +485,8 @@ class HomeService:
         return filtered_items
 
     async def filter_by_category(self,user_id: UUID, home_id: UUID, category_name: str) -> Response[List[Dict]]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         checks_response = await self.checks_before_filter(user, home)
         if checks_response.isError():
             return checks_response
@@ -500,8 +500,8 @@ class HomeService:
 
     """searches for products based on product name or nickname."""
     async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response[List[Dict]]:
-        user = self._user_repository.get_user_by_id(user_id)                        
-        home = self._home_repository.get_home_by_id(home_id)
+        user = self._user_repository.get_by_id(user_id)                        
+        home = self._home_repository.get_by_id(home_id)
         checks_response = await self.checks_before_filter(user, home)
         if checks_response.isError():
             return checks_response

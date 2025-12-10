@@ -2,8 +2,8 @@ from datetime import date
 from typing import Dict
 import uuid
 from Domain import User
-from Domain.SmartHome import Product
-from Domain.SmartHome import Home
+from Domain.SmartHome.Product import Product
+from Domain.SmartHome.Home import Home
 from Domain.DomainServices import DomainException
 import Response
 

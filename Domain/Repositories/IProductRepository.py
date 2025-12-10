@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 from Domain.SmartHome.Product import Product
 from uuid import UUID
 
-class IInventoryRepository(ABC):
+class IProductRepository(ABC):
     """
     Interface defining the contract for Inventory data access.
     """
