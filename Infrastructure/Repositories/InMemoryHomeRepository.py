@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 from Domain.Repositories.IHomeRepository import IHomeRepository
 from Domain.SmartHome.Home import Home
@@ -32,3 +32,10 @@ class InMemoryHomeRepository(IHomeRepository):
     async def delete(self, home_id: UUID) -> None:
         if home_id in self._storage:
             del self._storage[home_id]
+
+    async def get_homes_by_user_id(self, user_id: UUID) -> List[Home]:
+        result = []
+        for home in self._storage.values():
+            if home.is_member(user_id):
+                result.append(home)
+        return result

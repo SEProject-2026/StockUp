@@ -358,6 +358,63 @@ class HomeService:
         
         return Response(isOk = True, data = {"message": "Home deleted successfully."})
 
+    async def get_home_details(self, user_id: UUID, home_id: UUID) -> Response:
+        """Retrieves home details including members and inventory summary."""
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            home: Home = await self._i_home_repository.get_by_id(home_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        
+        if home is None:
+            return Response(isOk = False, error_message = "Home not found.")
+        
+        try:
+            home_details = self._management_service.get_home_details(user_id, home)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while getting home details.")
+        
+        return Response(isOk = True, data = home_details)
+    
+    def get_all_homes_for_user(self, user_id: UUID) -> Response:
+        """Retrieves a list of all homes the user is a member of."""
+        # Authentication session should provide user_id
+        try:
+            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
+        
+        if not is_logged_in:
+            return Response(isOk = False, error_message = "User not logged in")
+        
+        try:
+            homes: List[Home] = self._i_home_repository.get_homes_by_user_id(user_id)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving homes.")
+        
+        home_list = [
+            {
+                "home id": str(home.get_id()),
+                "home name": home.get_name()
+            }
+            for home in homes
+        ]
+        
+        return Response(isOk = True, data = home_list)
+
     # ==========================================
     # 2. Stock Management (Inventory)
     # ==========================================

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from uuid import UUID, uuid4
-from typing import Optional
+from typing import List, Optional
 from Domain.SmartHome.Home import Home
 
 class IHomeRepository(ABC):
@@ -27,4 +27,8 @@ class IHomeRepository(ABC):
 
     @abstractmethod
     async def update(self, home: Home) -> None:
+        pass
+
+    @abstractmethod
+    async def get_homes_by_user_id(self, user_id: UUID) -> List[Home]:
         pass

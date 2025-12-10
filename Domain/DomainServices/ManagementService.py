@@ -80,3 +80,16 @@ class ManagementService:
     def can_delete_home(self, admin_user_id: UUID, home: Home) -> None:
         if not home.is_admin(admin_user_id):
             raise PermissionError("Only admin can delete the home.")
+        
+    def get_home_details(self, user_id: UUID, home: Home) -> Dict:
+        if not home.is_member(user_id):
+            raise PermissionError("User is not a member of this home.")
+        
+        details = {
+            "id": str(home.id),
+            "name": home.name,
+            "join_code": home.get_join_code() if home.is_admin(user_id) else "Restricted",
+            "members": [str(member) for member in home.get_members()],
+            "admin": str(home.get_admin())
+        }
+        return details
