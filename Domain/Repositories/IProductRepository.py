@@ -55,3 +55,12 @@ class IProductRepository(ABC):
         Returns: An integer representing the next unique ID.
         """
         pass
+    
+    # need to implement in InMemoryProductRepository.py
+    @abstractmethod
+    def get_product_name_by_barcode(self, barcode: str, company_name: str) -> str:
+        """
+        Retrieves the product name associated with a given barcode.
+        Returns: The product name as a string.
+        """
+        pass

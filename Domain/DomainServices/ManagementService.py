@@ -86,8 +86,8 @@ class ManagementService:
             raise PermissionError("User is not a member of this home.")
         
         details = {
-            "id": str(home.id),
-            "name": home.name,
+            "id": str(home.get_id()),
+            "name": home.get_name(),
             "join_code": home.get_join_code() if home.is_admin(user_id) else "Restricted",
             "members": [str(member) for member in home.get_members()],
             "admin": str(home.get_admin())

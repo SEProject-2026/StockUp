@@ -10,7 +10,7 @@ from Domain.SmartHome.Home import Home
 
 from Domain import User
 import Response
-from Domain.SmartHome import Product
+from Domain.SmartHome.Product import Product
 
 
 
@@ -371,7 +371,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            home: Home = await self._i_home_repository.get_by_id(home_id)
+            home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
@@ -387,7 +387,7 @@ class HomeService:
         
         return Response(isOk = True, data = home_details)
     
-    def get_all_homes_for_user(self, user_id: UUID) -> Response:
+    async def get_all_homes_for_user(self, user_id: UUID) -> Response:
         """Retrieves a list of all homes the user is a member of."""
         # Authentication session should provide user_id
         try:
@@ -400,7 +400,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User not logged in")
         
         try:
-            homes: List[Home] = self._i_home_repository.get_homes_by_user_id(user_id)
+            homes: List[Home] = await self._home_repository.get_homes_by_user_id(user_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving homes.")
@@ -419,24 +419,29 @@ class HomeService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    ################################ should date be a list of dates?
-    async def add_product(self, user_id: UUID, home_id: UUID, product_name: str, quantity: int, 
-                          expiration_date: Optional[date], location_id: Optional[UUID]) -> Response[str]:
+    async def add_product(self, barcode: str, company_name: str, user_id: UUID, home_id: UUID, quantity: int, 
+                          expiration_date: Optional[date], location_id: Optional[UUID], nickname: Optional[str]) -> Response[str]:
         is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
         if not is_logged_in:
             return Response(isOk = False, error_message = "User not logged in")
-        user = self._user_repository.get_user_by_id(user_id)                            
-        home = self._home_repository.get_by_id(home_id)
-        product_to_add = Product(self._product_repository.get_next_id(), name = product_name, quantity = quantity, 
+        
+        try:
+            user = self._user_repository.get_user_by_id(user_id)                            
+            home = self._home_repository.get_by_id(home_id)
+            product_name = self._product_repository.get_product_name_by_barcode(barcode, company_name)
+        except Exception as e:
+            print(e)
+            return Response(isOk = False, error_message = "An internal error occurred while retrieving product name by barcode.")
+        product_to_add = Product(barcode=barcode, name = product_name, nickname = nickname, quantity = quantity, 
                                 expiration_date = expiration_date, location_id = location_id)
         try:
             self._stock_service.add_product(user, home, product_to_add)
+            self._product_repository.save(product_to_add)
+            self._home_repository.update(home)
         except DomainException as de:                               # catch domain logic error 
             return Response(isOk = False, error_message = str(de))
         except Exception as e:                                      # catch unexpected error
             return Response(isOk = False, error_message = "An internal error occurred while adding the product.")
-        self._product_repository.save(product_to_add)
-        self._home_repository.update(home)
         return Response(isOk = True, data = "Product added successfully.")
         
     ##########################################################################################

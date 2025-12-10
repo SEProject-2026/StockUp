@@ -1,4 +1,7 @@
+from datetime import date
 from enum import Enum, auto
+from typing import Optional
+from uuid import uuid4, UUID
 
 class ExpirationType(Enum):
     FRESH = "תקין"
@@ -6,13 +9,15 @@ class ExpirationType(Enum):
     EXPIRED = "פג תוקף"
 
 class Product:
-    def __init__(self, id: str, name: str, nickname: str, quantity: int, location_id: int, expiration_type: ExpirationType):
-        self._id = id
+    def __init__(self, barcode: str, name: str, nickname: str, quantity: int, location_id: int, expiration_date: Optional[date] = None):
+        self._id = uuid4()
+        self._barcode = barcode
         self._name = name
         self._nickname = nickname
         self.quantity = quantity
         self.location_id = location_id
-        self._expiration_type = expiration_type
+        self._expiration_type = ExpirationType.FRESH
+        self._expiration_date = expiration_date
 
     def get_id(self) -> str:
         return self._id
@@ -30,13 +35,16 @@ class Product:
         return self.location_id
     
     def get_expiration_type(self) -> ExpirationType:
-        return self._expiration_type    
+        return self._expiration_type
+
+    def get_expiration_date(self) -> Optional[date]:
+        return self._expiration_date 
     
     def set_nickname(self, new_nickname: str) -> None:
         self._nickname = new_nickname
     
     def set_expiration_date(self, new_date) -> None:
-        self._expiration_type = new_date
+        self._expiration_date = new_date
 
     def set_expiration_type(self, new_expiration_type: ExpirationType) -> None:
         self._expiration_type = new_expiration_type

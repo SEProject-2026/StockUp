@@ -14,7 +14,7 @@ class StockService:
     def __init__(self):
         pass
 
-    def add_product(self, user: User, home: Home, product_to_add: Product) -> Dict[uuid.UUID, Product]:
+    def add_product(self, user: User, home: Home, product_to_add: Product) -> None:
         if user is None:
             raise DomainException("User not found in system")
         if home is None:
@@ -23,10 +23,9 @@ class StockService:
             raise DomainException("User does not belong to this home.")
         if product_to_add.quantity <= 0:
             raise DomainException("Quantity must be greater than zero.")
-        if product_to_add.expiration_date and product_to_add.expiration_date < date.today():
+        if product_to_add.get_expiration_date() is not None and product_to_add.get_expiration_date() < date.today():
             raise DomainException("Expiration date cannot be in the past.")
-        home.get_inventory()[product_to_add.get_id()] = product_to_add
-        return home.get_inventory()
+        home.add_to_inventory(product_to_add)
     
     def remove_product(self, user: User, home: Home, product_to_remove: Product) -> Dict[uuid.UUID, Product]:
         if user is None:
