@@ -78,10 +78,11 @@ class StockService:
             raise DomainException("Nickname is too long.")
         if product is None:
             raise DomainException("Product not found in home inventory.")
-        if user_id not in home.get_members():
-            raise DomainException("User does not belong to this home.")
         if not self.is_valid_name(new_nickname):
             raise DomainException("Nickname contains invalid characters, must have only letters, numbers, and single spaces.")
+        all_nicknames = [prod.get_nickname() for prod in home.get_inventory().values()]
+        if new_nickname in all_nicknames:
+            raise DomainException("Nickname already in use.")
         product.set_nickname(new_nickname)
         home.get_inventory()[product_id] = product
         return home.get_inventory()
