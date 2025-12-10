@@ -33,7 +33,7 @@ class IProductRepository(ABC):
         pass
 
     @abstractmethod
-    def update(self, item_id: UUID, updates: Dict) -> bool:
+    def update(self, item_id: UUID) -> None:
         """
         Updates an existing item.
         Returns: True if successful, False if item not found.

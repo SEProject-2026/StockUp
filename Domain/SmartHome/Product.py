@@ -2,20 +2,17 @@ from datetime import date
 from enum import Enum, auto
 from typing import Optional
 from uuid import uuid4, UUID
+from Domain.SmartHome.Enums import ExpirationType, LocationType
 
-class ExpirationType(Enum):
-    FRESH = "תקין"
-    GOING_TO_EXPIRE = "בקרוב יפוג"
-    EXPIRED = "פג תוקף"
 
 class Product:
-    def __init__(self, barcode: str, name: str, nickname: str, quantity: int, location_id: int, expiration_date: Optional[date] = None):
+    def __init__(self, barcode: str, name: str, nickname: str, quantity: int, location: LocationType, expiration_date: Optional[date] = None):
         self._id = uuid4()
         self._barcode = barcode
         self._name = name
         self._nickname = nickname
-        self.quantity = quantity
-        self.location_id = location_id
+        self._quantity = quantity
+        self._location = location
         self._expiration_type = ExpirationType.FRESH
         self._expiration_date = expiration_date
 
@@ -29,10 +26,10 @@ class Product:
         return self._nickname
 
     def get_quantity(self) -> int:
-        return self.quantity
+        return self._quantity
     
-    def get_location_id(self) -> int:
-        return self.location_id
+    def get_location(self) -> LocationType:
+        return self._location
     
     def get_expiration_type(self) -> ExpirationType:
         return self._expiration_type
@@ -50,10 +47,12 @@ class Product:
         self._expiration_type = new_expiration_type
     
     def set_quantity(self, new_quantity: int) -> None:
-        self.quantity = new_quantity
+        self._quantity = new_quantity
 
-    def set_location_id(self, new_location_id: int) -> None:
-        self.location_id = new_location_id
+    def set_location(self, new_location: LocationType) -> None:
+        self._location = new_location
+
+    
     
 
     

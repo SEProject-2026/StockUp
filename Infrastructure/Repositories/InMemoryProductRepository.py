@@ -19,17 +19,17 @@ class InMemoryProductRepository(IProductRepository):
     def list_all(self) -> List[Product]:
         return list(self._all_products.values())
     
-    def delete(self, product_id: uuid.UUID) -> bool:
+    def delete(self, product_id: uuid.UUID) -> None:
         if product_id in self._all_products:
             del self._all_products[product_id]
-            return True
-        return False
+        else:
+            raise KeyError("Product not found.")
     
     def get_next_id(self) -> uuid.UUID:
         return uuid.uuid4()
     
-    def update(self, product: Product, updates: Dict) -> bool:
-        return self.save(product)
+    def update(self, product: Product) -> None:
+        self._all_products[product.get_id()] = product
     
     def clear(self):
         self._all_products.clear()
