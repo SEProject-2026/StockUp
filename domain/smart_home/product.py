@@ -6,7 +6,7 @@ from domain.smart_home.enums import ExpirationType, LocationType
 
 
 class Product:
-    def __init__(self, barcode: str, name: str, nickname: str, quantity: int, location: LocationType, expiration_date: Optional[date] = None):
+    def __init__(self, barcode: str, name: str, nickname: Optional[str], quantity: int, location: Optional[LocationType], expiration_date: Optional[date] = None):
         self._id = uuid4()
         self._barcode = barcode
         self._name = name

@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
 
-from domain.domain_services.domain_exception import DomainException
+from domain.domain_services.domain_exception import DomainException, UserMustBeMemberException, ProductNotFoundException
 from domain.smart_home.enums import ExpirationType, LocationType
 from domain.smart_home.product import Product
 
@@ -43,7 +43,7 @@ class Home:
 
     def assign_admin(self, user_id: UUID) -> None:
         if not self.is_member(user_id):
-            raise ValueError("User must be a member to be assigned as admin.")
+            raise UserMustBeMemberException()
         self._admin = user_id
 
     def is_admin(self, user_id: UUID) -> bool:
@@ -75,7 +75,7 @@ class Home:
         if user_id in self._members:
             del self._members[user_id]
         else:
-            raise ValueError("User is not a member of this home.")
+            raise UserMustBeMemberException()
         
     def add_to_inventory(self, product: Product) -> None:
         self._inventory[product.get_id()] = product
@@ -84,7 +84,7 @@ class Home:
         if product.get_id() in self._inventory:
             del self._inventory[product.get_id()]
         else:
-            raise DomainException("Product not found in inventory.")
+            raise ProductNotFoundException()
         
     def update_product_quantity(self, product_id: UUID, new_quantity: int) -> None:
         if product_id in self._inventory:
@@ -92,7 +92,7 @@ class Home:
             product.set_quantity(new_quantity)
             self._inventory[product_id] = product
         else:
-            raise DomainException("Product not found in inventory.")
+            raise ProductNotFoundException()
         
     def update_expiration_date(self, product_id: UUID, new_date: date) -> None:
         if product_id in self._inventory:
@@ -100,19 +100,15 @@ class Home:
             product.set_expiration_date(new_date)
             self._inventory[product_id] = product
         else:
-            raise DomainException("Product not found in inventory.")
+            raise ProductNotFoundException()
     
     def update_nickname(self, product_id: UUID, new_nickname: str) -> None:
         if product_id in self._inventory:
-            # check for nickname uniqueness
-            all_nicknames = [prod.get_nickname() for prod in self._inventory.values()]
-            if new_nickname in all_nicknames:
-                raise DomainException("Nickname already in use.")
             product = self._inventory[product_id]
             product.set_nickname(new_nickname)
             self._inventory[product_id] = product
         else:
-            raise DomainException("Product not found in inventory.")
+            raise ProductNotFoundException()
 
     def filter_by_expiration_type(self, filter_type: ExpirationType) -> Dict[UUID, Product]:
         filtered_inventory = {}
