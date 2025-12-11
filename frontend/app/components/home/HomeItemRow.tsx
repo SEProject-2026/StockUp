@@ -1,7 +1,10 @@
 // frontend/app/components/HomeItemRow.tsx
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { InventoryItem } from "../inventory-store";
+import { InventoryItem } from "../../inventory/inventory-store";
+
+const BRAND_YELLOW = "#3A6EA5";
+const BRAND_PINK = "#c43131ff";
 
 type Props = {
   item: InventoryItem;
@@ -16,14 +19,15 @@ export default function HomeItemRow({ item, variant }: Props) {
       ? "מקפיא"
       : "מזווה";
 
+  const isWarning = variant === "warning";
+
   return (
     <View
       style={[
         styles.row,
-        variant === "warning" && styles.rowWarning,
+        isWarning && styles.rowWarning,
       ]}
     >
-      <View style={styles.leftStrip} />
       <View style={styles.main}>
         <View style={styles.headerRow}>
           <Text style={styles.name}>{item.name}</Text>
@@ -32,7 +36,12 @@ export default function HomeItemRow({ item, variant }: Props) {
           </View>
         </View>
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>
+          <Text
+            style={[
+              styles.metaText,
+              isWarning && styles.metaTextWarning,
+            ]}
+          >
             {categoryLabel}
             {item.expiresAt ? " · תוקף " + item.expiresAt : ""}
           </Text>
@@ -44,26 +53,24 @@ export default function HomeItemRow({ item, variant }: Props) {
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: "row",
-    borderRadius: 16,
-    overflow: "hidden",
+    borderRadius: 22,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E8DED2",
-    marginTop: 4,
+    borderColor: "#F3F4F6",
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: "hidden",
   },
   rowWarning: {
-    borderColor: "#DC2626",
-    backgroundColor: "#FEE2E2",
-  },
-  leftStrip: {
-    width: 4,
-    backgroundColor: "#DC2626",
+    borderColor: BRAND_YELLOW,
   },
   main: {
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   headerRow: {
     flexDirection: "row-reverse",
@@ -73,18 +80,18 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#3B2F28",
+    color: "#111827",
     textAlign: "right",
   },
   qtyChip: {
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    backgroundColor: "#3B2F28",
+    backgroundColor: BRAND_PINK,
   },
   qtyText: {
     fontSize: 11,
-    color: "#FEFCE8",
+    color: "#FFFFFF",
   },
   metaRow: {
     flexDirection: "row-reverse",
@@ -92,7 +99,10 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 11,
-    color: "#7C6A5A",
+    color: "#6B7280",
     textAlign: "right",
+  },
+  metaTextWarning: {
+    color: BRAND_PINK,
   },
 });

@@ -1,7 +1,7 @@
 import React from "react";
-import { InventoryScreenBase } from "./index";
+import { InventoryScreenBase } from "../screens/InventoryScreen";
 
-export default function FreezerScreen() {
+export default function FridgeScreen() {
   return (
     <InventoryScreenBase
       initialCategory="freezer"

@@ -1,4 +1,3 @@
-// frontend/app/inventory-store.tsx
 import React, {
   createContext,
   useContext,
