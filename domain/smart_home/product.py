@@ -2,7 +2,7 @@ from datetime import date
 from enum import Enum, auto
 from typing import Optional
 from uuid import uuid4, UUID
-from Domain.SmartHome.Enums import ExpirationType, LocationType
+from domain.smart_home.enums import ExpirationType, LocationType
 
 
 class Product:

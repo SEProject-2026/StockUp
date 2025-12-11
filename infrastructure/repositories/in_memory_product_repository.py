@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, List, Optional
-from Repositories.IProductRepository import IProductRepository
-from Domain.SmartHome.Product import Product
+from repositories.i_product_repository import IProductRepository
+from domain.smart_home.product import Product
 
 
 
@@ -9,9 +9,8 @@ class InMemoryProductRepository(IProductRepository):
     def __init__(self):
         self._all_products: Dict = {}
     
-    def save(self, product: Product) -> uuid.UUID:
+    def save(self, product: Product) -> None:
         self._all_products[product.get_id()] = product
-        return product.get_id()
     
     def get_by_id(self, product_id: uuid.UUID) -> Optional[Product]: 
         return self._all_products.get(product_id)

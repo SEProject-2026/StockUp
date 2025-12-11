@@ -1,19 +1,17 @@
 from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
-from Domain.DomainServices import DomainException, StockService
-from Repositories.IProductRepository import IProductRepository
-from Repositories.IHomeRepository import IHomeRepository
-from Domain.DomainServices.ManagementService import ManagementService
-from Domain.DomainServices.StockService import StockService
-from Domain.SmartHome.Enums import LocationType
-from Domain.SmartHome.Home import Home
-
-from Domain import User
-from Response import Response
-from Domain.SmartHome.Product import Product
-
-
+from domain.domain_services.domain_exception import DomainException
+from repositories.i_product_repository import IProductRepository
+from repositories.i_home_repository import IHomeRepository
+from domain.domain_services.management_service import ManagementService
+from domain.domain_services.stock_service import StockService
+from domain.smart_home.enums import LocationType
+from domain.smart_home.home import Home
+from repositories.user_repository import IUserRepository
+from domain.user import User
+from response import Response
+from domain.smart_home.product import Product
 
 class HomeService:
  
@@ -31,15 +29,8 @@ class HomeService:
 
     async def create_home(self, user_id: UUID, home_name: str) -> Response:
         """Creates a new home and sets the creator as ADMIN."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An error occurred while checking user login status: ")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
+        if not user_id or not home_name:
+            return Response(isOk = False, error_message = "User ID and Home Name are required.")
         # Validation of home_name can be added with home repository checks
         try:
             home: Home = await self._home_repository.get_by_name(home_name)
@@ -76,16 +67,8 @@ class HomeService:
 
     async def view_home_code(self, user_id: UUID, home_id: UUID) -> Response:
         """Retrieves the home join code (Admin only)."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id) 
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id or not home_id:
+            return Response(isOk = False, error_message = "User ID and Home ID are required.")
         # Check if home exists
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
@@ -115,16 +98,8 @@ class HomeService:
         User requests to join a home using a code.
         Creates a 'join request' waiting for approval.
         """
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id or not home_code:
+            return Response(isOk = False, error_message = "User ID and Home Code are required.")
         # Check if home exists
         try:
             home: Home = await self._home_repository.get_by_code(home_code)
@@ -152,15 +127,8 @@ class HomeService:
     async def answer_join_request(self, home_id: UUID, head_user_id: UUID, user_id: UUID, approved: bool) -> Response:
         """Head of House approves or denies a join request."""
         # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(head_user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id or not home_id or not head_user_id:
+            return Response(isOk = False, error_message = "Users ID and Home ID are required.")        
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
@@ -186,16 +154,8 @@ class HomeService:
 
     async def remove_member(self, head_user_id: UUID, home_id: UUID, target_user_id: UUID) -> Response:
         """Head of House removes a member from the home."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(head_user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not head_user_id or not home_id or not target_user_id:
+            return Response(isOk = False, error_message = "Users ID and Home ID are required.") 
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
@@ -221,16 +181,8 @@ class HomeService:
 
     async def switch_home(self, user_id: UUID, target_home_id: UUID) -> Response:
         """Switches user context to a different home (returns new home details)."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id or not target_home_id:
+            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
         try:
             target_home: Home = await self._home_repository.get_by_id(target_home_id)
         except Exception as e:
@@ -256,16 +208,8 @@ class HomeService:
 
     async def leave_home(self, user_id: UUID, home_id: UUID) -> Response:
         """User voluntarily leaves a home."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id or not home_id:
+            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
@@ -291,16 +235,8 @@ class HomeService:
 
     async def switch_home_head(self, current_head_id: UUID, home_id: UUID, new_head_id: UUID) -> Response:
         """Transfers 'Head of House' role to another member."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(current_head_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not current_head_id or not home_id or not new_head_id:
+            return Response(isOk = False, error_message = "Users ID and Home ID are required.") 
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
@@ -326,16 +262,8 @@ class HomeService:
 
     async def delete_home(self, head_user_id: UUID, home_id: UUID) -> Response:
         """Permanently deletes the home and all associated data (Admin only)."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(head_user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not head_user_id or not home_id:
+            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
@@ -361,16 +289,8 @@ class HomeService:
 
     async def get_home_details(self, user_id: UUID, home_id: UUID) -> Response:
         """Retrieves home details including members and inventory summary."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id or not home_id:
+            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
         try:
             home: Home = await self._home_repository.get_by_id(home_id)
         except Exception as e:
@@ -390,31 +310,19 @@ class HomeService:
     
     async def get_all_homes_for_user(self, user_id: UUID) -> Response:
         """Retrieves a list of all homes the user is a member of."""
-        # Authentication session should provide user_id
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
-        
+        if not user_id:
+            return Response(isOk = False, error_message = "User ID is required.") 
         try:
             homes: List[Home] = await self._home_repository.get_homes_by_user_id(user_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving homes.")
         
-        home_list = [
-            {
-                "home id": str(home.get_id()),
-                "home name": home.get_name()
-            }
-            for home in homes
-        ]
-        
-        return Response(isOk = True, data = home_list)
+        home_dict = {}
+        for home in homes:
+            home_dict[home.get_id()] = home.get_name()
+
+        return Response(isOk = True, data = home_dict)
 
     # ==========================================
     # 2. Stock Management (Inventory)
@@ -424,10 +332,8 @@ class HomeService:
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
         
         try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
-            if not is_logged_in:
-                return Response(isOk = False, error_message = "User not logged in")
-            user = self._user_repository.get_user_by_id(user_id)                            
+            if not user_id or not home_id:
+                return Response(isOk = False, error_message = "User ID and Home ID are required.")                            
             home = self._home_repository.get_by_id(home_id)
             product_name = self._product_repository.get_product_name_by_barcode(barcode, company_name)
         except Exception as e:
@@ -436,7 +342,7 @@ class HomeService:
         product_to_add = Product(barcode=barcode, name = product_name, nickname = nickname, quantity = quantity, 
                                 expiration_date = expiration_date, location = location)
         try:
-            self._stock_service.add_product(user, home, product_to_add)
+            self._stock_service.add_product(user_id, home, product_to_add)
             self._product_repository.save(product_to_add)
             self._home_repository.update(home)
         except DomainException as de:                               # catch domain logic error 
@@ -453,15 +359,13 @@ class HomeService:
 
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response[str]:
         try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
-            if not is_logged_in:
-                return Response(isOk = False, error_message = "User not logged in")
-            user = self._user_repository.get_by_id(user_id)                            
+            if not user_id or not home_id:
+                return Response(isOk = False, error_message = "User ID and Home ID are required.")                            
             home = self._home_repository.get_by_id(home_id)
             product_to_remove = self._product_repository.get_by_id(product_id)
             if product_to_remove is None:
                 return Response(isOk = False, error_message = "Product not found in system")
-            self._stock_service.remove_product(user, home, product_to_remove)
+            self._stock_service.remove_product(user_id, home, product_to_remove)
             self._home_repository.update(home)
         except DomainException as de:                              
             return Response(isOk = False, error_message = str(de))
@@ -472,13 +376,11 @@ class HomeService:
 
     async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response[str]:
         try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user_id)      #check user is logged in 
-            if not is_logged_in:
-                return Response(isOk = False, error_message = "User not logged in")
-            user = self._user_repository.get_by_id(user_id)                        
+            if not user_id or not home_id:
+                return Response(isOk = False, error_message = "User ID and Home ID are required.")
             home = self._home_repository.get_by_id(home_id)
             product = self._product_repository.get_by_id(product_id)
-            checks_response = await self.check_user_home_product(user, home, product)
+            checks_response = self.check_user_home_product(user_id, home, product)
             if checks_response.isError():
                 return checks_response
             self._stock_service.update_quantity(user_id, home, product_id, new_quantity)
@@ -493,95 +395,88 @@ class HomeService:
 
     async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
         try:
-            user = self._user_repository.get_by_id(user_id)                        
             home = self._home_repository.get_by_id(home_id)
             product = self._product_repository.get_by_id(product_id)
-            checks_response = await self.check_user_home_product(user, home, product)
+            checks_response = self.check_user_home_product(user_id, home, product)
             if checks_response.isError():
                 return checks_response
             self._stock_service.update_expiration_date(user_id, home, product_id, new_date)
             self._product_repository.update(product)
         except DomainException as de:                              
             return Response(isOk = False, error_message = str(de))
-        except Exception as e:                                     
+        except Exception as e: 
+            print(e)                                    
             return Response(isOk = False, error_message = "An internal error occurred while updating the expiration date.")
         return Response(isOk = True, data = "Product expiration date updated successfully.")
     
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
         try:
-            user = self._user_repository.get_by_id(user_id)                        
             home = self._home_repository.get_by_id(home_id)
             product = self._product_repository.get_by_id(product_id)
-            checks_response = await self.check_user_home_product(user, home, product)
+            checks_response = self.check_user_home_product(user_id, home, product)
             if checks_response.isError():
                 return checks_response
             self._stock_service.update_nickname(user_id, home, product_id, new_nickname)
             self._product_repository.update(product)
         except DomainException as de:                              
             return Response(isOk = False, error_message = str(de))
-        except Exception as e:                                     
+        except Exception as e:
+            print(e)                                
             return Response(isOk = False, error_message = "An internal error occurred while updating product nickname.")
         return Response(isOk = True, data = "Product nickname updated successfully.")
 
     async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: str) -> Response[List[Dict]]:
         try:
-            user = self._user_repository.get_by_id(user_id)                        
             home = self._home_repository.get_by_id(home_id)
-            checks_response = await self.check_user_home(user, home)
+            checks_response = self.check_user_home(user_id, home)
             if checks_response.isError():
                 return checks_response
             res_filtered_items = self._stock_service.filter_by_expiration_type(user_id, home, filter_type)
         except DomainException as de:
             return Response(isOk = False, error_message = str(de))
         except Exception as e:
+            print(e)
             return Response(isOk = False, error_message = "An internal error occurred while filtering by expiration type.")
         return res_filtered_items
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
         try:
-            user = self._user_repository.get_by_id(user_id)                        
             home = self._home_repository.get_by_id(home_id)
-            checks_response = await self.check_user_home(user, home)
+            checks_response = self.check_user_home(user_id, home)
             if checks_response.isError():
                 return checks_response
             filtered_items = self._stock_service.filter_by_location(user_id, home, location)
         except DomainException as de:
             return Response(isOk = False, error_message = str(de))  
         except Exception as e:
+            print(e)
             return Response(isOk = False, error_message = "An internal error occurred while filtering by location.")
         return filtered_items
 
     """searches for products based on product name or nickname."""
     async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response[List[Dict]]:
         try:
-            user = self._user_repository.get_by_id(user_id)                        
             home = self._home_repository.get_by_id(home_id)
-            checks_response = await self.check_user_home(user, home)
+            checks_response = self.check_user_home(user_id, home)
             if checks_response.isError():
                 return checks_response
             search_results = self._stock_service.search_product(user_id, home, query)
         except DomainException as de:
             return Response(isOk = False, error_message = str(de))  
         except Exception as e:
+            print(e)
             return Response(isOk = False, error_message = "An internal error occurred while searching for products.")
         return Response(isOk = True, data = search_results)
 
-    async def check_user_home_product(self, user: User, home: Home , product: Product) -> Response:
-        res = await self.check_user_home(user, home)
+    def check_user_home_product(self, user: UUID, home: Home , product: Product) -> Response:
+        res = self.check_user_home(user, home)
         if res.isError():
             return res
         if product is None:
             return Response(isOk = False, error_message = "Product not found in system")  #check product exists in system
         return Response(isOk = True)
     
-    async def check_user_home(self, user: User, home: Home) -> Response:
-        try:
-            is_logged_in = self.Authentication_Adapter.is_logged_in(user.get_id())      #check user is logged in 
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking user login status.")
-        if not is_logged_in:
-            return Response(isOk = False, error_message = "User not logged in")
+    def check_user_home(self, user: UUID, home: Home) -> Response:
         if user is None:
             return Response(isOk = False, error_message = "User not found in system")
         if home is None:

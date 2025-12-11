@@ -2,9 +2,9 @@ from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
 
-from Domain.DomainServices.DomainException import DomainException
-from Domain.SmartHome.Enums import ExpirationType, LocationType
-from Domain.SmartHome.Product import Product
+from domain.domain_services.domain_exception import DomainException
+from domain.smart_home.enums import ExpirationType, LocationType
+from domain.smart_home.product import Product
 
 class Home:
 

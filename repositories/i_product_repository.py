@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict
-from Domain.SmartHome.Product import Product
+from domain.smart_home.product import Product
 from uuid import UUID
 
 class IProductRepository(ABC):
@@ -9,7 +9,7 @@ class IProductRepository(ABC):
     """
 
     @abstractmethod
-    def save(self, product: Product) -> UUID:
+    def save(self, product: Product) -> None:
         """
         Creates a new inventory item.
         Returns: The ID of the new item.

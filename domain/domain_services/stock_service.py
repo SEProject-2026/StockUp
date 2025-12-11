@@ -1,12 +1,12 @@
 from datetime import date
 from typing import Dict
-import uuid
-from Domain import User
-from Domain.SmartHome.Enums import LocationType
-from Domain.SmartHome.Product import ExpirationType, Product
-from Domain.SmartHome.Home import Home
-from Domain.DomainServices import DomainException
-import Response
+from uuid import uuid4, UUID
+from domain import User
+from domain.smart_home.enums import LocationType, ExpirationType
+from domain.smart_home.product import Product
+from domain.smart_home.home import Home
+from domain.domain_services.domain_exception import DomainException
+from response import Response
 
 nickname_max_length = 20
 
@@ -15,21 +15,21 @@ class StockService:
     def __init__(self):
         pass
 
-    def add_product(self, user: User, home: Home, product_to_add: Product) -> None:
-        if not home.is_member(user.get_id()):
+    def add_product(self, user_id: UUID, home: Home, product_to_add: Product) -> None:
+        if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
-        if product_to_add.quantity <= 0:
+        if product_to_add.get_quantity() <= 0:
             raise DomainException("Quantity must be greater than zero.")
         if product_to_add.get_expiration_date() is not None and product_to_add.get_expiration_date() < date.today():
             raise DomainException("Expiration date cannot be in the past.")
         home.add_to_inventory(product_to_add)
     
-    def remove_product(self, user: User, home: Home, product_to_remove: Product) -> None:  
-        if not home.is_member(user.get_id()):
+    def remove_product(self, user_id: UUID, home: Home, product_to_remove: Product) -> None:  
+        if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
         home.remove_from_inventory(product_to_remove)
     
-    def update_quantity(self, user_id: uuid.UUID, home: Home, product_id, new_quantity: int) -> None:
+    def update_quantity(self, user_id: UUID, home: Home, product_id, new_quantity: int) -> None:
         if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
         if new_quantity < 0:
@@ -37,14 +37,14 @@ class StockService:
         home.update_product_quantity(product_id, new_quantity)
         
     
-    def update_expiration_date(self, user_id: uuid.UUID, home: Home, product_id, new_date: date) -> None:
+    def update_expiration_date(self, user_id: UUID, home: Home, product_id, new_date: date) -> None:
         if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
         if new_date < date.today():
             raise DomainException("Expiration date cannot be in the past.")
         home.update_expiration_date(product_id, new_date)
     
-    def update_nickname(self, user_id: uuid.UUID, home: Home, product_id, new_nickname: str) -> None:
+    def update_nickname(self, user_id: UUID, home: Home, product_id, new_nickname: str) -> None:
         if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
         if new_nickname.strip() == "":
@@ -62,7 +62,7 @@ class StockService:
             return False
         return True
     
-    def filter_by_expiration_type(self, user_id: uuid.UUID, home: Home, filter_type: str) -> Response[Dict[uuid.UUID, Product]]:
+    def filter_by_expiration_type(self, user_id: UUID, home: Home, filter_type: str) -> Response[Dict[UUID, Product]]:
         if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
         filter_type: ExpirationType = ExpirationType(filter_type)
@@ -71,7 +71,7 @@ class StockService:
             return Response(isOk = True, data = "No products found for the selected filter type.")
         return Response(isOk = True, data = filtered_inventory)
     
-    def filter_by_location(self, user_id: uuid.UUID, home: Home, location: LocationType) -> Response[Dict[uuid.UUID, Product]]:
+    def filter_by_location(self, user_id: UUID, home: Home, location: LocationType) -> Response[Dict[UUID, Product]]:
         if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")    
         filtered_inventory = home.filter_by_location(location)
@@ -79,7 +79,7 @@ class StockService:
             return Response(isOk = True, data = "No products found for the selected location.")
         return Response(isOk = True, data = filtered_inventory)
     
-    def search_product(self, user_id: uuid.UUID, home: Home, query: str) -> Dict[uuid.UUID, Product]:
+    def search_product(self, user_id: UUID, home: Home, query: str) -> Dict[UUID, Product]:
         if not home.is_member(user_id):
             raise DomainException("User does not belong to this home.")
         if not query or query.strip() == "":

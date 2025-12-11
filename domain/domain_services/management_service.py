@@ -1,8 +1,8 @@
 from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
-from Domain.SmartHome.Home import Home
-from Domain import User
+from domain.smart_home.home import Home
+from domain.user import User
 
 class ManagementService:
 
