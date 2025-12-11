@@ -1,6 +1,6 @@
 import uuid
 from typing import Dict, List, Optional
-from Domain.Repositories.IProductRepository import IProductRepository
+from Repositories.IProductRepository import IProductRepository
 from Domain.SmartHome.Product import Product
 
 

@@ -2,8 +2,8 @@ from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
 from Domain.DomainServices import DomainException, StockService
-from Domain.Repositories.IProductRepository import IProductRepository
-from Domain.Repositories.IHomeRepository import IHomeRepository
+from Repositories.IProductRepository import IProductRepository
+from Repositories.IHomeRepository import IHomeRepository
 from Domain.DomainServices.ManagementService import ManagementService
 from Domain.DomainServices.StockService import StockService
 from Domain.SmartHome.Enums import LocationType
