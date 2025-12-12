@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
+from domain.domain_services.domain_exception import UserMustBeMemberException
 from domain.smart_home.home import Home
 from domain.user import User
 
@@ -93,3 +94,7 @@ class ManagementService:
             "admin": str(home.get_admin())
         }
         return details
+    
+    def verify_user_membership(self, user_id: UUID, home: Home) -> None:
+        if not home.is_member(user_id):
+            raise UserMustBeMemberException()

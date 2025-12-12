@@ -2,11 +2,12 @@ from uuid import UUID, uuid4
 from typing import List, Optional, Dict
 from datetime import date
 from domain.domain_services.domain_exception import DomainException
+from repositories.i_catalog_repositoy import ICatalogRepository
 from repositories.i_product_repository import IProductRepository
 from repositories.i_home_repository import IHomeRepository
 from domain.domain_services.management_service import ManagementService
 from domain.domain_services.stock_service import StockService
-from domain.smart_home.enums import LocationType
+from domain.smart_home.enums import ChainType, ExpirationType, LocationType
 from domain.smart_home.home import Home
 from repositories.user_repository import IUserRepository
 from domain.user import User
@@ -16,12 +17,13 @@ from domain.smart_home.product import Product
 class HomeService:
  
     def __init__(self, home_repository: IHomeRepository, user_repository: IUserRepository, product_repository: IProductRepository,
-                  management_service: ManagementService, stock_service: StockService):
+                  management_service: ManagementService, stock_service: StockService, catalog_repository: ICatalogRepository):
         self._home_repository = home_repository
         self._user_repository = user_repository
         self._management_service = management_service
         self._stock_service = stock_service
         self._product_repository = product_repository
+        self._catalog_repository = catalog_repository
 
     # ==========================================
     # 1. Home Management (House & Members)
@@ -328,28 +330,56 @@ class HomeService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, barcode: str, company_name: str, user_id: UUID, home_id: UUID, quantity: int, 
+    async def add_product(self, barcode: str, chain: ChainType, user_id: UUID, home_id: UUID, quantity: int, 
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
         
         try:
-            if not user_id or not home_id:
-                return Response(isOk = False, error_message = "User ID and Home ID are required.")                            
-            home = self._home_repository.get_by_id(home_id)
-            product_name = self._product_repository.get_product_name_by_barcode(barcode, company_name)
+            if not await self._check_access(user_id, home_id):
+                return Response(isOk=False, error_message="Access denied or invalid IDs")
         except Exception as e:
             print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving product name by barcode.")
-        product_to_add = Product(barcode=barcode, name = product_name, nickname = nickname, quantity = quantity, 
-                                expiration_date = expiration_date, location = location)
+            return Response(isOk=False, error_message=f"Permission validation failed: {e}")
+        
         try:
-            self._stock_service.add_product(user_id, home, product_to_add)
-            self._product_repository.save(product_to_add)
-            self._home_repository.update(home)
-        except DomainException as de:                               # catch domain logic error 
-            return Response(isOk = False, error_message = str(de))
-        except Exception as e:                                      # catch unexpected error
-            return Response(isOk = False, error_message = "An internal error occurred while adding the product.")
-        return Response(isOk = True, data = "Product added successfully.")
+            # checking catalog only if product name not found in local DB
+            catalog_product = await self._catalog_repository.get_product_details(barcode, chain)
+            
+            # fallback to generic name if not found in catalog
+            if not catalog_product:
+                catalog_product_name = "מוצר כללי" 
+            else:
+                catalog_product_name = catalog_product.name
+        except Exception as e:
+            print(f"Catalog Error: {e}")
+            return Response(isOk=False, error_message="Error retrieving product details")
+
+        # Domain Logic
+        try:
+            # passing the name retrieved from catalog to domain layer
+            new_product_entity = self._stock_service.create_home_product(
+                home_id=home_id,
+                barcode=barcode,
+                product_name=catalog_product_name,
+                chain=chain,
+                quantity=quantity,
+                expiration_date=expiration_date,
+                location=location,
+                nickname=nickname
+            )
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+             return Response(isOk=False, error_message=f"Domain logic error: {e}")
+
+        # Persistence
+        try:
+            # saving the new product entity to the product repository
+            await self._product_repository.save(new_product_entity)
+            
+            return Response(isOk=True, data="Product added successfully")
+            
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Database save error: {e}")
         
     ##########################################################################################
     async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:
@@ -357,131 +387,123 @@ class HomeService:
         raise NotImplementedError("Not implemented yet")
     ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response[str]:
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response:
         try:
-            if not user_id or not home_id:
-                return Response(isOk = False, error_message = "User ID and Home ID are required.")                            
-            home = self._home_repository.get_by_id(home_id)
-            product_to_remove = self._product_repository.get_by_id(product_id)
-            if product_to_remove is None:
-                return Response(isOk = False, error_message = "Product not found in system")
-            self._stock_service.remove_product(user_id, home, product_to_remove)
-            self._home_repository.update(home)
-        except DomainException as de:                              
-            return Response(isOk = False, error_message = str(de))
-        except Exception as e:                                      
-            return Response(isOk = False, error_message = "An internal error occurred while removing the product.")
-        return Response(isOk = True, data = "Product removed successfully.")
+            if not await self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied or invalid IDs")
 
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found in this home")
 
-    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response[str]:
-        try:
-            if not user_id or not home_id:
-                return Response(isOk = False, error_message = "User ID and Home ID are required.")
-            home = self._home_repository.get_by_id(home_id)
-            product = self._product_repository.get_by_id(product_id)
-            checks_response = self.check_user_home_product(user_id, home, product)
-            if checks_response.isError():
-                return checks_response
-            self._stock_service.update_quantity(user_id, home, product_id, new_quantity)
-            self._product_repository.update(product)
-        except DomainException as de:                            
-            return Response(isOk = False, error_message = str(de))
+            await self._product_repository.delete(product_id)
+            
+            return Response(isOk=True, data="Product removed successfully.")
+
         except Exception as e:
-            print(e)                                
-            return Response(isOk = False, error_message = "An internal error occurred while updating the quantity.")
-        return Response(isOk = True, data = "Product quantity updated successfully.")
+            return Response(isOk=False, error_message=f"Error removing product: {e}")
 
+
+    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response:
+        try:
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found")
+            
+            self._stock_service.update_quantity(product, new_quantity)
+
+            await self._product_repository.update(product)
+            return Response(isOk=True, data="Quantity updated successfully.")
+
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error updating quantity: {e}")
 
     async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
         try:
-            home = self._home_repository.get_by_id(home_id)
-            product = self._product_repository.get_by_id(product_id)
-            checks_response = self.check_user_home_product(user_id, home, product)
-            if checks_response.isError():
-                return checks_response
-            self._stock_service.update_expiration_date(user_id, home, product_id, new_date)
-            self._product_repository.update(product)
-        except DomainException as de:                              
-            return Response(isOk = False, error_message = str(de))
-        except Exception as e: 
-            print(e)                                    
-            return Response(isOk = False, error_message = "An internal error occurred while updating the expiration date.")
-        return Response(isOk = True, data = "Product expiration date updated successfully.")
-    
+            if not await self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied or invalid IDs")
+
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found in this home")
+
+            self._stock_service.update_expiration_date(user_id, product.get_home_id(), product_id, new_date)
+
+            await self._product_repository.update(product)
+            return Response(isOk=True, data="Expiration date updated successfully.")
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error updating expiration date: {e}")
+        
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
         try:
-            home = self._home_repository.get_by_id(home_id)
-            product = self._product_repository.get_by_id(product_id)
-            checks_response = self.check_user_home_product(user_id, home, product)
-            if checks_response.isError():
-                return checks_response
-            self._stock_service.update_nickname(user_id, home, product_id, new_nickname)
-            self._product_repository.update(product)
-        except DomainException as de:                              
-            return Response(isOk = False, error_message = str(de))
-        except Exception as e:
-            print(e)                                
-            return Response(isOk = False, error_message = "An internal error occurred while updating product nickname.")
-        return Response(isOk = True, data = "Product nickname updated successfully.")
+            if not await self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied or invalid IDs")
 
-    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: str) -> Response[List[Dict]]:
-        try:
-            home = self._home_repository.get_by_id(home_id)
-            checks_response = self.check_user_home(user_id, home)
-            if checks_response.isError():
-                return checks_response
-            res_filtered_items = self._stock_service.filter_by_expiration_type(user_id, home, filter_type)
-        except DomainException as de:
-            return Response(isOk = False, error_message = str(de))
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found in this home")
+
+            self._stock_service.update_nickname(user_id, product.get_home_id(), product_id, new_nickname)
+
+            await self._product_repository.update(product)
+            return Response(isOk=True, data="Nickname updated successfully.")
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
         except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while filtering by expiration type.")
-        return res_filtered_items
+            return Response(isOk=False, error_message=f"Error updating nickname: {e}")
+
+    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> Response:
+        try:
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
+            
+            data = [p.to_dict() for p in filtered_products]
+            return Response(isOk=True, data=data)
+
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error filtering products: {e}")
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
         try:
-            home = self._home_repository.get_by_id(home_id)
-            checks_response = self.check_user_home(user_id, home)
-            if checks_response.isError():
-                return checks_response
-            filtered_items = self._stock_service.filter_by_location(user_id, home, location)
-        except DomainException as de:
-            return Response(isOk = False, error_message = str(de))  
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            filtered_products = await self._product_repository.get_by_location(home_id, location)
+            
+            data = [p.to_dict() for p in filtered_products]
+            return Response(isOk=True, data=data)
         except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while filtering by location.")
-        return filtered_items
+            return Response(isOk=False, error_message=f"Error filtering products by location: {e}")
 
     """searches for products based on product name or nickname."""
-    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response[List[Dict]]:
+    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response:
         try:
-            home = self._home_repository.get_by_id(home_id)
-            checks_response = self.check_user_home(user_id, home)
-            if checks_response.isError():
-                return checks_response
-            search_results = self._stock_service.search_product(user_id, home, query)
-        except DomainException as de:
-            return Response(isOk = False, error_message = str(de))  
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while searching for products.")
-        return Response(isOk = True, data = search_results)
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
 
-    def check_user_home_product(self, user: UUID, home: Home , product: Product) -> Response:
-        res = self.check_user_home(user, home)
-        if res.isError():
-            return res
-        if product is None:
-            return Response(isOk = False, error_message = "Product not found in system")  #check product exists in system
-        return Response(isOk = True)
+            search_results = await self._product_repository.search_by_name(home_id, query)
+            
+            data = [p.to_dict() for p in search_results]
+            return Response(isOk=True, data=data)
+
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error searching products: {e}")
     
-    def check_user_home(self, user: UUID, home: Home) -> Response:
-        if user is None:
-            return Response(isOk = False, error_message = "User not found in system")
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found in system")     #check home exists in system
-        return Response(isOk = True)
+    async def _check_access(self, user_id: UUID, home_id: UUID) -> bool:
+        """Helper to verify user exists, logged in, and member of the home"""
+        home = await self._home_repository.get_by_id(home_id)
+        if not home: 
+            return False
+        return home.is_member(user_id)
     
     # ==========================================
     # 3. Shopping List (Active & Base Mode)

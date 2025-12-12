@@ -1,66 +1,53 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict
+from typing import List, Optional
+from domain.smart_home.enums import ExpirationType
 from domain.smart_home.product import Product
 from uuid import UUID
 
 class IProductRepository(ABC):
     """
-    Interface defining the contract for Inventory data access.
+    Interface defining the contract for Inventory (Home Products) data access.
     """
 
     @abstractmethod
-    def save(self, product: Product) -> None:
+    async def save(self, product: Product) -> None:
+        """Creates a new inventory item."""
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, product_id: UUID) -> Optional[Product]:
+        """Retrieves a single item by its ID."""
+        pass
+
+    @abstractmethod
+    async def update(self, product: Product) -> None:
+        """Updates an existing item (replaces the object)."""
+        pass
+
+    @abstractmethod
+    async def delete(self, product_id: UUID) -> None:
+        """Removes an item from the repository."""
+        pass
+
+    @abstractmethod
+    async def list_all_by_home(self, home_id: UUID) -> List[Product]:
+        """Retrieves all items belonging to a specific home."""
+        pass
+
+    @abstractmethod
+    async def search_by_name(self, home_id: UUID, query: str) -> List[Product]:
+        """Searches products in a home by name or nickname."""
+        pass
+
+    @abstractmethod
+    async def get_by_expiration_filter(self, home_id: UUID, filter_type: ExpirationType) -> List[Product]:
         """
-        Creates a new inventory item.
-        Returns: The ID of the new item.
+        Retrieves products based on expiration status.
+        filter_type options: 'EXPIRED', 'NEAR_EXPIRATION', 'FRESH'
         """
         pass
 
     @abstractmethod
-    def get_by_id(self, item_id: UUID) -> Optional[Product]:
-        """
-        Retrieves a single item by its ID.
-        Returns: The item data if found, or None.
-        """
-        pass
-
-    
-    def list_all(self) -> List[Product]:
-        """
-        Retrieves all items in the inventory.
-        Returns: A list of items (can be empty).
-        """
-        pass
-
-    @abstractmethod
-    def update(self, item_id: UUID) -> None:
-        """
-        Updates an existing item.
-        Returns: True if successful, False if item not found.
-        """
-        pass
-
-    @abstractmethod
-    def delete(self, item_id: UUID) -> None:
-        """
-        Removes an item from the repository.
-        Returns: None (Raises an exception if deletion fails).
-        """
-        pass
-
-    @abstractmethod
-    def get_next_id(self) -> int:
-        """
-        Retrieves the next available unique identifier for a new inventory item.
-        Returns: An integer representing the next unique ID.
-        """
-        pass
-    
-    # need to implement in InMemoryProductRepository.py
-    @abstractmethod
-    def get_product_name_by_barcode(self, barcode: str, company_name: str) -> str:
-        """
-        Retrieves the product name associated with a given barcode.
-        Returns: The product name as a string.
-        """
+    async def get_by_location(self, home_id: UUID, location: str) -> List[Product]:
+        """Retrieves products stored in a specific location within the home."""
         pass

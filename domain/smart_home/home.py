@@ -15,7 +15,6 @@ class Home:
         self._members: Dict[UUID, None] = {user_id: None}  # Dictionary of user IDs
         self._admin: UUID = user_id  # Admin user ID, assigned to creator by default
         self._join_requests: Dict[UUID, None] = {}  # Dictionary of user IDs requesting to join
-        self._inventory: Dict[UUID, Product] = {}  # Dictionary of product IDs to Product objects
 
     def get_id(self) -> UUID:
         return self._id
@@ -34,9 +33,6 @@ class Home:
     
     def get_join_requests(self) -> Dict[UUID, None]:
         return self._join_requests
-    
-    def get_inventory(self) -> Dict[UUID, Product]:
-        return self._inventory
     
     def set_name(self, name: str) -> None:
         self._name = name
@@ -76,59 +72,3 @@ class Home:
             del self._members[user_id]
         else:
             raise UserMustBeMemberException()
-        
-    def add_to_inventory(self, product: Product) -> None:
-        self._inventory[product.get_id()] = product
-
-    def remove_from_inventory(self, product: Product) -> None:
-        if product.get_id() in self._inventory:
-            del self._inventory[product.get_id()]
-        else:
-            raise ProductNotFoundException()
-        
-    def update_product_quantity(self, product_id: UUID, new_quantity: int) -> None:
-        if product_id in self._inventory:
-            product = self._inventory[product_id]
-            product.set_quantity(new_quantity)
-            self._inventory[product_id] = product
-        else:
-            raise ProductNotFoundException()
-        
-    def update_expiration_date(self, product_id: UUID, new_date: date) -> None:
-        if product_id in self._inventory:
-            product = self._inventory[product_id]
-            product.set_expiration_date(new_date)
-            self._inventory[product_id] = product
-        else:
-            raise ProductNotFoundException()
-    
-    def update_nickname(self, product_id: UUID, new_nickname: str) -> None:
-        if product_id in self._inventory:
-            product = self._inventory[product_id]
-            product.set_nickname(new_nickname)
-            self._inventory[product_id] = product
-        else:
-            raise ProductNotFoundException()
-
-    def filter_by_expiration_type(self, filter_type: ExpirationType) -> Dict[UUID, Product]:
-        filtered_inventory = {}
-        for product_id, product in self._inventory.items():
-            if filter_type == product.get_expiration_type():
-                filtered_inventory[product_id] = product
-        return filtered_inventory
-
-    def filter_by_location(self, location: LocationType) -> Dict[UUID, Product]:
-        filtered_inventory = {}
-        for product_id, product in self._inventory.items():
-            if product.get_location() == location:
-                filtered_inventory[product_id] = product
-        return filtered_inventory
-    
-    def search_product(self, query: str) -> Dict[UUID, Product]:
-        found_products = {}
-        for product_id, product in self._inventory.items():
-            if query.lower() in product.get_nickname().lower():
-                found_products[product_id] = product
-            elif query.lower() in product.get_name().lower():
-                found_products[product_id] = product
-        return found_products
