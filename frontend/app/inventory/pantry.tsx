@@ -1,5 +1,5 @@
 import React from "react";
-import { InventoryScreenBase } from "../screens/InventoryScreen";
+import { InventoryScreenBase } from "./inventory";
 
 export default function PantryScreen() {
   return (

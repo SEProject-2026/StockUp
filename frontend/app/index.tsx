@@ -1,4 +1,4 @@
 // frontend/app/index.tsx
-import HomeScreen from "././screens/HomeScreen";
+import HomeScreen from "./HomeScreen";
 
 export default HomeScreen;
