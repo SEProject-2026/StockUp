@@ -14,7 +14,7 @@ class IHomeRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_code(self, home_code: str) -> Optional[Home]:
+    async def get_by_join_code(self, home_code: str) -> Optional[Home]:
         pass
 
     @abstractmethod

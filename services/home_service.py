@@ -16,14 +16,16 @@ from domain.smart_home.product import Product
 
 class HomeService:
  
-    def __init__(self, home_repository: IHomeRepository, user_repository: IUserRepository, product_repository: IProductRepository,
+    def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
                   management_service: ManagementService, stock_service: StockService, catalog_repository: ICatalogRepository):
         self._home_repository = home_repository
-        self._user_repository = user_repository
         self._management_service = management_service
         self._stock_service = stock_service
         self._product_repository = product_repository
         self._catalog_repository = catalog_repository
+
+    def get_home_repository(self) -> IHomeRepository:
+        return self._home_repository
 
     # ==========================================
     # 1. Home Management (House & Members)
@@ -45,7 +47,7 @@ class HomeService:
         
         # Create Home instance
         try:
-            new_home: Home = self._management_service.create_new_home(user_id,home_name)
+            new_home: Home = self._management_service.create_new_home(home_name, user_id)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while creating the home.")
@@ -104,7 +106,7 @@ class HomeService:
             return Response(isOk = False, error_message = "User ID and Home Code are required.")
         # Check if home exists
         try:
-            home: Home = await self._home_repository.get_by_code(home_code)
+            home: Home = await self._home_repository.get_by_join_code(home_code)
         except Exception as e:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")

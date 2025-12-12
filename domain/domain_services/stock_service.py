@@ -1,7 +1,6 @@
 from datetime import date
 from typing import Dict, Optional
 from uuid import uuid4, UUID
-from domain import User
 from domain.smart_home.enums import ChainType, LocationType, ExpirationType
 from domain.smart_home.product import Product
 from domain.smart_home.home import Home

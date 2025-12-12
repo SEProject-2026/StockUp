@@ -12,6 +12,9 @@ class Response(Generic[T]):
     def isError(self) -> bool:
         return not self._isOk
     
+    def isOk(self) -> bool:
+        return self._isOk
+    
     def get_data(self) -> Optional[T]:
         return self._data
     
