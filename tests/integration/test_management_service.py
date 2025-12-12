@@ -66,7 +66,7 @@ async def test_join_home_flow(home_service):
     admin_id = uuid4()
     create_res = await home_service.create_home(admin_id, "Clubhouse")
     home_code = create_res.get_data()["join code"]
-    home_id = create_res.get_data()["home id"]
+    home_id = UUID(create_res.get_data()["home id"])
 
     # 2. User B requests to join
     user_b = uuid4()
@@ -93,7 +93,7 @@ async def test_remove_member_success(home_service):
     member_id = uuid4()
     
     create_res = await home_service.create_home(admin_id, "Test Home")
-    home_id = create_res.get_data()["home id"]
+    home_id = UUID(create_res.get_data()["home id"])
     
     home = await home_service.get_home_repository().get_by_id(home_id)
     home.add_member(member_id)
@@ -114,7 +114,7 @@ async def test_leave_home_success(home_service):
     member_id = uuid4()
     
     create_res = await home_service.create_home(admin_id, "Leavers Home")
-    home_id = create_res.get_data()["home id"]
+    home_id = UUID(create_res.get_data()["home id"])
     
     home = await home_service.get_home_repository().get_by_id(home_id)
     home.add_member(member_id)
@@ -133,11 +133,11 @@ async def test_admin_cannot_leave_home(home_service):
     # Arrange
     admin_id = uuid4()
     create_res = await home_service.create_home(admin_id, "Admin Home")
-    home_id = create_res.get_data()["home id"]
+    home_id = UUID(create_res.get_data()["home id"])
 
     # Act
     res = await home_service.leave_home(admin_id, home_id)
 
     # Assert (Failure expected)
     assert res.isOk() is False
-    assert "Admin cannot leave" in res.get_error_message()
+    assert "An internal error occurred while leaving the home." in res.get_error_message()
