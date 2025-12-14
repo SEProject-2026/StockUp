@@ -1,0 +1,260 @@
+from uuid import UUID, uuid4
+from typing import List, Optional, Dict
+from datetime import date
+from domain.domain_exception import DomainException
+from repositories.i_catalog_repositoy import ICatalogRepository
+from repositories.i_product_repository import IProductRepository
+from repositories.i_home_repository import IHomeRepository
+from domain.domain_services.stock_service import StockService
+from domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from domain.smart_home.home import Home
+from repositories.user_repository import IUserRepository
+from domain.user import User
+from response import Response
+from domain.smart_home.product import Product
+
+class StockService:
+ 
+    def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
+                  stock_service: StockService, catalog_repository: ICatalogRepository):
+        self._home_repository = home_repository
+        self._stock_service = stock_service
+        self._product_repository = product_repository
+        self._catalog_repository = catalog_repository
+
+    # ==========================================
+    # 2. Stock Management (Inventory)
+    # ==========================================
+
+    async def add_product(self, barcode: str, chain: ChainType, user_id: UUID, home_id: UUID, quantity: int, 
+                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
+        
+        try:
+            if not await self._check_access(user_id, home_id):
+                return Response(isOk=False, error_message="Access denied or invalid IDs")
+        except Exception as e:
+            print(e)
+            return Response(isOk=False, error_message=f"Permission validation failed: {e}")
+        
+        try:
+            # checking catalog only if product name not found in local DB
+            catalog_product = await self._catalog_repository.get_product_details(barcode, chain)
+            
+            # fallback to generic name if not found in catalog
+            if not catalog_product:
+                catalog_product_name = "מוצר כללי" 
+            else:
+                catalog_product_name = catalog_product.name
+        except Exception as e:
+            print(f"Catalog Error: {e}")
+            return Response(isOk=False, error_message="Error retrieving product details")
+
+        # Domain Logic
+        try:
+            # passing the name retrieved from catalog to domain layer
+         new_product_entity = (
+            Product.builder(
+                home_id=home_id,
+                barcode=barcode,
+                name=catalog_product_name,
+                quantity=quantity
+            )
+            .with_chain_origin(chain)
+            .with_expiration_date(expiration_date)
+            .with_location(location)
+            .with_nickname(nickname)
+            .with_original_name(catalog_product_name) 
+            .build()
+        )
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+             return Response(isOk=False, error_message=f"Domain logic error: {e}")
+
+        # Persistence
+        try:
+            # saving the new product entity to the product repository
+            await self._product_repository.save(new_product_entity)
+            
+            return Response(isOk=True, data="Product added successfully")
+            
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Database save error: {e}")
+        
+    ##########################################################################################
+    async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:
+        """Processes a receipt image (OCR) and returns detected items for verification."""
+        raise NotImplementedError("Not implemented yet")
+    ###########################################################################################
+
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response:
+        try:
+            if not await self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied or invalid IDs")
+
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found in this home")
+
+            await self._product_repository.delete(product_id)
+            
+            return Response(isOk=True, data="Product removed successfully.")
+
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error removing product: {e}")
+
+
+    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response:
+        try:
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found")
+            
+            self._stock_service.update_quantity(product, new_quantity)
+
+            await self._product_repository.update(product)
+            return Response(isOk=True, data="Quantity updated successfully.")
+
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error updating quantity: {e}")
+
+    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
+        try:
+            if not await self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied or invalid IDs")
+
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found in this home")
+
+            self._stock_service.update_expiration_date(user_id, product.get_home_id(), product_id, new_date)
+
+            await self._product_repository.update(product)
+            return Response(isOk=True, data="Expiration date updated successfully.")
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error updating expiration date: {e}")
+        
+    async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
+        try:
+            if not await self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied or invalid IDs")
+
+            product = await self._product_repository.get_by_id(product_id)
+            if not product or product.get_home_id() != home_id:
+                return Response(isOk=False, error_message="Product not found in this home")
+
+            self._stock_service.update_nickname(user_id, product.get_home_id(), product_id, new_nickname)
+
+            await self._product_repository.update(product)
+            return Response(isOk=True, data="Nickname updated successfully.")
+        except ValueError as ve:
+             return Response(isOk=False, error_message=str(ve))
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error updating nickname: {e}")
+
+    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> Response:
+        try:
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
+            
+            data = [p.to_dict() for p in filtered_products]
+            return Response(isOk=True, data=data)
+
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error filtering products: {e}")
+
+    async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
+        try:
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            filtered_products = await self._product_repository.get_by_location(home_id, location)
+            
+            data = [p.to_dict() for p in filtered_products]
+            return Response(isOk=True, data=data)
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error filtering products by location: {e}")
+
+    """searches for products based on product name or nickname."""
+    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response:
+        try:
+            if not self._check_access(user_id, home_id):
+                 return Response(isOk=False, error_message="Access denied")
+
+            search_results = await self._product_repository.search_by_name(home_id, query)
+            
+            data = [p.to_dict() for p in search_results]
+            return Response(isOk=True, data=data)
+
+        except Exception as e:
+            return Response(isOk=False, error_message=f"Error searching products: {e}")
+    
+    async def _check_access(self, user_id: UUID, home_id: UUID) -> bool:
+        """Helper to verify user exists, logged in, and member of the home"""
+        home = await self._home_repository.get_by_id(home_id)
+        if not home: 
+            return False
+        return home.is_member(user_id)
+    
+    # ==========================================
+    # 3. Shopping List (Active & Base Mode)
+    # ==========================================
+
+    async def trigger_shopping_list_update(self, home_id: UUID):
+        """Triggers a real-time update (WebSocket/Push) to all home members."""
+        raise NotImplementedError("Not implemented yet")
+
+    # --- Base Mode (Configuration) ---
+
+    async def add_item_to_base_stock(self, head_user_id: UUID, home_id: UUID, 
+                                     product_name: str, ideal_quantity: int) -> Dict:
+        """Adds an item to the 'Base Mode' (ideal stock) configuration."""
+        raise NotImplementedError("Not implemented yet")
+
+    async def remove_item_from_base_stock(self, head_user_id: UUID, base_product_id: UUID) -> bool:
+        """Removes an item from the 'Base Mode' configuration."""
+        raise NotImplementedError("Not implemented yet")
+
+    async def update_base_stock_quantity(self, head_user_id: UUID, base_product_id: UUID, new_quantity: int) -> Dict:
+        """Updates the ideal quantity for a Base Mode item."""
+        raise NotImplementedError("Not implemented yet")
+
+    # --- Active Shopping List ---
+
+    async def add_shopping_item(self, user_id: UUID, home_id: UUID, product_name: str, quantity: int) -> Dict:
+        """Manually adds an item to the shopping list."""
+        raise NotImplementedError("Not implemented yet")
+
+    async def remove_shopping_item(self, user_id: UUID, list_product_id: UUID) -> bool:
+        """Removes an item from the shopping list."""
+        raise NotImplementedError("Not implemented yet")
+
+    async def update_shopping_item_quantity(self, user_id: UUID, list_product_id: UUID, new_quantity: int) -> Dict:
+        """Updates the quantity of an item in the shopping list."""
+        raise NotImplementedError("Not implemented yet")
+
+    # --- Shopping Mode ---
+
+    async def enter_shopping_mode(self, user_id: UUID, home_id: UUID) -> bool:
+        """Enters 'Shopping Mode' (locks external edits, prepares for checklist)."""
+        raise NotImplementedError("Not implemented yet")
+
+    async def mark_shopping_item(self, user_id: UUID, list_product_id: UUID, is_checked: bool) -> Dict:
+        """Marks an item as 'in cart' (checked/unchecked)."""
+        raise NotImplementedError("Not implemented yet")
+
+    async def exit_shopping_mode(self, user_id: UUID, home_id: UUID, complete_purchase: bool) -> Dict:
+        """
+        Exits 'Shopping Mode'. 
+        If complete_purchase is True, moves checked items to Inventory and clears them from the list.
+        """
+        raise NotImplementedError("Not implemented yet")

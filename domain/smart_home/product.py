@@ -2,8 +2,15 @@ from datetime import date
 from typing import Optional
 from uuid import uuid4, UUID
 from domain.smart_home.enums import ExpirationType, LocationType, ChainType
+from domain.domain_exception import DomainException
+from domain.smart_home.product_builder import ProductBuilder
 
 class Product:
+
+
+    def builder(home_id: UUID, barcode: str, name: str, quantity: int) -> ProductBuilder:
+        return ProductBuilder(home_id, barcode, name, quantity)
+
     def __init__(self, 
                  home_id: UUID,
                  barcode: str,
@@ -63,10 +70,8 @@ class Product:
     
     # Setters
     def set_nickname(self, new_nickname: str) -> None:
-        self._nickname = new_nickname
-        # Update display name accordingly
-        self._name = new_nickname if new_nickname else self._original_name
-    
+            self._nickname = new_nickname    
+
     def set_expiration_date(self, new_date: date) -> None:
         self._expiration_date = new_date
 
@@ -74,10 +79,14 @@ class Product:
         self._expiration_type = new_expiration_type
     
     def set_quantity(self, new_quantity: int) -> None:
+        if new_quantity < 0:
+            raise DomainException("Quantity cannot be negative.")
         self._quantity = new_quantity
 
     def set_location(self, new_location: LocationType) -> None:
         self._location = new_location
+
+  
 
     def to_dict(self) -> dict:
         return {
@@ -93,3 +102,6 @@ class Product:
             "expiration_type": self._expiration_type.name,
             "expiration_date": self._expiration_date.isoformat() if self._expiration_date else None
         }
+
+         
+

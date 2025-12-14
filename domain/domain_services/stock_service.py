@@ -4,7 +4,7 @@ from uuid import uuid4, UUID
 from domain.smart_home.enums import ChainType, LocationType, ExpirationType
 from domain.smart_home.product import Product
 from domain.smart_home.home import Home
-from domain.domain_services.domain_exception import DomainException
+from domain.domain_exception import DomainException
 from response import Response
 
 
@@ -43,34 +43,29 @@ class StockService:
 
         return new_product
     
-    def update_quantity(self, product: Product, new_quantity: int) -> None:
-        if new_quantity < 0:
-            raise DomainException("Quantity cannot be negative.")
-        product.set_quantity(new_quantity)
+    # def update_quantity(self, product: Product, new_quantity: int) -> None:
+    #     if new_quantity < 0:
+    #         raise DomainException("Quantity cannot be negative.")
+    #     product.set_quantity(new_quantity)
         
+    # def update_expiration_date(self, product: Product, new_date: date) -> None:
+    #     if new_date < date.today():
+    #         raise DomainException("Expiration date cannot be in the past.")
+    #     product.set_expiration_date(new_date)
     
-    def update_expiration_date(self, product: Product, new_date: date) -> None:
-        if new_date < date.today():
-            raise DomainException("Expiration date cannot be in the past.")
-        product.set_expiration_date(new_date)
+    # def update_nickname(self, product: Product, new_nickname: str) -> None:
+    #     if not new_nickname or new_nickname.strip() == "":
+    #         raise ValueError("Nickname cannot be empty.")
+    #     if len(new_nickname) > self.NICKNAME_MAX_LENGTH:
+    #         raise ValueError(f"Nickname is too long (max {self.NICKNAME_MAX_LENGTH} chars).")
+    #     if not self._is_valid_name(new_nickname):
+    #         raise ValueError("Nickname contains invalid characters.")
+    #     product.set_nickname(new_nickname)
     
-    def update_nickname(self, product: Product, new_nickname: str) -> None:
-        if not new_nickname or new_nickname.strip() == "":
-            raise ValueError("Nickname cannot be empty.")
-        
-        if len(new_nickname) > self.NICKNAME_MAX_LENGTH:
-            raise ValueError(f"Nickname is too long (max {self.NICKNAME_MAX_LENGTH} chars).")
-        
-        if not self._is_valid_name(new_nickname):
-            raise ValueError("Nickname contains invalid characters.")
-        
-        product.set_nickname(new_nickname)
-    
-    def is_valid_name(new_nickname: str) -> bool:
-        if "  " in new_nickname:
-            return False
-        clean_name = new_nickname.replace(" ", "")
-        if not clean_name.isalnum():
-            return False
-            
-        return True
+    # def _is_valid_name(self, new_nickname: str) -> bool:
+    #     if "  " in new_nickname:
+    #         return False
+    #     clean_name = new_nickname.replace(" ", "")
+    #     if not clean_name.isalnum():
+    #         return False
+    #     return True
