@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from uuid import UUID
 from typing import Optional, Dict, Union
 
@@ -15,10 +15,7 @@ class UserDTO(BaseModel):
     email: EmailStr
     name: str
 
-    class Config:
-        # Allows Pydantic to read data from ORM/Entity objects
-        # (e.g., UserDTO.model_validate(user_entity))
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True)
 
 # --------------------------------------
 # 2. Input Models (Requests)
