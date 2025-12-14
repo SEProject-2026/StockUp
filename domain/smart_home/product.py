@@ -1,8 +1,8 @@
 from datetime import date
 from typing import Optional
 from uuid import uuid4, UUID
-from Domain.smart_home.enums import ExpirationType, LocationType, ChainType
-from Domain.domain_exception import DomainException
+from domain.smart_home.enums import ExpirationType, LocationType, ChainType
+from domain.domain_exception import DomainException
 
 
 class ProductBuilder:
@@ -36,8 +36,7 @@ class ProductBuilder:
         return self
 
     def with_expiration_date(self, exp_date: date) -> 'ProductBuilder':
-        if exp_date and exp_date > date.today():
-            self._expiration_date = exp_date
+        self._expiration_date = exp_date
         return self
 
     def build(self) -> 'Product':
@@ -114,7 +113,7 @@ class Product:
     
     # Setters
     def set_nickname(self, new_nickname: str) -> None:
-        if not new_nickname:
+        if new_nickname is None:
             self._nickname = None
             return
         if self._is_valid_name(new_nickname):

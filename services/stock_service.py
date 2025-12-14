@@ -1,11 +1,11 @@
 from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
-from Domain.smart_home.product import Product
+from domain.smart_home.product import Product
 from Repositories.i_catalog_repositoy import ICatalogRepository
 from Repositories.i_product_repository import IProductRepository
 from Repositories.i_home_repository import IHomeRepository
-from Domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from domain.smart_home.enums import ChainType, ExpirationType, LocationType
 from Response import Response
 
 class StockService:
