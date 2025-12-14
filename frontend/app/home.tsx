@@ -7,7 +7,7 @@ import { router } from "expo-router";
 import { useInventory } from "@/src/context/inventory-context";
 
 import QuickActionButton from "@/src/ui/QuickActionButton";
-import CategoryAreaButton from ".././src/components/home/CategoryAreaButton";
+import CategoryAreaButton from "../src/components/home/CategoryAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 import InventoryStatusCard, {
   Stats,
