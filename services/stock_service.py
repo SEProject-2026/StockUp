@@ -1,24 +1,18 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
-from domain.domain_exception import DomainException
-from repositories.i_catalog_repositoy import ICatalogRepository
-from repositories.i_product_repository import IProductRepository
-from repositories.i_home_repository import IHomeRepository
-from domain.domain_services.stock_service import StockService
-from domain.smart_home.enums import ChainType, ExpirationType, LocationType
-from domain.smart_home.home import Home
-from repositories.user_repository import IUserRepository
-from domain.user import User
-from response import Response
-from domain.smart_home.product import Product
+from Domain.smart_home.product import Product
+from Repositories.i_catalog_repositoy import ICatalogRepository
+from Repositories.i_product_repository import IProductRepository
+from Repositories.i_home_repository import IHomeRepository
+from Domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from Response import Response
 
 class StockService:
  
     def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
-                  stock_service: StockService, catalog_repository: ICatalogRepository):
+                  catalog_repository: ICatalogRepository):
         self._home_repository = home_repository
-        self._stock_service = stock_service
         self._product_repository = product_repository
         self._catalog_repository = catalog_repository
 
@@ -30,8 +24,9 @@ class StockService:
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
         
         try:
-            if not await self._check_access(user_id, home_id):
-                return Response(isOk=False, error_message="Access denied or invalid IDs")
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
         except Exception as e:
             print(e)
             return Response(isOk=False, error_message=f"Permission validation failed: {e}")
@@ -49,35 +44,29 @@ class StockService:
             print(f"Catalog Error: {e}")
             return Response(isOk=False, error_message="Error retrieving product details")
 
-        # Domain Logic
         try:
-            # passing the name retrieved from catalog to domain layer
-         new_product_entity = (
+            # will need later on to figure out how to calculate expiration type based on date
+            new_product_entity = (
             Product.builder(
                 home_id=home_id,
                 barcode=barcode,
                 name=catalog_product_name,
                 quantity=quantity
             )
-            .with_chain_origin(chain)
-            .with_expiration_date(expiration_date)
-            .with_location(location)
-            .with_nickname(nickname)
             .with_original_name(catalog_product_name) 
+            .with_nickname(nickname)
+            .with_chain_origin(chain)
+            .with_location(location)
+            .with_expiration_date(expiration_date)
             .build()
         )
         except ValueError as ve:
              return Response(isOk=False, error_message=str(ve))
         except Exception as e:
              return Response(isOk=False, error_message=f"Domain logic error: {e}")
-
-        # Persistence
         try:
-            # saving the new product entity to the product repository
             await self._product_repository.save(new_product_entity)
-            
             return Response(isOk=True, data="Product added successfully")
-            
         except Exception as e:
             return Response(isOk=False, error_message=f"Database save error: {e}")
         
@@ -89,35 +78,35 @@ class StockService:
 
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response:
         try:
-            if not await self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied or invalid IDs")
-
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
             product = await self._product_repository.get_by_id(product_id)
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found in this home")
-
-            await self._product_repository.delete(product_id)
-            
-            return Response(isOk=True, data="Product removed successfully.")
-
+            try:
+                await self._product_repository.delete(product_id)
+                return Response(isOk=True, data="Product removed successfully.")
+            except Exception as e:
+                return Response(isOk=False, error_message=f"Error removing product: {e}")
         except Exception as e:
-            return Response(isOk=False, error_message=f"Error removing product: {e}")
-
+            print(e)
+            return Response(isOk=False, error_message=f"Permission validation failed: {e}")
 
     async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response:
         try:
-            if not self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied")
-
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
+            
             product = await self._product_repository.get_by_id(product_id)
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found")
             
-            self._stock_service.update_quantity(product, new_quantity)
-
+            product.set_quantity(new_quantity)
             await self._product_repository.update(product)
             return Response(isOk=True, data="Quantity updated successfully.")
-
+        
         except ValueError as ve:
              return Response(isOk=False, error_message=str(ve))
         except Exception as e:
@@ -125,17 +114,18 @@ class StockService:
 
     async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
         try:
-            if not await self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied or invalid IDs")
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
 
             product = await self._product_repository.get_by_id(product_id)
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found in this home")
 
-            self._stock_service.update_expiration_date(user_id, product.get_home_id(), product_id, new_date)
-
+            product.set_expiration_date(new_date)
             await self._product_repository.update(product)
             return Response(isOk=True, data="Expiration date updated successfully.")
+        
         except ValueError as ve:
              return Response(isOk=False, error_message=str(ve))
         except Exception as e:
@@ -143,17 +133,18 @@ class StockService:
         
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
         try:
-            if not await self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied or invalid IDs")
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
 
             product = await self._product_repository.get_by_id(product_id)
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found in this home")
 
-            self._stock_service.update_nickname(user_id, product.get_home_id(), product_id, new_nickname)
-
+            product.set_nickname(new_nickname)
             await self._product_repository.update(product)
             return Response(isOk=True, data="Nickname updated successfully.")
+        
         except ValueError as ve:
              return Response(isOk=False, error_message=str(ve))
         except Exception as e:
@@ -161,21 +152,23 @@ class StockService:
 
     async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> Response:
         try:
-            if not self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied")
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
 
             filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
             
             data = [p.to_dict() for p in filtered_products]
             return Response(isOk=True, data=data)
-
+        
         except Exception as e:
             return Response(isOk=False, error_message=f"Error filtering products: {e}")
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
         try:
-            if not self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied")
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
 
             filtered_products = await self._product_repository.get_by_location(home_id, location)
             
@@ -187,8 +180,9 @@ class StockService:
     """searches for products based on product name or nickname."""
     async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response:
         try:
-            if not self._check_access(user_id, home_id):
-                 return Response(isOk=False, error_message="Access denied")
+            valid_member_response = await self._check_access(user_id, home_id)
+            if valid_member_response.isError():
+                return valid_member_response
 
             search_results = await self._product_repository.search_by_name(home_id, query)
             
@@ -198,12 +192,13 @@ class StockService:
         except Exception as e:
             return Response(isOk=False, error_message=f"Error searching products: {e}")
     
-    async def _check_access(self, user_id: UUID, home_id: UUID) -> bool:
+    async def _check_access(self, user_id: UUID, home_id: UUID) -> Response:
         """Helper to verify user exists, logged in, and member of the home"""
         home = await self._home_repository.get_by_id(home_id)
         if not home: 
-            return False
-        return home.is_member(user_id)
+            return Response(isOk=False, error_message="Home not found")
+        #error message for non-members, caller will check isError()
+        return Response(isOk=home.is_member(user_id), error_message="User is not a member of the home")
     
     # ==========================================
     # 3. Shopping List (Active & Base Mode)
