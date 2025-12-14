@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { InventoryItem } from "../../inventory/inventory-store";
+import { InventoryItem } from "../../context/inventory-context";
 import HomeItemRow from "./HomeItemRow";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";

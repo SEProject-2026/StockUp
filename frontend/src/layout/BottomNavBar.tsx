@@ -34,10 +34,10 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
         router.replace("/inventory/inventory");
         break;
       case "shopping-list":
-        router.replace("/ShoppingListScreen");
+        //router.replace("/ShoppingListScreen");
         break;
       case "settings":
-        router.replace("/SettingsScreen");
+        //router.replace("/SettingsScreen");
         break;
     }
   };

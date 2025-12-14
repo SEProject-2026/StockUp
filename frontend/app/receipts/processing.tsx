@@ -4,24 +4,17 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Image,
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import InfoBox from "@/src/ui/InfoBox";
 import ScreenHeader from "@/src/layout/ScreenHeader";
-import PrimaryButton from "@/src/ui/PrimaryButton";
 
 export default function ReceiptProcessingScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri?: string }>();
-
-  const handleGoToInventory = () => {
-    router.replace("./inventory");
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>

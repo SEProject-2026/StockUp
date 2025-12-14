@@ -1,7 +1,7 @@
 // frontend/app/components/HomeItemRow.tsx
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { InventoryItem } from "../../inventory/inventory-store";
+import { InventoryItem } from "../../context/inventory-context";
 
 const BRAND_YELLOW = "#3A6EA5";
 const BRAND_PINK = "#c43131ff";
