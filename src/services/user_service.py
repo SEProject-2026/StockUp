@@ -1,9 +1,9 @@
 from uuid import UUID
 from typing import Dict, Tuple
-from authentication.auth_provider import IAuthProvider
-from authentication.password_encoder import PasswordEncoder
-from domain.user import User
-from repositories.user_repository import IUserRepository
+from src.authentication.auth_provider import IAuthProvider
+from src.authentication.password_encoder import PasswordEncoder
+from src.domain.user import User
+from src.repositories.user_repository import IUserRepository
 
 class UserService:
 

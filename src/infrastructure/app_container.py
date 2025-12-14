@@ -1,6 +1,6 @@
-from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
-from services.user_service import UserService
-from authentication.auth_provider import AuthProvider 
+from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from src.services.user_service import UserService
+from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 
 class AppContainer:
     """
@@ -25,7 +25,7 @@ class AppContainer:
         """Creates (if needed) and returns the Auth Provider"""
         if AppContainer._auth_provider_instance is None:
             # In production, get secret from env variables
-            AppContainer._auth_provider_instance = AuthProvider(secret_key="MY_SUPER_SECRET_KEY")
+            AppContainer._auth_provider_instance = JwtAuthProvider()
         return AppContainer._auth_provider_instance
 
     @staticmethod
