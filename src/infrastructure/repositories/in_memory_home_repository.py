@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 from uuid import UUID
-from repositories.i_home_repository import IHomeRepository
-from domain.smart_home.home import Home
+from src.repositories.i_home_repository import IHomeRepository
+from src.domain.smart_home.home import Home
 
 class InMemoryHomeRepository(IHomeRepository):
     

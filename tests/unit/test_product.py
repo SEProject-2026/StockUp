@@ -1,9 +1,9 @@
 import unittest
 from datetime import date, timedelta
 from uuid import uuid4
-from domain.domain_exception import DomainException
-from domain.smart_home.enums import ChainType, ExpirationType, LocationType
-from domain.smart_home.product import Product, ProductBuilder
+from src.domain.domain_exception import DomainException
+from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from src.domain.smart_home.product import Product, ProductBuilder
 
 
 class TestProduct(unittest.TestCase):

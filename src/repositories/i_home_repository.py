@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 from typing import List, Optional
-from domain.smart_home.home import Home
+from src.domain.smart_home.home import Home
 
 class IHomeRepository(ABC):
 

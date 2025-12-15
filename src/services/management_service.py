@@ -1,8 +1,8 @@
 from uuid import UUID
 from typing import List
-from repositories.i_home_repository import IHomeRepository
-from domain.smart_home.home import Home
-from response import Response
+from src.repositories.i_home_repository import IHomeRepository
+from src.domain.smart_home.home import Home
+from src.response import Response
 
 
 class ManagementService:

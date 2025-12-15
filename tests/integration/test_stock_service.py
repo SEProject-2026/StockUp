@@ -2,11 +2,11 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-from services.stock_service import StockService 
-from domain.smart_home.product import Product
-from domain.smart_home.enums import ChainType, LocationType
+from src.services.stock_service import StockService 
+from src.domain.smart_home.product import Product
+from src.domain.smart_home.enums import ChainType, LocationType
 from unittest.mock import MagicMock, AsyncMock
-from response import Response
+from src.response import Response
 
 
 

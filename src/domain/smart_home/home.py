@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from typing import Dict
-from domain.domain_exception import UserMustBeMemberException
+from src.domain.domain_exception import UserMustBeMemberException
 
 
 

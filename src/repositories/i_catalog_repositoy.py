@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from domain.smart_home.catalog_item import CatalogItem
-from domain.smart_home.enums import ChainType
+from src.domain.smart_home.catalog_item import CatalogItem
+from src.domain.smart_home.enums import ChainType
 
 class ICatalogRepository(ABC):
     
