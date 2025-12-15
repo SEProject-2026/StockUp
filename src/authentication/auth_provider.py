@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
+from typing import Optional
 from uuid import UUID
 
 class IAuthProvider(ABC):
