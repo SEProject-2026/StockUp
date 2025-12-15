@@ -1,5 +1,4 @@
-from typing import Dict, Optional
-from uuid import UUID, uuid4
+from typing import Optional
 from repositories.i_catalog_repositoy import ICatalogRepository
 from domain.smart_home.catalog_item import CatalogItem
 from domain.smart_home.enums import ChainType

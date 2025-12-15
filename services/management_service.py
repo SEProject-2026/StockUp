@@ -1,4 +1,4 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 from typing import List
 from repositories.i_home_repository import IHomeRepository
 from domain.smart_home.home import Home

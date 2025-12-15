@@ -1,10 +1,7 @@
 from uuid import UUID, uuid4
-from typing import List, Optional, Dict
-from datetime import date
+from typing import Dict
+from domain.domain_exception import UserMustBeMemberException
 
-from domain.domain_exception import DomainException, UserMustBeMemberException, ProductNotFoundException
-from domain.smart_home.enums import ExpirationType, LocationType
-from domain.smart_home.product import Product
 
 class Home:
 

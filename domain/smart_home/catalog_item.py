@@ -1,5 +1,4 @@
 from typing import Optional
-from uuid import UUID
 from domain.smart_home.enums import ChainType
 
 class CatalogItem:

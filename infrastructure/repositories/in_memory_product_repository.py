@@ -1,5 +1,4 @@
 import uuid
-from datetime import date, timedelta
 from typing import Dict, List, Optional
 from domain.smart_home.enums import ExpirationType, LocationType
 from repositories.i_product_repository import IProductRepository

@@ -1,16 +1,12 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock
-from urllib import response
 from uuid import uuid4
-from datetime import date
-from typing import Optional
 
-from Services.stock_service import StockService 
+from services.stock_service import StockService 
 from domain.smart_home.product import Product
-from domain.smart_home.enums import ChainType, LocationType, ExpirationType
-from Response import Response
-from Repositories import i_product_repository, i_home_repository, i_catalog_repositoy 
+from domain.smart_home.enums import ChainType, LocationType
 from unittest.mock import MagicMock, AsyncMock
+from response import Response
 
 
 
