@@ -25,6 +25,7 @@ def test_register_success():
     response = client.post("/auth/register", json={
         "email": "new@test.com",
         "password": "Password123!",
+        "password_confirm": "Password123!",
         "name": "New User"
     })
     
@@ -39,12 +40,12 @@ def test_register_duplicate_email():
     """
     # 1. First registration - Using a valid password
     client.post("/auth/register", json={
-        "email": "dup@test.com", "password": "Password123!", "name": "1"
+        "email": "dup@test.com", "password": "Password123!", "password_confirm": "Password123!", "name": "1"
     })
     
     # 2. Second registration (should fail)
     response = client.post("/auth/register", json={
-        "email": "dup@test.com", "password": "Password123!", "name": "2"
+        "email": "dup@test.com", "password": "Password123!", "password_confirm": "Password123!", "name": "2"
     })
     
     assert response.status_code == 400
@@ -58,7 +59,7 @@ def test_login_success():
     """
     # Register first
     client.post("/auth/register", json={
-        "email": "login@test.com", "password": "SecretPassword123!", "name": "Login User"
+        "email": "login@test.com", "password": "SecretPassword123!", "password_confirm": "SecretPassword123!", "name": "Login User"
     })
     
     # Login
@@ -76,7 +77,7 @@ def test_login_wrong_password():
     Test that login fails when the password is incorrect.
     """
     client.post("/auth/register", json={
-        "email": "wrong@test.com", "password": "CorrectPass123!", "name": "User"
+        "email": "wrong@test.com", "password": "CorrectPass123!", "password_confirm": "CorrectPass123!", "name": "User"
     })
     
     response = client.post("/auth/login", json={
@@ -102,7 +103,7 @@ def test_update_name_flow_success():
     pwd = "Password123!" # Valid password length
     
     # 1. Register
-    client.post("/auth/register", json={"email": email, "password": pwd, "name": "Old Name"})
+    client.post("/auth/register", json={"email": email, "password": pwd, "password_confirm": pwd, "name": "Old Name"})
     
     # 2. Login
     login_res = client.post("/auth/login", json={"email": email, "password": pwd})
@@ -126,7 +127,7 @@ def test_change_password_flow():
     new_pass = "NewPassword456!"
     
     # 1. Register the user first
-    client.post("/auth/register", json={"email": email, "password": old_pass, "name": "User"})
+    client.post("/auth/register", json={"email": email, "password": old_pass, "password_confirm": old_pass, "name": "User"})
 
     # 2. Security Check: Attempt to change password WITHOUT a token
     # This ensures the route is protected and cannot be accessed anonymously.

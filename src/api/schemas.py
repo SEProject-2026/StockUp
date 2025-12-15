@@ -25,6 +25,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     name: str
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    password_confirm: str=Field(..., min_length=8, description="Password confirmation must match password")
 
 class LoginRequest(BaseModel):
     email: EmailStr

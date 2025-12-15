@@ -25,6 +25,7 @@ async def register(request: RegisterRequest):
         user = await user_service.register(
             email=request.email, 
             password=request.password, 
+            confirm_password=request.password_confirm,
             name=request.name
         )
         

@@ -11,12 +11,14 @@ class UserService:
         self.user_repo = user_repo
         self.auth_provider = auth_provider
     
-    async def register(self, email: str, password: str, name: str) -> User:
+    async def register(self, email: str, password: str, confirm_password: str, name: str) -> User:
         """
         Registers a new user to the system.
         """
         if await self.user_repo.get_by_email(email):
             raise ValueError("User with this email already exists") 
+        if password != confirm_password:
+            raise ValueError("Passwords do not match")
 
         hashed_password = PasswordEncoder.encode(password)
 

@@ -36,7 +36,7 @@ async def test_register_success(user_service):
     Test that a valid registration creates a user and stores it in the repository.
     """
     # Act
-    user = await user_service.register("dave@test.com", "password123", "Dave")
+    user = await user_service.register("dave@test.com", "password123", "password123", "Dave")
     
     # Assert
     assert user.email == "dave@test.com"
@@ -54,21 +54,31 @@ async def test_register_duplicate_email(user_service):
     Test that registering with an existing email raises a ValueError.
     """
     # Arrange
-    await user_service.register("dave@test.com", "12345678", "Dave")
+    await user_service.register("dave@test.com", "12345678", "12345678", "Dave")
     
     # Act & Assert
     with pytest.raises(ValueError) as excinfo:
-        await user_service.register("dave@test.com", "87654321", "Dave 2")
+        await user_service.register("dave@test.com", "87654321", "87654321", "Dave 2")
     
     assert "already exists" in str(excinfo.value)
 
+@pytest.mark.asyncio
+async def test_register_password_mismatch(user_service):
+    """
+    Test that registering with mismatched passwords raises a ValueError.
+    """
+    # Act & Assert
+    with pytest.raises(ValueError) as excinfo:
+        await user_service.register("dave@test.com", "password123", "differentpassword", "Dave")
+    assert "Passwords do not match" in str(excinfo.value)
+    
 @pytest.mark.asyncio
 async def test_login_success(user_service):
     """
     Test that valid credentials return a User object and a token.
     """
     # Arrange
-    await user_service.register("login@test.com", "secret123", "Login User")
+    await user_service.register("login@test.com", "secret123", "secret123", "Login User")
     
     # Act
     user, token = await user_service.login("login@test.com", "secret123")
@@ -83,7 +93,7 @@ async def test_login_wrong_password(user_service):
     Test that login fails when the password is incorrect.
     """
     # Arrange
-    await user_service.register("wrong@test.com", "secret123", "User")
+    await user_service.register("wrong@test.com", "secret123", "secret123", "User")
     
     # Act & Assert
     with pytest.raises(ValueError) as excinfo:
@@ -97,7 +107,7 @@ async def test_update_name_logic(user_service):
     Test the flow of updating a user profile name.
     """
     # Arrange
-    user = await user_service.register("update@test.com", "12345678", "Old Name")
+    user = await user_service.register("update@test.com", "12345678", "12345678", "Old Name")
     
     # Act
     updated_user = await user_service.update_name(user.id, "New Name")
@@ -117,7 +127,7 @@ async def test_change_password_success(user_service):
     old_pass = "OldPass123"
     new_pass = "NewPass456"
     
-    user = await user_service.register(email, old_pass, "User")
+    user = await user_service.register(email, old_pass, old_pass, "User")
 
     # Act
     await user_service.change_password(user.id, old_pass, new_pass)
