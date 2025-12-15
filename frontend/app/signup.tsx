@@ -20,6 +20,7 @@ import InfoBox from "@/src/ui/InfoBox";
 import AuthTextField from "@/src/ui/AuthTextField";
 
 export default function SignupScreen() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -34,7 +35,7 @@ export default function SignupScreen() {
     return {
       canSubmit: passOk && matchOk && !loading,
     };
-  }, [email, password, confirm, loading]);
+  }, [name, email, password, confirm, loading]);
 
   async function onSignup() {
     if (!validation.canSubmit) {
@@ -86,6 +87,14 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.card}>
+
+            <AuthTextField
+              label="שם"
+              value={name}
+              onChangeText={setName}
+              leftIcon="person-circle-outline"
+              autoCapitalize="none"
+            />
 
             <AuthTextField
               label="אימייל"
