@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 from jose import jwt, JWTError
-from authentication.auth_provider import IAuthProvider
+from src.authentication.auth_provider import IAuthProvider
 
 #settings will be moved to config file later
 SECRET_KEY = "MY_SUPER_SECRET_KEY"
@@ -14,7 +14,7 @@ class JwtAuthProvider(IAuthProvider):
         #creation of the token payload
         payload = {
             "sub": str(user_id),  # sub = the subject of the token, the user ID
-            "exp": datetime.utcnow() + timedelta(minutes=EXPIRE_MINUTES)
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=EXPIRE_MINUTES)
         }
         # create signature and return the token
         return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
