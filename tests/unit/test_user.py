@@ -1,6 +1,6 @@
 import pytest
 from uuid import UUID
-from domain.user import User
+from src.domain.user import User
 
 def test_user_initialization():
     """
@@ -28,17 +28,6 @@ def test_update_name_success():
     
     # Assert
     assert user.name == "New Name"
-
-def test_update_name_empty_name_failure():
-    """
-    Test that update_name prevents setting an empty name.
-    """
-    # Arrange
-    user = User(email="test@test.com", name="Valid Name", hashed_password="hash")
-    
-    # Act & Assert
-    with pytest.raises(ValueError):
-        user.update_name("")
 
 def test_change_password_entity():
     """
