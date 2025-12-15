@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
+import { login } from "@/src/api/auth";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -33,10 +34,7 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      // backend
-
-      await new Promise((r) => setTimeout(r, 650));
-
+      await login({ email: email.trim().toLowerCase(), password });
       router.replace("/home"); 
     } catch (e: any) {
       Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");

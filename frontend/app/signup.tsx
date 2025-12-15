@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import InfoBox from "@/src/ui/InfoBox";
 import AuthTextField from "@/src/ui/AuthTextField";
+import { register } from "@/src/api/auth";
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
@@ -45,11 +46,12 @@ export default function SignupScreen() {
     try {
       setLoading(true);
 
-      // TODO: כאן תחברי ל-backend (FastAPI) / auth service
-      // await authApi.signup({ fullName, email, password });
-
-      await new Promise((r) => setTimeout(r, 700));
-
+      await register({
+      email: email.trim().toLowerCase(),
+      name: name.trim(),
+      password,
+      password_confirm: confirm,
+    });
       Alert.alert("נרשמת בהצלחה", "אפשר להתחבר עכשיו", [
         { text: "להתחברות", onPress: () => router.replace("/login") },
       ]);
