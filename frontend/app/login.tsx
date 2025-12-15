@@ -38,7 +38,7 @@ export default function LoginScreen() {
 
       await new Promise((r) => setTimeout(r, 650));
 
-      router.replace("/home"); 
+      router.replace("/home/home"); 
     } catch (e: any) {
       Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");
     } finally {

@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useInventory, Category } from "../../src/context/inventory-context";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -24,6 +24,8 @@ const BRAND_TEXT = "#111827";
 
 export default function AddItemScreen() {
   const { addItem } = useInventory();
+  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+  const currentHomeId = homeId ? String(homeId) : "";
 
   const [barcode, setBarcode] = useState("");
   const [name, setName] = useState("");
@@ -46,7 +48,12 @@ export default function AddItemScreen() {
     }
   };
 
-  const onAdd = () => {
+   const onAdd = () => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
+      return;
+    }
+
     if (!name.trim()) {
       Alert.alert("שגיאה", "חייב להיות שם מוצר");
       return;
@@ -66,6 +73,7 @@ export default function AddItemScreen() {
       category,
       quantity: qty,
       expiresAt: formattedExpires,
+      homeId: currentHomeId,
     });
 
     router.back();
@@ -162,7 +170,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   addButton: {
-    position: "absolute",
+    //position: "absolute",
     left: 16,
     right: 16,
     bottom: 16,
