@@ -21,17 +21,7 @@ class ManagementService:
     async def create_home(self, user_id: UUID, home_name: str) -> Response:
         """Creates a new home and sets the creator as ADMIN."""
         if not user_id or not home_name or home_name.strip() == "":
-            return Response(isOk = False, error_message = "User ID and Home Name are required.")
-        # Validation of home_name can be added with home repository checks
-        try:
-            home: Home = await self._home_repository.get_by_name(home_name)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while checking home name uniqueness.")
-        
-        if home is not None:
-            return Response(isOk = False, error_message = "Home with the same name already exists.")
-        
+            return Response(isOk = False, error_message = "User ID and Home Name are required.")        
         # Create Home instance
         try:
             new_home: Home = Home(user_id=user_id, name=home_name)

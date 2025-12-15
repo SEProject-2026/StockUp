@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from typing import Dict
+from typing import Dict, Set
 from src.domain.domain_exception import UserMustBeMemberException
 
 
@@ -10,9 +10,10 @@ class Home:
         self._id: UUID = uuid4()
         self._name: str = name
         self._join_code: str = self._id.hex[:6].upper()  # Simple join code generation
-        self._members: Dict[UUID, None] = {user_id: None}  # Dictionary of user IDs
+        self._members: Set[UUID] = set()  # Set of user IDs
+        self._members.add(user_id)  # Creator is the first member
         self._admin: UUID = user_id  # Admin user ID, assigned to creator by default
-        self._join_requests: Dict[UUID, None] = {}  # Dictionary of user IDs requesting to join
+        self._join_requests: Set[UUID] = set()  # Set of user IDs requesting to join
 
     def get_id(self) -> UUID:
         return self._id
@@ -23,13 +24,13 @@ class Home:
     def get_join_code(self) -> str:
         return self._join_code
     
-    def get_members(self) -> Dict[UUID, None]:
+    def get_members(self) -> Set[UUID]:
         return self._members
     
     def get_admin(self) -> UUID:
         return self._admin
     
-    def get_join_requests(self) -> Dict[UUID, None]:
+    def get_join_requests(self) -> Set[UUID]:
         return self._join_requests
     
     def set_name(self, name: str) -> None:
@@ -51,7 +52,7 @@ class Home:
     def add_join_request(self, user_id: UUID) -> None:
         if self.has_request_from(user_id):
             raise ValueError("User has already requested to join.")
-        self._join_requests[user_id] = None
+        self._join_requests.add(user_id)
 
     def answer_join_request(self, head_user_id: UUID, user_id: UUID, approved: bool) -> None:
         if not self.is_admin(head_user_id):
@@ -63,13 +64,12 @@ class Home:
         if approved:
             self.add_member(user_id)
         
-        # Remove the request after processing
-        del self._join_requests[user_id]
+        self._join_requests.remove(user_id)
         
     def add_member(self, user_id: UUID) -> None:
-        if user_id in self._members:
+        if self.is_member(user_id):
             raise ValueError("User is already a member of the home.")
-        self._members[user_id] = None
+        self._members.add(user_id)
 
     def is_member(self, user_id: UUID) -> bool:
         return user_id in self._members
@@ -79,7 +79,7 @@ class Home:
             raise PermissionError("Only admin can remove members from the home.")
         
         if self.is_member(user_id):
-            del self._members[user_id]
+            self._members.remove(user_id)
         else:
             raise UserMustBeMemberException()
         
@@ -89,7 +89,7 @@ class Home:
         if not self.is_member(user_id):
             raise ValueError("User is not a member of this home.")
         
-        del self._members[user_id]
+        self._members.remove(user_id)
         
     def view_home_code(self, user_id: UUID) -> str:
         if not self.is_admin(user_id):
@@ -104,7 +104,7 @@ class Home:
             "id": str(self.get_id()),
             "name": self.get_name(),
             "join code": self.get_join_code() if self.is_admin(user_id) else "Restricted",
-            "members": [str(member) for member in self.get_members().keys()],
+            "members": [str(member) for member in self._members],
             "admin": str(self.get_admin())
         }
         return details

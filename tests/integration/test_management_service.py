@@ -32,19 +32,6 @@ async def test_create_home_success(management_service):
     assert saved_home.get_admin() == user_id
 
 @pytest.mark.asyncio
-async def test_create_duplicate_home_fails(management_service):
-    # Arrange
-    user_id = uuid4()
-    await management_service.create_home(user_id, "Unique Home")
-
-    # Act
-    response = await management_service.create_home(user_id, "Unique Home")
-
-    # Assert
-    assert response.isOk() is False
-    assert "already exists" in response.get_error_message()
-
-@pytest.mark.asyncio
 async def test_join_home_flow(management_service):
     # 1. User A creates a home
     admin_id = uuid4()
