@@ -4,7 +4,7 @@ from services.management_service import ManagementService
 from infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 
 @pytest.fixture
-def home_service():
+def management_service():
     home_repo = InMemoryHomeRepository()
     service = ManagementService(home_repository=home_repo)    
     return service
@@ -21,8 +21,8 @@ async def test_create_home_success(management_service):
 
     # Assert
     assert response.isOk() is True
-    assert response.get_data()["home name"] == home_name
-    assert "home id" in response.get_data()
+    assert response.get_data()["name"] == home_name
+    assert "id" in response.get_data()
     assert "join code" in response.get_data()
 
     # Verify Persistence 
@@ -49,7 +49,7 @@ async def test_join_home_flow(management_service):
     admin_id = uuid4()
     create_res = await management_service.create_home(admin_id, "Clubhouse")
     home_code = create_res.get_data()["join code"]
-    home_id = UUID(create_res.get_data()["home id"])
+    home_id = UUID(create_res.get_data()["id"])
 
     # 2. User B requests to join
     user_b = uuid4()
@@ -76,7 +76,7 @@ async def test_remove_member_success(management_service):
     member_id = uuid4()
     
     create_res = await management_service.create_home(admin_id, "Test Home")
-    home_id = UUID(create_res.get_data()["home id"])
+    home_id = UUID(create_res.get_data()["id"])
     
     home = await management_service.get_home_repository().get_by_id(home_id)
     home.add_member(member_id)
@@ -97,7 +97,7 @@ async def test_leave_home_success(management_service):
     member_id = uuid4()
     
     create_res = await management_service.create_home(admin_id, "Leavers Home")
-    home_id = UUID(create_res.get_data()["home id"])
+    home_id = UUID(create_res.get_data()["id"])
     
     home = await management_service.get_home_repository().get_by_id(home_id)
     home.add_member(member_id)
@@ -116,7 +116,7 @@ async def test_admin_cannot_leave_home(management_service):
     # Arrange
     admin_id = uuid4()
     create_res = await management_service.create_home(admin_id, "Admin Home")
-    home_id = UUID(create_res.get_data()["home id"])
+    home_id = UUID(create_res.get_data()["id"])
 
     # Act
     res = await management_service.leave_home(admin_id, home_id)
