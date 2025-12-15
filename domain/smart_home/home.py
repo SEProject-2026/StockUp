@@ -3,6 +3,7 @@ from typing import Dict
 from domain.domain_exception import UserMustBeMemberException
 
 
+
 class Home:
 
     def __init__(self, user_id: UUID, name: str):
@@ -34,8 +35,8 @@ class Home:
     def set_name(self, name: str) -> None:
         self._name = name
 
-    def assign_admin(self, user_id: UUID) -> None:
-        if not self.is_admin(user_id):
+    def assign_admin(self, head_user_id: UUID, user_id: UUID) -> None:
+        if not self.is_admin(head_user_id):
                 raise PermissionError("Only current admin can transfer admin rights.")
         if not self.is_member(user_id):
             raise UserMustBeMemberException()
@@ -102,7 +103,7 @@ class Home:
         details = {
             "id": str(self.get_id()),
             "name": self.get_name(),
-            "join_code": self.get_join_code() if self.is_admin(user_id) else "Restricted",
+            "join code": self.get_join_code() if self.is_admin(user_id) else "Restricted",
             "members": [str(member) for member in self.get_members().keys()],
             "admin": str(self.get_admin())
         }
