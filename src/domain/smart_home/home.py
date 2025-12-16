@@ -14,6 +14,7 @@ class Home:
         self._members.add(user_id)  # Creator is the first member
         self._admin: UUID = user_id  # Admin user ID, assigned to creator by default
         self._join_requests: Set[UUID] = set()  # Set of user IDs requesting to join
+        self._expiration_range: int = 7 # Default expiration range in days
 
     def get_id(self) -> UUID:
         return self._id
@@ -32,6 +33,12 @@ class Home:
     
     def get_join_requests(self) -> Set[UUID]:
         return self._join_requests
+    
+    def get_expiration_range(self) -> int:
+        return self._expiration_range
+    
+    def set_expiration_range(self, days: int) -> None:
+        self._expiration_range = days
     
     def set_name(self, name: str) -> None:
         self._name = name
