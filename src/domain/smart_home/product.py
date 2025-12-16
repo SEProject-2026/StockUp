@@ -7,18 +7,18 @@ from src.domain.domain_exception import DomainException
 
 class ProductBuilder:
 
-    def __init__(self, home_id: UUID, barcode: str, name: str, quantity: int):
+    def __init__(self, home_id: UUID, name: str, quantity: int, expiration_range: int):
         self._home_id = home_id
-        self._barcode = barcode
         self._original_name = name
         self._quantity = quantity
+        self._expiration_range = expiration_range
+        self._barcode: Optional[str] = None
         self._nickname: Optional[str] = None
         self._location: Optional[LocationType] = None
-        self._chain_origin: Optional[ChainType] = None
         self._expiration_date: Optional[date] = None
 
-    def with_original_name(self, original_name: str) -> 'ProductBuilder':
-        self._original_name = original_name
+    def with_barcode(self, barcode: str) -> 'ProductBuilder':
+        self._barcode = barcode
         return self
 
     def with_nickname(self, new_nickname: str) -> 'ProductBuilder':
@@ -30,13 +30,12 @@ class ProductBuilder:
             self._location = location
         return self
 
-    def with_chain_origin(self, chain: ChainType) -> 'ProductBuilder':
-        if chain:
-            self._chain_origin = chain
-        return self
-
     def with_expiration_date(self, exp_date: date) -> 'ProductBuilder':
         self._expiration_date = exp_date
+        return self
+    
+    def with_expiration_range(self, exp_range: int) -> 'ProductBuilder':
+        self._expiration_range = exp_range
         return self
 
     def build(self) -> 'Product':
@@ -47,27 +46,27 @@ class ProductBuilder:
             quantity=self._quantity,
             location=self._location,
             nickname=self._nickname,
-            chain_origin=self._chain_origin,
-            expiration_date=self._expiration_date
+            expiration_date=self._expiration_date,
+            expiration_range=self._expiration_range
         )
 
 
 class Product:
 
-    def builder(home_id: UUID, barcode: str, name: str, quantity: int) -> 'ProductBuilder':
-        return ProductBuilder(home_id, barcode, name, quantity)
+    def builder(home_id: UUID, name: str, quantity: int, expiration_range: int) -> 'ProductBuilder':
+        return ProductBuilder(home_id, name, quantity, expiration_range)
     
     NICKNAME_MAX_LENGTH = 20
 
     def __init__(self, 
-                 home_id: UUID,
-                 barcode: str,
-                 original_name: str,
-                 quantity: int, 
-                 location: Optional[LocationType], 
-                 nickname: Optional[str] = None,
-                 chain_origin: Optional[ChainType] = None,
-                 expiration_date: Optional[date] = None):
+                home_id: UUID,
+                original_name: str,
+                quantity: int, 
+                expiration_range: int,
+                barcode: Optional[str] = None,
+                location: LocationType = LocationType.OTHER, 
+                nickname: Optional[str] = None,
+                expiration_date: Optional[date] = None):
         
         self._id = uuid4()
         self._home_id = home_id
@@ -76,9 +75,8 @@ class Product:
         self.set_nickname(nickname)
         self.set_quantity(quantity)
         self._location = location
-        self._chain_origin = chain_origin
-        self.set_expiration_date(expiration_date)
-        self._expiration_type = ExpirationType.FRESH
+        self._expiration_dates_to_quantity = {}
+        self.set_expiration_date(expiration_date, quantity, expiration_range)
 
     # Getters
     def get_id(self) -> UUID:
@@ -101,15 +99,9 @@ class Product:
     
     def get_location(self) -> Optional[LocationType]:
         return self._location
-    
-    def get_chain_origin(self) -> Optional[ChainType]:
-        return self._chain_origin
-    
-    def get_expiration_type(self) -> Optional[ExpirationType]:
-        return self._expiration_type
 
-    def get_expiration_date(self) -> Optional[date]:
-        return self._expiration_date 
+    def get_expiration_dates(self) -> Optional[date]:
+        return self._expiration_dates_to_quantity 
     
     # Setters
     def set_nickname(self, new_nickname: str) -> None:
@@ -119,20 +111,29 @@ class Product:
         if self._is_valid_name(new_nickname):
             self._nickname = new_nickname    
 
-    def set_expiration_date(self, new_date: date) -> None:
-        if new_date is None:
-            self._expiration_date = None
-            return
-        elif new_date < date.today():
-            raise ValueError("Expiration date cannot be in the past.")          
-        self._expiration_date = new_date
-
-    def set_expiration_type(self, new_expiration_type: ExpirationType) -> None:
-        self._expiration_type = new_expiration_type
+    def set_expiration_date(self, expiration_date: Optional[date], quantity: int, expiration_range: int) -> None:
+        if expiration_date is None:
+            self._expiration_dates_to_quantity[expiration_date] = (quantity, ExpirationType.FRESH)
+        else:
+            days_until_expiration = (expiration_date - date.today()).days
+            if days_until_expiration <= 0:
+                expiration_type = ExpirationType.EXPIRED
+            elif days_until_expiration <= expiration_range:
+                expiration_type = ExpirationType.GOING_TO_EXPIRE
+            else:
+                expiration_type = ExpirationType.FRESH
+            self._expiration_dates_to_quantity[expiration_date] = (quantity, expiration_type)
+    
+    def update_expiration_date(self, old_date: date, new_date: date, expiration_range: Optional[int]) -> None:
+        if old_date in self._expiration_dates_to_quantity:
+            quantity, _ = self._expiration_dates_to_quantity.pop(old_date)
+            self.set_expiration_date(new_date, quantity, expiration_range)
+        else:
+            raise DomainException("Old expiration date not found.")
     
     def set_quantity(self, new_quantity: int) -> None:
         if new_quantity < 0:
-            raise DomainException("Quantity cannot be negative.")
+            raise ValueError("Quantity cannot be negative.")
         self._quantity = new_quantity
 
     def set_location(self, new_location: LocationType) -> None:
@@ -156,13 +157,11 @@ class Product:
             "id": str(self._id),
             "home_id": str(self._home_id),
             "barcode": self._barcode,
-            "chain_origin": self._chain_origin.name if self._chain_origin else None,
             "original_name": self._original_name,
             "nickname": self._nickname,
             "quantity": self._quantity,
             "location": self._location.name if self._location else None,
-            "expiration_type": self._expiration_type.name,
-            "expiration_date": self._expiration_date.isoformat() if self._expiration_date else None
+            "expiration_dates_to_quantity": {str(k): (v[0], str(v[1])) for k, v in self._expiration_dates_to_quantity.items()},
         }
 
          

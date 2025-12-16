@@ -10,3 +10,6 @@ class InMemoryCatalogRepository(ICatalogRepository):
 
     async def get_product_details(self, barcode: str, chain_type: Optional[ChainType] = None) -> Optional[CatalogItem]:
        pass
+
+    async def save(self, barcode: str, chain: Optional[ChainType], name: str) -> None:
+        pass
