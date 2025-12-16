@@ -20,7 +20,7 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, barcode: str, chain: ChainType, user_id: UUID, home_id: UUID, quantity: int, 
+    async def add_product(self, chain: Optional[ChainType], name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
         
         try:
@@ -33,11 +33,13 @@ class StockService:
         
         try:
             # checking catalog only if product name not found in local DB
+            # assuming if no barcode return value is none
             catalog_product = await self._catalog_repository.get_product_details(barcode, chain)
             
-            # fallback to generic name if not found in catalog
+    
             if not catalog_product:
-                catalog_product_name = "מוצר כללי" 
+                await self._catalog_repository.save(barcode=barcode, chain=chain, name=name)
+                catalog_product_name = name
             else:
                 catalog_product_name = catalog_product.name
         except Exception as e:
@@ -45,21 +47,21 @@ class StockService:
             return Response(isOk=False, error_message="Error retrieving product details")
 
         try:
-            # will need later on to figure out how to calculate expiration type based on date
+            home = await self._home_repository.get_by_id(home_id)
+            expiration_range = home.get_expiration_range()
             new_product_entity = (
-            Product.builder(
-                home_id=home_id,
-                barcode=barcode,
-                name=catalog_product_name,
-                quantity=quantity
+                Product.builder(
+                    home_id=home_id,
+                    name=catalog_product_name,
+                    quantity=quantity,
+                    expiration_range=expiration_range
+                )
+                .with_barcode(barcode)
+                .with_nickname(nickname)
+                .with_location(location)
+                .with_expiration_date(expiration_date)
+                .build()
             )
-            .with_original_name(catalog_product_name) 
-            .with_nickname(nickname)
-            .with_chain_origin(chain)
-            .with_location(location)
-            .with_expiration_date(expiration_date)
-            .build()
-        )
         except ValueError as ve:
              return Response(isOk=False, error_message=str(ve))
         except Exception as e:
@@ -112,7 +114,7 @@ class StockService:
         except Exception as e:
             return Response(isOk=False, error_message=f"Error updating quantity: {e}")
 
-    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, new_date: date) -> Response[str]:
+    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> Response[str]:
         try:
             valid_member_response = await self._check_access(user_id, home_id)
             if valid_member_response.isError():
@@ -122,7 +124,8 @@ class StockService:
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found in this home")
 
-            product.set_expiration_date(new_date)
+            expiration_range = await self._home_repository.get_by_id(home_id).get_default_expiration_range()
+            product.update_expiration_date(old_date, new_date, expiration_range)
             await self._product_repository.update(product)
             return Response(isOk=True, data="Expiration date updated successfully.")
         
