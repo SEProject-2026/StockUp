@@ -7,11 +7,11 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useInventory } from "@/src/context/inventory-context";
 
 import QuickActionButton from "@/src/ui/QuickActionButton";
-import CategoryAreaButton from "@/src/components/home/CategoryAreaButton";
+import CategoryAreaButton from "@/src/components/homes/CategoryAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
-import InventoryStatusCard, { Stats } from "@/src/components/home/InventoryStatusCard";
+import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStatusCard";
 import SideTitleCard from "@/src/ui/SideTitleCard";
-import ExpiringSoonCard from "@/src/components/home/ExpiringSoonCard";
+import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
