@@ -75,8 +75,8 @@ class Product:
         self.set_nickname(nickname)
         self.set_quantity(quantity)
         self._location = location
-        self._expiration_dates_to_quantity = {}
-        self.set_expiration_date(expiration_date, quantity, expiration_range)
+        self._expiration_dates_to_quantity = {date: (int, ExpirationType)}
+        self.set_expiration_date_and_type(expiration_date, quantity, expiration_range)
 
     # Getters
     def get_id(self) -> UUID:
@@ -111,7 +111,7 @@ class Product:
         if self._is_valid_name(new_nickname):
             self._nickname = new_nickname    
 
-    def set_expiration_date(self, expiration_date: Optional[date], quantity: int, expiration_range: int) -> None:
+    def set_expiration_date_and_type(self, expiration_date: Optional[date], quantity: int, expiration_range: int) -> None:
         if expiration_date is None:
             self._expiration_dates_to_quantity[expiration_date] = (quantity, ExpirationType.FRESH)
         else:
@@ -127,7 +127,7 @@ class Product:
     def update_expiration_date(self, old_date: date, new_date: date, expiration_range: Optional[int]) -> None:
         if old_date in self._expiration_dates_to_quantity:
             quantity, _ = self._expiration_dates_to_quantity.pop(old_date)
-            self.set_expiration_date(new_date, quantity, expiration_range)
+            self.set_expiration_date_and_type(new_date, quantity, expiration_range)
         else:
             raise DomainException("Old expiration date not found.")
     
@@ -135,6 +135,31 @@ class Product:
         if new_quantity < 0:
             raise ValueError("Quantity cannot be negative.")
         self._quantity = new_quantity
+
+    async def update_quantity_and_removal(self, expiration_date: date) -> None:
+        if expiration_date in self._expiration_dates_to_quantity:
+            date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
+            del self._expiration_dates_to_quantity[expiration_date]
+            self._quantity = self._quantity - date_quantity 
+            return self._quantity
+        else:
+            raise ValueError(f"item of date {expiration_date} not found for this product.")
+        
+    async def update_quantity(self, expiration_date: date, new_quantity: int) -> None:
+        if not isinstance(new_quantity, int):
+            raise ValueError("Quantity must be a number.")
+        if new_quantity < 0:
+            raise ValueError("Quantity cannot be negative.")
+        elif new_quantity == 0:
+            return await self.update_quantity_and_removal(expiration_date)
+        else:
+            if expiration_date in self._expiration_dates_to_quantity:
+                _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
+                self._expiration_dates_to_quantity[expiration_date] = (new_quantity, expiration_type)
+                self._quantity = sum(q for q, _ in self._expiration_dates_to_quantity.values())
+                return self._quantity
+            else:
+                raise ValueError(f"item of date {expiration_date} not found for this product.")
 
     def set_location(self, new_location: LocationType) -> None:
         self._location = new_location

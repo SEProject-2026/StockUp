@@ -1,3 +1,4 @@
+from sys import exception
 from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
@@ -20,7 +21,7 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, chain: Optional[ChainType], name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
+    async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
         
         try:
@@ -32,26 +33,12 @@ class StockService:
             return Response(isOk=False, error_message=f"Permission validation failed: {e}")
         
         try:
-            # checking catalog only if product name not found in local DB
-            # assuming if no barcode return value is none
-            catalog_product = await self._catalog_repository.get_product_details(barcode, chain)
-            
-    
-            if not catalog_product:
-                catalog_product_name = name
-            else:
-                catalog_product_name = catalog_product.name
-        except Exception as e:
-            print(f"Catalog Error: {e}")
-            return Response(isOk=False, error_message="Error retrieving product details")
-
-        try:
             home = await self._home_repository.get_by_id(home_id)
             expiration_range = home.get_expiration_range()
             new_product_entity = (
                 Product.builder(
                     home_id=home_id,
-                    name=catalog_product_name,
+                    name=name,
                     quantity=quantity,
                     expiration_range=expiration_range
                 )
@@ -77,7 +64,7 @@ class StockService:
         raise NotImplementedError("Not implemented yet")
     ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response:
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> Response:
         try:
             valid_member_response = await self._check_access(user_id, home_id)
             if valid_member_response.isError():
@@ -86,7 +73,12 @@ class StockService:
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found in this home")
             try:
-                await self._product_repository.delete(product_id)
+                product_total_quantity = product.update_quantity_and_removal(date)
+                if product_total_quantity > 0:
+                    await self._product_repository.update(product)
+                    return Response(isOk=True, data="Product quantity updated successfully.")
+                else:
+                    await self._product_repository.delete(product_id)
                 return Response(isOk=True, data="Product removed successfully.")
             except Exception as e:
                 return Response(isOk=False, error_message=f"Error removing product: {e}")
@@ -94,7 +86,7 @@ class StockService:
             print(e)
             return Response(isOk=False, error_message=f"Permission validation failed: {e}")
 
-    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response:
+    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> Response:
         try:
             valid_member_response = await self._check_access(user_id, home_id)
             if valid_member_response.isError():
@@ -104,10 +96,13 @@ class StockService:
             if not product or product.get_home_id() != home_id:
                 return Response(isOk=False, error_message="Product not found")
             
-            product.set_quantity(new_quantity)
-            await self._product_repository.update(product)
-            return Response(isOk=True, data="Quantity updated successfully.")
-        
+            product_total_quantity = await product.update_quantity(date, new_quantity)
+            if product_total_quantity > 0:
+                await self._product_repository.update(product)
+                return Response(isOk=True, data="Quantity updated successfully.")
+            else:
+                await self._product_repository.delete(product_id)
+                return Response(isOk=True, data="Product removed successfully, quantity is zero.")
         except ValueError as ve:
              return Response(isOk=False, error_message=str(ve))
         except Exception as e:
@@ -197,8 +192,8 @@ class StockService:
     async def _check_access(self, user_id: UUID, home_id: UUID) -> Response:
         """Helper to verify user exists, logged in, and member of the home"""
         home = await self._home_repository.get_by_id(home_id)
-        if not home: 
-            return Response(isOk=False, error_message="Home not found")
+        if not home:
+            raise exception("Home retrieval failed.")
         #error message for non-members, caller will check isError()
         return Response(isOk=home.is_member(user_id), error_message="User is not a member of the home")
     
