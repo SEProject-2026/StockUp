@@ -129,7 +129,7 @@ class Product:
             quantity, _ = self._expiration_dates_to_quantity.pop(old_date)
             self.set_expiration_date_and_type(new_date, quantity, expiration_range)
         else:
-            raise DomainException("Old expiration date not found.")
+            raise ValueError("Old expiration date not found.")
     
     def set_quantity(self, new_quantity: int) -> None:
         if new_quantity < 0:
