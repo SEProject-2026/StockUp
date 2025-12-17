@@ -54,7 +54,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
         //router.replace("/ShoppingListScreen");
         break;
       case "settings":
-        //router.replace("/SettingsScreen");
+        router.replace("/settings");
         break;
     }
   };

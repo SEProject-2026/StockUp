@@ -47,11 +47,11 @@ export function InventoryScreenBase({
   const [selectedTab, setSelectedTab] = useState<CategoryKey>(initialCategory);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [filtersVisible, setFiltersVisible] = useState(false);
 
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
 
   const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
+  const filtersVisible = true;
 
   // ✅ 1) items רק של הבית הנוכחי
   const itemsForHome = useMemo(() => {
@@ -153,18 +153,16 @@ export function InventoryScreenBase({
     setItemToEdit(null);
   };
 
-  // ✅ 4) back fallback תקין
   const handleBack = () => {
-    if (router.canGoBack && router.canGoBack()) {
-      router.back();
+    if (currentHomeId) {
+      router.replace({
+        pathname: "/home/[homeId]",
+        params: { homeId: currentHomeId },
+      });
       return;
     }
 
-    if (currentHomeId) {
-      router.replace({ pathname: "/home/[homeId]", params: { homeId: currentHomeId } });
-    } else {
-      router.replace("/home/home");
-    }
+    router.replace("/home/home");
   };
 
   return (
@@ -181,18 +179,6 @@ export function InventoryScreenBase({
         <ScreenHeader
           title={title}
           onBack={handleBack}
-          rightSlot={
-            <TouchableOpacity
-              style={styles.headerIconButton}
-              onPress={() => setFiltersVisible((prev) => !prev)}
-            >
-              <Ionicons
-                name={filtersVisible ? "options" : "filter-outline"}
-                size={20}
-                color="#111827"
-              />
-            </TouchableOpacity>
-          }
         />
 
         <InventoryFiltersBar

@@ -8,19 +8,20 @@ const BRAND_TEXT = "#111827";
 type Props = {
   title: string;
   onBack?: () => void;
-  rightSlot?: React.ReactNode; // למשל אייקון פילטר
+  rightSlot?: React.ReactNode;
 };
 
 export default function ScreenHeader({ title, onBack, rightSlot }: Props) {
   return (
     <View style={styles.headerRow}>
-      {/* Back button */}
-      <TouchableOpacity
-        style={styles.headerIconButton}
-        onPress={onBack}
-      >
-        <Ionicons name="chevron-back" size={22} color={BRAND_TEXT} />
-      </TouchableOpacity>
+      {/* Back button (only if onBack exists) */}
+      {onBack ? (
+        <TouchableOpacity style={styles.headerIconButton} onPress={onBack}>
+          <Ionicons name="chevron-back" size={22} color={BRAND_TEXT} />
+        </TouchableOpacity>
+      ) : (
+        <View style={{ width: 32 }} />
+      )}
 
       {/* Title */}
       <Text style={styles.title}>{title}</Text>

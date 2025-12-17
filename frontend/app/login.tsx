@@ -55,7 +55,7 @@ export default function LoginScreen() {
         style={styles.gradient}
       />
 
-      <ScreenHeader title="התחברות" onBack={() => router.back()} />
+      <ScreenHeader title="התחברות" />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
