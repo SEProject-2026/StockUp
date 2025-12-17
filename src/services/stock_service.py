@@ -38,7 +38,6 @@ class StockService:
             
     
             if not catalog_product:
-                await self._catalog_repository.save(barcode=barcode, chain=chain, name=name)
                 catalog_product_name = name
             else:
                 catalog_product_name = catalog_product.name
