@@ -1,11 +1,10 @@
 from typing import Optional
-from src.domain.smart_home.enums import ChainType
 
 class CatalogItem:
     def __init__(self, 
                  barcode: str, 
                  name: str, 
-                 chain: Optional[ChainType] = None):
+                 chain: Optional[str] = None):
         
         self.barcode = barcode
         self.name = name

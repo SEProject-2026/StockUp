@@ -1,7 +1,7 @@
 import pytest
 from uuid import UUID, uuid4
 from src.services.management_service import ManagementService
-from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
+from src.infrastructure.repositories_in_memory.in_memory_home_repository import InMemoryHomeRepository
 from src.response import Response
 
 @pytest.fixture

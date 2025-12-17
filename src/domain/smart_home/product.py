@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 from uuid import uuid4, UUID
-from src.domain.smart_home.enums import ExpirationType, LocationType, ChainType
+from src.domain.smart_home.enums import ExpirationType, LocationType
 from src.domain.domain_exception import DomainException
 
 
@@ -14,7 +14,7 @@ class ProductBuilder:
         self._quantity = quantity
         self._nickname: Optional[str] = None
         self._location: Optional[LocationType] = None
-        self._chain_origin: Optional[ChainType] = None
+        self._chain_origin: Optional[str] = None
         self._expiration_date: Optional[date] = None
 
     def with_original_name(self, original_name: str) -> 'ProductBuilder':
@@ -30,7 +30,7 @@ class ProductBuilder:
             self._location = location
         return self
 
-    def with_chain_origin(self, chain: ChainType) -> 'ProductBuilder':
+    def with_chain_origin(self, chain: str) -> 'ProductBuilder':
         if chain:
             self._chain_origin = chain
         return self
@@ -66,7 +66,7 @@ class Product:
                  quantity: int, 
                  location: Optional[LocationType], 
                  nickname: Optional[str] = None,
-                 chain_origin: Optional[ChainType] = None,
+                 chain_origin: Optional[str] = None,
                  expiration_date: Optional[date] = None):
         
         self._id = uuid4()
@@ -102,7 +102,7 @@ class Product:
     def get_location(self) -> Optional[LocationType]:
         return self._location
     
-    def get_chain_origin(self) -> Optional[ChainType]:
+    def get_chain_origin(self) -> Optional[str]:
         return self._chain_origin
     
     def get_expiration_type(self) -> Optional[ExpirationType]:

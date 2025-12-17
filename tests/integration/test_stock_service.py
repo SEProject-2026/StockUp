@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from src.services.stock_service import StockService 
 from src.domain.smart_home.product import Product
-from src.domain.smart_home.enums import ChainType, LocationType
+from src.domain.smart_home.enums import LocationType
 from unittest.mock import MagicMock, AsyncMock
 from src.response import Response
 
@@ -16,17 +16,17 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.mock_home_repo = MagicMock()
         self.mock_product_repo = MagicMock()
-        self.mock_catalog_repo = MagicMock()
+        self.mock_catalog_details_provider = MagicMock()
 
         self.service = StockService(
             home_repository=self.mock_home_repo,
             product_repository=self.mock_product_repo,
-            catalog_repository=self.mock_catalog_repo
+            catalog_details_provider=self.mock_catalog_details_provider
         )
         self.user_id = uuid4()
         self.home_id = uuid4()
         self.barcode = "729000000000"
-        self.chain = ChainType.SHUFERSAL
+        self.chain = "some_chain"
         self.mock_home = MagicMock()
         self.mock_home.is_member.return_value = True 
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
@@ -55,7 +55,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_add_product_success(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_home.is_member.return_value = True
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
+        self.mock_catalog_details_provider.get_product_details = AsyncMock(return_value=None)
         self.mock_product_repo.save = AsyncMock(return_value=None)
         response = await self.service.add_product(
             self.barcode, self.chain, self.user_id, self.home_id, 5, None, None, "My Snack"
@@ -73,7 +73,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_home.is_member.return_value = True
         mock_catalog_item = MagicMock()
         mock_catalog_item.name = "Coca Cola"
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=mock_catalog_item)
+        self.mock_catalog_details_provider.get_product_details = AsyncMock(return_value=mock_catalog_item)
         self.mock_product_repo.save = AsyncMock(return_value=None)
     
         response = await self.service.add_product(
@@ -87,7 +87,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_add_product_fails_on_negative_quantity(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
+        self.mock_catalog_details_provider.get_product_details = AsyncMock(return_value=None)
         self.mock_home.is_member.return_value = True
         response = await self.service.add_product(
             self.barcode, self.chain, self.user_id, self.home_id, -1, None, None, None
@@ -100,7 +100,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_remove_product_success(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_home.is_member.return_value = True
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
+        self.mock_catalog_details_provider.get_product_details = AsyncMock(return_value=None)
         mock_product = Product.builder(self.home_id, "123", "Milk", 1).build()
         self.mock_product_repo.get_by_id = AsyncMock(return_value=mock_product)
         self.mock_product_repo.delete = AsyncMock(return_value=None)

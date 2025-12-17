@@ -2,25 +2,25 @@ from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
 from src.domain.smart_home.product import Product
-from src.repositories.i_catalog_repositoy import ICatalogRepository
+from src.repositories.catalog_details_provider import CatalogDetailsProvider
 from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
-from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from src.domain.smart_home.enums import ExpirationType, LocationType
 from src.response import Response
 
 class StockService:
  
     def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
-                  catalog_repository: ICatalogRepository):
+                  catalog_details_provider: CatalogDetailsProvider):
         self._home_repository = home_repository
         self._product_repository = product_repository
-        self._catalog_repository = catalog_repository
+        self._catalog_details_provider = catalog_details_provider
 
     # ==========================================
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, barcode: str, chain: ChainType, user_id: UUID, home_id: UUID, quantity: int, 
+    async def add_product(self, barcode: str, chain: Optional[str], user_id: UUID, home_id: UUID, quantity: int, 
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
         
         try:
@@ -33,7 +33,7 @@ class StockService:
         
         try:
             # checking catalog only if product name not found in local DB
-            catalog_product = await self._catalog_repository.get_product_details(barcode, chain)
+            catalog_product = await self._catalog_details_provider.get_product_details(barcode, chain)
             
             # fallback to generic name if not found in catalog
             if not catalog_product:

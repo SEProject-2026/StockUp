@@ -2,7 +2,7 @@ import unittest
 from datetime import date, timedelta
 from uuid import uuid4
 from src.domain.domain_exception import DomainException
-from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from src.domain.smart_home.enums import ExpirationType, LocationType
 from src.domain.smart_home.product import Product, ProductBuilder
 
 
@@ -40,13 +40,13 @@ class TestProduct(unittest.TestCase):
             .with_original_name("NewName")
             .with_nickname("MyMilk")
             .with_location(LocationType.FRIDGE)
-            .with_chain_origin(ChainType.SHUFERSAL)
+            .with_chain_origin("some_chain")
             .with_expiration_date(self.tomorrow)
             .build()
         )
         self.assertEqual(product.get_nickname(), "MyMilk")
         self.assertEqual(product.get_location(), LocationType.FRIDGE)
-        self.assertEqual(product.get_chain_origin(), ChainType.SHUFERSAL)
+        self.assertEqual(product.get_chain_origin(), "some_chain")
         self.assertEqual(product.get_expiration_date(), self.tomorrow)
         self.assertEqual(product.get_original_name(), "NewName")
 

@@ -1,4 +1,4 @@
-from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from src.infrastructure.repositories_in_memory.in_memory_user_repository import InMemoryUserRepository
 from src.services.user_service import UserService
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 
