@@ -35,7 +35,7 @@ export default function LoginScreen() {
       setLoading(true);
 
       await login({ email: email.trim().toLowerCase(), password });
-      router.replace("/home"); 
+      router.replace("/home/home"); 
     } catch (e: any) {
       Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");
     } finally {
@@ -52,7 +52,7 @@ export default function LoginScreen() {
         style={styles.gradient}
       />
 
-      <ScreenHeader title="התחברות" onBack={() => router.back()} />
+      <ScreenHeader title="התחברות" />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

@@ -13,6 +13,7 @@ export type InventoryItem = {
   category: Category;
   quantity: number;
   expiresAt?: string;
+  homeId: string; 
 };
 
 type InventoryContextValue = {
