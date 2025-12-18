@@ -23,7 +23,7 @@ class StockService:
     # ==========================================
 
     async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
-                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> None:
+                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Product:
 
         home_expr_range = await self._check_access(user_id, home_id)
         products = await self._product_repository.search_by_name(home_id, name)
@@ -88,7 +88,7 @@ class StockService:
             return None
 
 
-    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> None:
+    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> Product:
 
         expiration_range = await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
@@ -134,7 +134,7 @@ class StockService:
         return search_results
     
 
-    async def search_product_external_db(self, user_id: UUID, home_id: UUID, query: str) -> Response:
+    async def search_product_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[str]:
 
         await self._check_access(user_id, home_id)
         search_results = await self._catalog_repository.search_by_name(query)
