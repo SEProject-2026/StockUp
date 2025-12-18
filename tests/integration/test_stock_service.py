@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -36,22 +37,22 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_add_product_fails_if_home_not_found(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=None)
-        response = await self.service.add_product(
-            self.chain, self.name, self.user_id, self.home_id, 1, self.barcode, None, None, None
-        )
-        self.assertFalse(response.isOk())
-        self.assertEqual(response.get_error_message(), "Home not found")
+        with self.assertRaises(ValueError) as cm:
+            await self.service.add_product(
+                self.name, self.user_id, self.home_id, 1, self.barcode, None, None, None
+            )
         self.mock_product_repo.save.assert_not_called()
     
 
     async def test_add_product_fails_if_user_not_home_member(self):
         self.mock_home.is_member.return_value = False
-        response = await self.service.add_product(
-            self.chain, self.name, self.user_id, self.home_id, 1, self.barcode, None, None, None
-        )
-        self.assertFalse(response.isOk())
-        self.assertIn("User is not a member of the home", response.get_error_message())
+        with self.assertRaises(ValueError) as cm:
+            await self.service.add_product(
+                self.name, self.user_id, self.home_id, 1, self.barcode, None, None, None
+            )
         self.mock_product_repo.save.assert_not_called()
+        self.assertIn("User is not a member of the home", str(cm.exception))
+        
 
 
     async def test_add_product_success(self):
@@ -61,10 +62,9 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_catalog_repo.save = AsyncMock(return_value=None)
         self.mock_product_repo.save = AsyncMock(return_value=None)
         self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
-        response = await self.service.add_product(
-            self.chain, self.name, self.user_id, self.home_id, 5, self.barcode, None, None, "My Snack"
+        await self.service.add_product(
+            self.name, self.user_id, self.home_id, 5, self.barcode, None, None, "My Snack"
         )
-        self.assertTrue(response.isOk())
         self.mock_product_repo.save.assert_called_once()
         saved_product = self.mock_product_repo.save.call_args.args[0]
         self.assertEqual(saved_product.get_quantity(), 5)
@@ -72,77 +72,70 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved_product.get_original_name(), "Generic Product") 
 
 
-    async def test_add_product_success_from_catalog(self):
-        self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
-        self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
-        self.mock_home.is_member.return_value = True
-        mock_catalog_item = MagicMock()
-        mock_catalog_item.name = "Coca Cola"
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=mock_catalog_item)
-        self.mock_product_repo.save = AsyncMock(return_value=None)
-    
-        response = await self.service.add_product(
-            self.chain, mock_catalog_item.name, self.user_id, self.home_id, 2, None, None, None, "soda"
-        )
-        self.assertTrue(response.isOk())
-        saved_product = self.mock_product_repo.save.call_args[0][0]
-        self.assertEqual(saved_product.get_original_name(), "Coca Cola")
-        self.assertEqual(saved_product.get_nickname(), "soda")
-        self.assertEqual(saved_product.get_quantity(), 2)
-
-
     async def test_add_product_fails_on_negative_quantity(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
         self.mock_catalog_repo.save = AsyncMock(return_value=None)
         self.mock_home.is_member.return_value = True
-        response = await self.service.add_product(
-            self.chain, self.name, self.user_id, self.home_id, -1, self.barcode, None, None, None
-        )
-        self.assertFalse(response.isOk())
-        self.assertIn("Quantity cannot be negative", response.get_error_message())
+        with self.assertRaises(ValueError) as cm:
+            await self.service.add_product(
+                self.name, self.user_id, self.home_id, -1, self.barcode, None, None, None
+            )
         self.mock_product_repo.save.assert_not_called()
+        self.assertIn("Quantity cannot be negative", str(cm.exception))
 
 
     async def test_remove_product_success(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_home.is_member.return_value = True
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
-        mock_product = Product.builder(self.home_id, "Milk", 1, expiration_range=self.expiration_range).build()
-        self.mock_product_repo.get_by_id = AsyncMock(return_value=mock_product)
+        self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
+        self.mock_product_repo.save = AsyncMock(return_value=None)
         self.mock_product_repo.delete = AsyncMock(return_value=None)
-        response = await self.service.remove_product(
-            self.user_id, self.home_id, mock_product.get_id()
+
+        mock_product = (
+            Product.builder(self.home_id, "Milk", 1, expiration_range=self.expiration_range)
+                .with_expiration_date(date.today()).build()
         )
-        
-        self.assertTrue(response.isOk())
+
+        await self.service.add_product(mock_product.get_original_name(), self.user_id,
+                                        self.home_id, 1, self.barcode, date.today(), None, None)
+        self.mock_product_repo.save.assert_called_once()
+        self.mock_product_repo.get_by_id = AsyncMock(return_value=mock_product)
+        await self.service.remove_product(
+            self.user_id, self.home_id, mock_product.get_id(), date.today()
+        )
         self.mock_product_repo.delete.assert_called_once_with(mock_product.get_id())
 
 
     async def test_update_quantity_success(self):
-        mock_product = Product.builder(self.home_id, "Milk", 1, expiration_range=self.expiration_range).build()
+        mock_product = (
+            Product.builder(self.home_id, "Milk", 1, expiration_range=self.expiration_range)
+            .with_expiration_date(date.today()).build()
+        )
         self.mock_product_repo.get_by_id = AsyncMock(return_value=mock_product)
         self.mock_product_repo.update = AsyncMock(return_value=None)
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_home.is_member.return_value = True
-        response = await self.service.update_stock_quantity(
-            self.user_id, self.home_id, mock_product.get_id(), 10
+        await self.service.update_stock_quantity(
+            self.user_id, self.home_id, mock_product.get_id(), date.today(), 10
         )
-        self.assertTrue(response.isOk())
         self.assertEqual(mock_product.get_quantity(), 10) 
         self.mock_product_repo.update.assert_called_once_with(mock_product)
 
 
     async def test_update_product_quantity_for_other_home_fail(self):
-        other_home_id = uuid4()
-        mock_product = Product.builder(other_home_id, "Milk", 1, expiration_range=self.expiration_range).build()
-        self.mock_product_repo.get_by_id = AsyncMock(return_value=mock_product)
+        with self.assertRaises(ValueError) as cm:
+            other_home_id = uuid4()
+            mock_product = (
+                Product.builder(other_home_id, "Milk", 1, expiration_range=self.expiration_range)
+                .with_expiration_date(date.today() + timedelta(days=1)).build()
+            )
+            self.mock_product_repo.get_by_id = AsyncMock(return_value=mock_product)
 
-        response = await self.service.update_stock_quantity(
-            self.user_id, self.home_id, mock_product.get_id(), 5
-        )
-        self.assertFalse(response.isOk())
-        self.assertIn("Product not found", response.get_error_message())
+            response = await self.service.update_stock_quantity(
+                self.user_id, self.home_id, mock_product.get_id(), date.today() + timedelta(days=1), 5
+            )
+        self.assertIn("Product not found", str(cm.exception))
         self.mock_product_repo.update.assert_not_called()
 
 

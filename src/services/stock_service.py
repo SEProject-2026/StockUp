@@ -1,3 +1,4 @@
+from sys import exception
 from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
@@ -20,56 +21,30 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, chain: Optional[ChainType], name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
-                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Response[str]:
-        
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
-        except Exception as e:
-            print(e)
-            return Response(isOk=False, error_message=f"Permission validation failed: {e}")
-        
-        try:
-            # checking catalog only if product name not found in local DB
-            # assuming if no barcode return value is none
-            catalog_product = await self._catalog_repository.get_product_details(barcode, chain)
-            
-    
-            if not catalog_product:
-                catalog_product_name = name
-            else:
-                catalog_product_name = catalog_product.name
-        except Exception as e:
-            print(f"Catalog Error: {e}")
-            return Response(isOk=False, error_message="Error retrieving product details")
+    async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
+                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> None:
 
-        try:
-            home = await self._home_repository.get_by_id(home_id)
-            expiration_range = home.get_expiration_range()
-            new_product_entity = (
-                Product.builder(
-                    home_id=home_id,
-                    name=catalog_product_name,
-                    quantity=quantity,
-                    expiration_range=expiration_range
-                )
-                .with_barcode(barcode)
-                .with_nickname(nickname)
-                .with_location(location)
-                .with_expiration_date(expiration_date)
-                .build()
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
+    
+        home = await self._home_repository.get_by_id(home_id)
+        expiration_range = home.get_expiration_range()
+        new_product_entity = (
+            Product.builder(
+                home_id=home_id,
+                name=name,
+                quantity=quantity,
+                expiration_range=expiration_range
             )
-        except ValueError as ve:
-             return Response(isOk=False, error_message=str(ve))
-        except Exception as e:
-             return Response(isOk=False, error_message=f"Domain logic error: {e}")
-        try:
-            await self._product_repository.save(new_product_entity)
-            return Response(isOk=True, data="Product added successfully")
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Database save error: {e}")
+            .with_barcode(barcode)
+            .with_nickname(nickname)
+            .with_location(location)
+            .with_expiration_date(expiration_date)
+            .build()
+        )
+        await self._product_repository.save(new_product_entity)
+
         
     ##########################################################################################
     async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:
@@ -77,128 +52,103 @@ class StockService:
         raise NotImplementedError("Not implemented yet")
     ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID) -> Response:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
-            product = await self._product_repository.get_by_id(product_id)
-            if not product or product.get_home_id() != home_id:
-                return Response(isOk=False, error_message="Product not found in this home")
-            try:
-                await self._product_repository.delete(product_id)
-                return Response(isOk=True, data="Product removed successfully.")
-            except Exception as e:
-                return Response(isOk=False, error_message=f"Error removing product: {e}")
-        except Exception as e:
-            print(e)
-            return Response(isOk=False, error_message=f"Permission validation failed: {e}")
-
-    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, new_quantity: int) -> Response:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
-            
-            product = await self._product_repository.get_by_id(product_id)
-            if not product or product.get_home_id() != home_id:
-                return Response(isOk=False, error_message="Product not found")
-            
-            product.set_quantity(new_quantity)
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> None:
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
+        
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.get_home_id() != home_id:
+            raise ValueError("Product not found in this home")
+        
+        product_total_quantity = await product.update_quantity_and_removal(date)
+        if product_total_quantity > 0:
             await self._product_repository.update(product)
-            return Response(isOk=True, data="Quantity updated successfully.")
+        else:
+            await self._product_repository.delete(product_id)
+
+
+    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> None:
+
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
         
-        except ValueError as ve:
-             return Response(isOk=False, error_message=str(ve))
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Error updating quantity: {e}")
-
-    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> Response[str]:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
-
-            product = await self._product_repository.get_by_id(product_id)
-            if not product or product.get_home_id() != home_id:
-                return Response(isOk=False, error_message="Product not found in this home")
-
-            expiration_range = await self._home_repository.get_by_id(home_id).get_default_expiration_range()
-            product.update_expiration_date(old_date, new_date, expiration_range)
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.get_home_id() != home_id:
+            raise ValueError("Product not found")
+        
+        product_total_quantity = await product.update_quantity(date, new_quantity)
+        if product_total_quantity > 0:
             await self._product_repository.update(product)
-            return Response(isOk=True, data="Expiration date updated successfully.")
-        
-        except ValueError as ve:
-             return Response(isOk=False, error_message=str(ve))
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Error updating expiration date: {e}")
-        
-    async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Response[str]:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
+        else:
+            await self._product_repository.delete(product_id)
 
-            product = await self._product_repository.get_by_id(product_id)
-            if not product or product.get_home_id() != home_id:
-                return Response(isOk=False, error_message="Product not found in this home")
 
-            product.set_nickname(new_nickname)
-            await self._product_repository.update(product)
-            return Response(isOk=True, data="Nickname updated successfully.")
+    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> None:
+
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
+
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.get_home_id() != home_id:
+            raise ValueError("Product not found in this home")
+
+        expiration_range = await self._home_repository.get_by_id(home_id).get_default_expiration_range()
+        product.update_expiration_date(old_date, new_date, expiration_range)
+        await self._product_repository.update(product)
         
-        except ValueError as ve:
-             return Response(isOk=False, error_message=str(ve))
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Error updating nickname: {e}")
+
+    async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> None:
+
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
+
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.get_home_id() != home_id:
+            raise ValueError("Product not found in this home")
+        product.set_nickname(new_nickname)
+        await self._product_repository.update(product)
+
 
     async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> Response:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
-
-            filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
-            
-            data = [p.to_dict() for p in filtered_products]
-            return Response(isOk=True, data=data)
+       
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
         
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Error filtering products: {e}")
+        filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
+        return [p.to_dict() for p in filtered_products]
+
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
+ 
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
 
-            filtered_products = await self._product_repository.get_by_location(home_id, location)
-            
-            data = [p.to_dict() for p in filtered_products]
-            return Response(isOk=True, data=data)
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Error filtering products by location: {e}")
+        filtered_products = await self._product_repository.get_by_location(home_id, location)
+        return [p.to_dict() for p in filtered_products]
+
 
     """searches for products based on product name or nickname."""
     async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response:
-        try:
-            valid_member_response = await self._check_access(user_id, home_id)
-            if valid_member_response.isError():
-                return valid_member_response
+  
+        valid_member_response = await self._check_access(user_id, home_id)
+        if valid_member_response.isError():
+            raise ValueError(valid_member_response.get_error_message())
 
-            search_results = await self._product_repository.search_by_name(home_id, query)
+        search_results = await self._product_repository.search_by_name(home_id, query)
             
-            data = [p.to_dict() for p in search_results]
-            return Response(isOk=True, data=data)
-
-        except Exception as e:
-            return Response(isOk=False, error_message=f"Error searching products: {e}")
+        return [p.to_dict() for p in search_results]
     
     async def _check_access(self, user_id: UUID, home_id: UUID) -> Response:
         """Helper to verify user exists, logged in, and member of the home"""
         home = await self._home_repository.get_by_id(home_id)
-        if not home: 
-            return Response(isOk=False, error_message="Home not found")
+        if not home:
+            raise ValueError("Home retrieval failed.")
         #error message for non-members, caller will check isError()
         return Response(isOk=home.is_member(user_id), error_message="User is not a member of the home")
     
