@@ -1,4 +1,4 @@
 // frontend/app/index.tsx
-import LoginScreen from "./login";
+import HomesScreen from "./home/home";
 
-export default LoginScreen;
+export default HomesScreen;

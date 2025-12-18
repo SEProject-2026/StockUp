@@ -14,10 +14,3 @@ class ICatalogRepository(ABC):
         2. If not found or chain_name is None, looks for a global item (EAN barcode).
         """
         pass
-
-    @abstractmethod
-    async def save(self, barcode: str, chain: Optional[ChainType], name: str) -> None:
-        """
-        Saves a new catalog item with the given barcode, chain, and name.
-        """
-        pass

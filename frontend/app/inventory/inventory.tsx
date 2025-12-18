@@ -1,16 +1,14 @@
-
 import React, { useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Text,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient"; 
+import { router, useLocalSearchParams } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useInventory, Category, InventoryItem } from "../../src/context/inventory-context";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 
@@ -21,14 +19,6 @@ import ScreenHeader from "@/src/layout/ScreenHeader";
 
 export type CategoryKey = Category | "all";
 type StatusFilter = "all" | "soon" | "expired";
-
-export type InventoryStats = {
-  total: number;
-  fridge: number;
-  freezer: number;
-  pantry: number;
-  expiringSoon: number;
-};
 
 export type GroupedInventory = {
   key: string;
@@ -51,25 +41,32 @@ export function InventoryScreenBase({
 }: InventoryScreenBaseProps) {
   const { items, updateItem, removeItem } = useInventory();
 
+  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+  const currentHomeId = homeId ? String(homeId) : undefined;
+
   const [selectedTab, setSelectedTab] = useState<CategoryKey>(initialCategory);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [filtersVisible, setFiltersVisible] = useState(false);
 
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
 
   const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
+  const filtersVisible = true;
 
-  const { groupedItems /*, stats*/ } = useMemo(() => {
+  // ✅ 1) items רק של הבית הנוכחי
+  const itemsForHome = useMemo(() => {
+    // אם עדיין אין homeId על פריטים — זה יחזיר הכל (כדי לא לשבור).
+    // אם את רוצה לחייב בית: תחזירי [] כשאין homeId.
+    if (!currentHomeId) return items;
+    return items.filter((it: any) => it.homeId === currentHomeId);
+  }, [items, currentHomeId]);
+
+  // ✅ 2) חישוב groupedItems על itemsForHome ולא items
+  const { groupedItems } = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let fridge = 0;
-    let freezer = 0;
-    let pantry = 0;
-    let expiringSoon = 0;
-
-    const filtered = items.filter((item) => {
+    const filtered = itemsForHome.filter((item) => {
       if (effectiveCategory !== "all" && item.category !== effectiveCategory) {
         return false;
       }
@@ -86,8 +83,6 @@ export function InventoryScreenBase({
         const diffDays =
           (exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
 
-        //expiring soon = 0-3 days
-        //will be user choice later
         if (statusFilter === "soon" && !(diffDays >= 0 && diffDays <= 3)) {
           return false;
         }
@@ -97,22 +92,6 @@ export function InventoryScreenBase({
       }
 
       return true;
-    });
-
-    items.forEach((item) => {
-      if (item.category === "fridge") fridge++;
-      if (item.category === "freezer") freezer++;
-      if (item.category === "pantry") pantry++;
-
-      if (item.expiresAt) {
-        const exp = new Date(item.expiresAt);
-        exp.setHours(0, 0, 0, 0);
-        const diffMs = exp.getTime() - today.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        if (diffDays >= 0 && diffDays <= 3) {
-          expiringSoon++;
-        }
-      }
     });
 
     const groupMap = new Map<string, GroupedInventory>();
@@ -138,13 +117,12 @@ export function InventoryScreenBase({
       a.name.localeCompare(b.name, "he")
     );
 
-    return {
-      groupedItems,
-    };
-  }, [items, effectiveCategory, search, statusFilter]);
+    return { groupedItems };
+  }, [itemsForHome, effectiveCategory, search, statusFilter]);
 
+  // ✅ 3) handlers עובדים על itemsForHome
   const handleChangeQty = (id: string, delta: number) => {
-    const current = items.find((it) => it.id === id);
+    const current = itemsForHome.find((it) => it.id === id);
     if (!current) return;
     const next = current.quantity + delta;
     if (next < 1) return;
@@ -152,17 +130,13 @@ export function InventoryScreenBase({
   };
 
   const handleDelete = (id: string) => {
-    const current = items.find((it) => it.id === id);
+    const current = itemsForHome.find((it) => it.id === id);
     Alert.alert(
       "מחיקת מוצר",
       `למחוק את "${current?.name ?? "המוצר"}" מהמלאי?`,
       [
         { text: "ביטול", style: "cancel" },
-        {
-          text: "מחק",
-          style: "destructive",
-          onPress: () => removeItem(id),
-        },
+        { text: "מחק", style: "destructive", onPress: () => removeItem(id) },
       ]
     );
   };
@@ -180,12 +154,17 @@ export function InventoryScreenBase({
   };
 
   const handleBack = () => {
-    if (router.canGoBack && router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/");
+    if (currentHomeId) {
+      router.replace({
+        pathname: "/home/[homeId]",
+        params: { homeId: currentHomeId },
+      });
+      return;
     }
-};
+
+    router.replace("/home/home");
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
@@ -197,25 +176,11 @@ export function InventoryScreenBase({
       />
 
       <View style={styles.main}>
-        {/* HEADER */}
         <ScreenHeader
           title={title}
           onBack={handleBack}
-          rightSlot={
-            <TouchableOpacity
-              style={styles.headerIconButton}
-              onPress={() => setFiltersVisible(prev => !prev)}
-            >
-              <Ionicons
-                name={filtersVisible ? "options" : "filter-outline"}
-                size={20}
-                color="#111827"
-              />
-            </TouchableOpacity>
-          }
         />
 
-        {/* Tabs + (optionally) filters panel */}
         <InventoryFiltersBar
           hideTabs={hideTabs}
           selectedTab={selectedTab}
@@ -224,22 +189,27 @@ export function InventoryScreenBase({
           onChangeSearch={setSearch}
           statusFilter={statusFilter}
           onChangeStatusFilter={setStatusFilter}
-        filtersVisible={filtersVisible}
+          filtersVisible={filtersVisible}
         />
 
-        {/* Grouped list */}
         <GroupedInventoryList
           groupedItems={groupedItems}
           onChangeQty={handleChangeQty}
           onEditItem={setItemToEdit}
           onDeleteItem={handleDelete}
-          onAddItem={() => router.push("/inventory/add-item")}
+          onAddItem={() =>
+            router.push({
+              pathname: "/inventory/add-item",
+              params: currentHomeId ? { homeId: currentHomeId } : {},
+            })
+          }
         />
 
+        {/* לא חייב להעביר activeTab בכלל כי הוא יודע לנחש,
+            אבל בסדר להשאיר. */}
         <BottomNavBar activeTab="inventory" />
       </View>
 
-      {/* Edit modal */}
       <EditItemModal
         visible={!!itemToEdit}
         item={itemToEdit}
@@ -249,6 +219,7 @@ export function InventoryScreenBase({
     </SafeAreaView>
   );
 }
+
 
 export default function InventoryScreen() {
   return (

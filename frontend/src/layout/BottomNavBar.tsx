@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, usePathname } from "expo-router";
+import { router, useLocalSearchParams, usePathname } from "expo-router";
 
 type TabKey = "home" | "inventory" | "shopping-list" | "settings";
 
@@ -11,7 +11,9 @@ interface BottomNavBarProps {
 
 export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
   const pathname = usePathname();
-
+  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+  const currentHomeId = homeId ? String(homeId) : undefined;
+  
   // Auto-guess based on URL if activeTab is not manually passed
   const current: TabKey =
     activeTab ??
@@ -28,16 +30,31 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
 
     switch (tab) {
       case "home":
-        router.replace("/");
+        if (currentHomeId) {
+          router.replace({
+            pathname: "/home/[homeId]",
+            params: { homeId: currentHomeId },
+          });
+        } else {
+          router.replace("/home/home"); // מסך רשימת הבתים
+        }
         break;
+
       case "inventory":
-        router.replace("/inventory/inventory");
+        if (currentHomeId) {
+          router.replace({
+            pathname: "/inventory/inventory",
+            params: { homeId: currentHomeId },
+          });
+        } else {
+          router.replace("/inventory/inventory"); // או "/homes" אם מלאי חייב בית
+        }
         break;
       case "shopping-list":
         //router.replace("/ShoppingListScreen");
         break;
       case "settings":
-        //router.replace("/SettingsScreen");
+        router.replace("/settings");
         break;
     }
   };

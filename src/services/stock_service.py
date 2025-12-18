@@ -23,7 +23,6 @@ class StockService:
 
     async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> None:
-        
 
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
