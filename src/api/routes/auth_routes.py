@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from api.schemas.common import GeneralResponse
-from api.schemas.user_schemas import (
+from src.api.schemas.user_schemas import (
+    UserDTO,
     RegisterRequest, 
     LoginRequest, 
     LoginResponse, 
-    UserDTO,
-    UpdateNameRequest,
+    UpdateNameRequest, 
     ChangePasswordRequest
 )
+from src.api.schemas.common import GeneralResponse
+
 from src.infrastructure.app_container import AppContainer
-from src.api.security import get_current_user_id
+from src.api.security import get_current_user_id 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

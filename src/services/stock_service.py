@@ -46,6 +46,7 @@ class StockService:
             existing_product = products[0]
             await existing_product.update_quantity(quantity + existing_product.get_quantity(), expiration_date)
             await self._product_repository.update(existing_product)
+        return existing_product if len(products) > 0 else new_product_entity
 
         
     ##########################################################################################
@@ -56,8 +57,6 @@ class StockService:
 
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> Optional[Product]:
         valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
@@ -140,6 +139,7 @@ class StockService:
         search_results = await self._catalog_repository.search_by_name(query)
         return [ci.__repr__() for ci in search_results]
     
+    #provides the expiration range for the home after verifying user access
     async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
         """Helper to verify user exists, logged in, and member of the home"""
         home = await self._home_repository.get_by_id(home_id)

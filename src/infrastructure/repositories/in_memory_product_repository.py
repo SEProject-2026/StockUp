@@ -41,7 +41,7 @@ class InMemoryProductRepository(IProductRepository):
 
             if p.get_home_id() != home_id:
                 continue
-            name_match = query in p.get_name().lower()
+            name_match = query in p.get_original_name().lower()
             nickname_match = p.get_nickname() and query in p.get_nickname().lower()
             
             if name_match or nickname_match:
