@@ -188,3 +188,23 @@ async def filter_by_expiration(
         return GeneralResponse(status="success", data=dtos)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+
+
+@router.get("/all", response_model=GeneralResponse)
+async def get_all_products(
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+    service: StockService = Depends(AppContainer.get_stock_service)
+):
+    try:
+        products = await service.get_home_products(user_id=user_id, home_id=home_id)
+        
+        products_dtos = [ProductDTO.from_domain(p) for p in products]
+        
+        return GeneralResponse(
+            status="success",
+            data=products_dtos
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

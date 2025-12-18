@@ -139,6 +139,12 @@ class StockService:
         search_results = await self._catalog_repository.search_by_name(query)
         return [ci.__repr__() for ci in search_results]
     
+    async def get_home_products(self, user_id: UUID, home_id: UUID) -> List[Product]:
+        """Retrieves all products in the home's inventory."""
+        await self._check_access(user_id, home_id)
+        products = await self._product_repository.list_all_by_home(home_id)
+        return products
+    
     #provides the expiration range for the home after verifying user access
     async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
         """Helper to verify user exists, logged in, and member of the home"""
@@ -148,6 +154,8 @@ class StockService:
         if not home.is_member(user_id):
             raise ValueError("User is not a member of the home")
         return home.get_expiration_range()
+    
+
     
     # ==========================================
     # 3. Shopping List (Active & Base Mode)
