@@ -62,7 +62,7 @@ class StockService:
         if not product or product.get_home_id() != home_id:
             raise ValueError("Product not found in this home")
         
-        product_total_quantity = product.update_quantity_and_removal(date)
+        product_total_quantity = await product.update_quantity_and_removal(date)
         if product_total_quantity > 0:
             await self._product_repository.update(product)
         else:

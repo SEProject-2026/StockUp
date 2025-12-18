@@ -1,8 +1,7 @@
 from datetime import date
 from typing import Optional
 from uuid import uuid4, UUID
-from src.domain.smart_home.enums import ExpirationType, LocationType, ChainType
-from src.domain.domain_exception import DomainException
+from src.domain.smart_home.enums import ExpirationType, LocationType
 
 
 class ProductBuilder:
@@ -75,7 +74,7 @@ class Product:
         self.set_nickname(nickname)
         self.set_quantity(quantity)
         self._location = location
-        self._expiration_dates_to_quantity = {date: (int, ExpirationType)}
+        self._expiration_dates_to_quantity = {} # expiration_date: (quantity, ExpirationType)
         self.set_expiration_date_and_type(expiration_date, quantity, expiration_range)
 
     # Getters
