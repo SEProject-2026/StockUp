@@ -58,9 +58,9 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_add_product_success(self):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_home.is_member.return_value = True
-        self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
         self.mock_catalog_repo.save = AsyncMock(return_value=None)
         self.mock_product_repo.save = AsyncMock(return_value=None)
+        self.mock_product_repo.search_by_name = AsyncMock(return_value=[])
         self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
         await self.service.add_product(
             self.name, self.user_id, self.home_id, 5, self.barcode, None, None, "My Snack"
@@ -76,6 +76,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
         self.mock_catalog_repo.save = AsyncMock(return_value=None)
+        self.mock_product_repo.search_by_name = AsyncMock(return_value=[])
         self.mock_home.is_member.return_value = True
         with self.assertRaises(ValueError) as cm:
             await self.service.add_product(
@@ -91,6 +92,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
         self.mock_product_repo.save = AsyncMock(return_value=None)
         self.mock_product_repo.delete = AsyncMock(return_value=None)
+        self.mock_product_repo.search_by_name = AsyncMock(return_value=[])
 
         mock_product = (
             Product.builder(self.home_id, "Milk", 1, expiration_range=self.expiration_range)
