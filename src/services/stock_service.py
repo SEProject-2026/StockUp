@@ -2,6 +2,7 @@ from sys import exception
 from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
+from src.domain.smart_home.catalog_item import CatalogItem
 from src.domain.smart_home.product import Product
 from src.repositories.i_catalog_repositoy import ICatalogRepository
 from src.repositories.i_product_repository import IProductRepository
@@ -24,26 +25,27 @@ class StockService:
     async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> None:
 
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-    
-        home = await self._home_repository.get_by_id(home_id)
-        expiration_range = home.get_expiration_range()
-        new_product_entity = (
-            Product.builder(
-                home_id=home_id,
-                name=name,
-                quantity=quantity,
-                expiration_range=expiration_range
+        home_expr_range = await self._check_access(user_id, home_id)
+        products = await self._product_repository.search_by_name(home_id, name)
+        if len(products) == 0:
+            new_product_entity = (
+                Product.builder(
+                    home_id=home_id,
+                    name=name,
+                    quantity=quantity,
+                    expiration_range=home_expr_range
+                )
+                .with_barcode(barcode)
+                .with_nickname(nickname)
+                .with_location(location)
+                .with_expiration_date(expiration_date)
+                .build()
             )
-            .with_barcode(barcode)
-            .with_nickname(nickname)
-            .with_location(location)
-            .with_expiration_date(expiration_date)
-            .build()
-        )
-        await self._product_repository.save(new_product_entity)
+            await self._product_repository.save(new_product_entity)
+        else:
+            existing_product = products[0]
+            await existing_product.update_quantity(quantity + existing_product.get_quantity(), expiration_date)
+            await self._product_repository.update(existing_product)
 
         
     ##########################################################################################
@@ -53,10 +55,7 @@ class StockService:
     ###########################################################################################
 
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> None:
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-        
+        await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
             raise ValueError("Product not found in this home")
@@ -70,10 +69,7 @@ class StockService:
 
     async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> None:
 
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-        
+        await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
             raise ValueError("Product not found")
@@ -87,24 +83,18 @@ class StockService:
 
     async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> None:
 
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-
+        expiration_range = await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
             raise ValueError("Product not found in this home")
 
-        expiration_range = await self._home_repository.get_by_id(home_id).get_default_expiration_range()
         product.update_expiration_date(old_date, new_date, expiration_range)
         await self._product_repository.update(product)
         
 
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> None:
 
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
+        await self._check_access(user_id, home_id)
 
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
@@ -115,42 +105,40 @@ class StockService:
 
     async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> Response:
        
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-        
+        await self._check_access(user_id, home_id)
         filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
         return [p.to_dict() for p in filtered_products]
 
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
  
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-
+        await self._check_access(user_id, home_id)
         filtered_products = await self._product_repository.get_by_location(home_id, location)
         return [p.to_dict() for p in filtered_products]
 
 
     """searches for products based on product name or nickname."""
-    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response:
+    async def search_product_inventory(self, user_id: UUID, home_id: UUID, query: str) -> Response:
   
-        valid_member_response = await self._check_access(user_id, home_id)
-        if valid_member_response.isError():
-            raise ValueError(valid_member_response.get_error_message())
-
+        await self._check_access(user_id, home_id)
         search_results = await self._product_repository.search_by_name(home_id, query)
-            
         return [p.to_dict() for p in search_results]
     
-    async def _check_access(self, user_id: UUID, home_id: UUID) -> Response:
+
+    async def search_product_external_db(self, user_id: UUID, home_id: UUID, query: str) -> Response:
+
+        await self._check_access(user_id, home_id)
+        search_results = await self._catalog_repository.search_by_name(query)
+        return [ci.__repr__() for ci in search_results]
+    
+    async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
         """Helper to verify user exists, logged in, and member of the home"""
         home = await self._home_repository.get_by_id(home_id)
         if not home:
             raise ValueError("Home retrieval failed.")
-        #error message for non-members, caller will check isError()
-        return Response(isOk=home.is_member(user_id), error_message="User is not a member of the home")
+        if not home.is_member(user_id):
+            raise ValueError("User is not a member of the home")
+        return home.get_expiration_range()
     
     # ==========================================
     # 3. Shopping List (Active & Base Mode)
