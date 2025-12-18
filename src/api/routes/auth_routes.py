@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from src.api.schemas import (
+from api.schemas.common import GeneralResponse
+from api.schemas.user_schemas import (
     RegisterRequest, 
     LoginRequest, 
     LoginResponse, 
-    GeneralResponse, 
     UserDTO,
     UpdateNameRequest,
     ChangePasswordRequest

@@ -52,7 +52,7 @@ class StockService:
         raise NotImplementedError("Not implemented yet")
     ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> None:
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> Optional[Product]:
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
             raise ValueError(valid_member_response.get_error_message())
@@ -64,11 +64,13 @@ class StockService:
         product_total_quantity = await product.update_quantity_and_removal(date)
         if product_total_quantity > 0:
             await self._product_repository.update(product)
+            return product
         else:
             await self._product_repository.delete(product_id)
+            return None
 
 
-    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> None:
+    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> Optional[Product]:
 
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
@@ -81,8 +83,10 @@ class StockService:
         product_total_quantity = await product.update_quantity(date, new_quantity)
         if product_total_quantity > 0:
             await self._product_repository.update(product)
+            return product
         else:
             await self._product_repository.delete(product_id)
+            return None
 
 
     async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> None:
@@ -100,7 +104,7 @@ class StockService:
         await self._product_repository.update(product)
         
 
-    async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> None:
+    async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:
 
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
@@ -111,30 +115,31 @@ class StockService:
             raise ValueError("Product not found in this home")
         product.set_nickname(new_nickname)
         await self._product_repository.update(product)
+        return product
 
 
-    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> Response:
+    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[Product]:
        
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
             raise ValueError(valid_member_response.get_error_message())
         
         filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
-        return [p.to_dict() for p in filtered_products]
+        return filtered_products
 
 
-    async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> Response[List[Dict]]:
+    async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> List[Product]:
  
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
             raise ValueError(valid_member_response.get_error_message())
 
         filtered_products = await self._product_repository.get_by_location(home_id, location)
-        return [p.to_dict() for p in filtered_products]
+        return filtered_products
 
 
     """searches for products based on product name or nickname."""
-    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> Response:
+    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> List[Product]:
   
         valid_member_response = await self._check_access(user_id, home_id)
         if valid_member_response.isError():
@@ -142,7 +147,7 @@ class StockService:
 
         search_results = await self._product_repository.search_by_name(home_id, query)
             
-        return [p.to_dict() for p in search_results]
+        return search_results
     
     async def _check_access(self, user_id: UUID, home_id: UUID) -> Response:
         """Helper to verify user exists, logged in, and member of the home"""
