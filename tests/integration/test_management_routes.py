@@ -32,7 +32,7 @@ def get_auth_token(client, email="home_admin@test.com"):
     """
     password = "Password123!"
     # 1. Register
-    client.post("/auth/register", json={"email": email, "password": password, "name": "Admin User"})
+    client.post("/auth/register", json={"email": email, "password": password, "password_confirm": password, "name": "Admin User"})
     
     # 2. Login
     login_res = client.post("/auth/login", json={"email": email, "password": password})
@@ -88,3 +88,72 @@ def test_create_home_unauthorized():
     response = client.post("/homes/create", json=payload)
     
     assert response.status_code == 401
+
+
+def test_get_my_homes_success():
+    """
+    Test that a user can retrieve all homes they belong to.
+    """
+    token, user_id = get_auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # 1. Create two homes
+    client.post("/homes/create", json={"name": "City Apt"}, headers=headers)
+    client.post("/homes/create", json={"name": "Country House"}, headers=headers)
+    
+    # 2. Get list of homes
+    response = client.get("/homes/my_homes", headers=headers)
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    
+    homes_list = data["data"]
+    assert len(homes_list) == 2
+    
+    # Verify names exist in the list
+    home_names = [h["name"] for h in homes_list]
+    assert "City Apt" in home_names
+    assert "Country House" in home_names
+    
+    # Verify structure (DTO)
+    assert "id" in homes_list[0]
+    assert "member_ids" in homes_list[0]
+
+def test_get_my_homes_empty_list():
+    """
+    Test that a user with no homes gets an empty list (not an error).
+    """
+    # Create a fresh user
+    token, _ = get_auth_token(client, email="homeless@test.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    response = client.get("/homes/my_homes", headers=headers)
+    
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert isinstance(data, list)
+    assert len(data) == 0
+
+def test_get_my_homes_isolation():
+    """
+    Test that User A cannot see User B's homes.
+    """
+    # User A setup
+    token_a, _ = get_auth_token(client, email="userA@test.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    client.post("/homes/create", json={"name": "User A Home"}, headers=headers_a)
+    
+    # User B setup
+    token_b, _ = get_auth_token(client, email="userB@test.com")
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    client.post("/homes/create", json={"name": "User B Home"}, headers=headers_b)
+    
+    # User A requests their homes
+    response = client.get("/homes/my_homes", headers=headers_a)
+    
+    homes_list = response.json()["data"]
+    assert len(homes_list) == 1
+    assert homes_list[0]["name"] == "User A Home"
+    # Ensure User B's home is NOT present
+    assert "User B Home" not in [h["name"] for h in homes_list]

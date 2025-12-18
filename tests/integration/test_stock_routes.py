@@ -44,7 +44,7 @@ def setup_user_and_home(client):
     # 1. Register
     email = "stock_test@test.com"
     password = "Password123!"
-    client.post("/auth/register", json={"email": email, "password": password, "name": "Stock User"})
+    client.post("/auth/register", json={"email": email, "password": password, "password_confirm": password, "name": "Stock User"})
     
     # 2. Login
     login_res = client.post("/auth/login", json={"email": email, "password": password})
