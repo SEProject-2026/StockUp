@@ -16,6 +16,12 @@ class InMemoryProductRepository(IProductRepository):
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[Product]: 
         return self._products_db.get(product_id)
     
+    async def get_by_name(self, home_id: uuid.UUID, name: str) -> Optional[Product]:
+        for p in self._products_db.values():
+            if p.get_home_id() == home_id and p.get_original_name() == name:
+                return p
+        return None
+    
     async def update(self, product: Product) -> None:
         if product.get_id() in self._products_db:
             self._products_db[product.get_id()] = product

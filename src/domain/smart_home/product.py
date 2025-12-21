@@ -165,6 +165,12 @@ class Product:
             
     async def add_to_existing_product(self, expiration_date: date, new_quantity: int, expiration_range: int) -> None:
         if expiration_date in self._expiration_dates_to_quantity:
+            old_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
+            await self.update_date_quantity(expiration_date, new_quantity + old_quantity)
+        else:
+            self.set_expiration_date_and_type(expiration_date, new_quantity, expiration_range)
+            self._quantity += new_quantity
+            
     def set_location(self, new_location: LocationType) -> None:
         self._location = new_location
 
@@ -179,7 +185,6 @@ class Product:
         if not clean_name.isalnum():
             raise ValueError("Nickname must contain only letters or numbers.")
         return True
-
   
     def to_dict(self) -> dict:
         return {

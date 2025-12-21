@@ -27,9 +27,9 @@ class StockService:
                           expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Product:
 
         home_expr_range = await self._check_access(user_id, home_id)
-        products = await self._product_repository.search_by_name(home_id, name)
-        if len(products) == 0:
-            new_product_entity = (
+        product = await self._product_repository.get_by_name(home_id, name)
+        if not product:
+            product = (
                 Product.builder(
                     home_id=home_id,
                     name=name,
@@ -42,13 +42,11 @@ class StockService:
                 .with_expiration_date(expiration_date)
                 .build()
             )
-            await self._product_repository.save(new_product_entity)
+            await self._product_repository.save(product)
         else:
-            existing_product = products[0]
-            await existing_product.add_to_existing_product(expiration_date, quantity, home_expr_range)
-            await self._product_repository.update(existing_product)
-        return existing_product if len(products) > 0 else new_product_entity
-
+            await product.add_to_existing_product(expiration_date, quantity, home_expr_range)
+            await self._product_repository.update(product)
+        return product
         
     ##########################################################################################
     async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:

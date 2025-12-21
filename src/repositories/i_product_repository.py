@@ -35,6 +35,11 @@ class IProductRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_by_name(self, home_id: UUID, name: str) -> Optional[Product]:
+        """Retrieves a product by its name within a specific home."""
+        pass
+
+    @abstractmethod
     async def search_by_name(self, home_id: UUID, query: str) -> List[Product]:
         """Searches products in a home by name or nickname."""
         pass

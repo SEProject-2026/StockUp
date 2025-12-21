@@ -9,7 +9,7 @@ from src.infrastructure.repositories.in_memory_home_repository import InMemoryHo
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
 from src.services.stock_service import StockService 
 from src.domain.smart_home.product import Product
-from src.domain.smart_home.enums import ChainType, LocationType
+from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
 from unittest.mock import MagicMock, AsyncMock
 from src.response import Response
 
@@ -64,6 +64,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_home.is_member.return_value = True
         self.mock_catalog_repo.save = AsyncMock(return_value=None)
         self.mock_product_repo.save = AsyncMock(return_value=None)
+        self.mock_product_repo.get_by_name = AsyncMock(return_value=None)
         self.mock_product_repo.search_by_name = AsyncMock(return_value=[])
         self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
         await self.service.add_product(
@@ -80,6 +81,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_catalog_repo.get_product_details = AsyncMock(return_value=None)
         self.mock_catalog_repo.save = AsyncMock(return_value=None)
+        self.mock_product_repo.get_by_name = AsyncMock(return_value=None)
         self.mock_product_repo.search_by_name = AsyncMock(return_value=[])
         self.mock_home.is_member.return_value = True
         with self.assertRaises(ValueError) as cm:
@@ -94,6 +96,7 @@ class TestStockServiceIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_home_repo.get_by_id = AsyncMock(return_value=self.mock_home)
         self.mock_home.is_member.return_value = True
         self.mock_home.get_default_expiration_range = MagicMock(return_value=None)
+        self.mock_product_repo.get_by_name = AsyncMock(return_value=None)
         self.mock_product_repo.save = AsyncMock(return_value=None)
         self.mock_product_repo.delete = AsyncMock(return_value=None)
         self.mock_product_repo.search_by_name = AsyncMock(return_value=[])
@@ -160,7 +163,6 @@ class TestStockServiceNoMocks(unittest.IsolatedAsyncioTestCase):
         )
 
         self.user_id = uuid4()
-        self.home_id = uuid4()
         self.barcode = "123456789"
         self.chain = ChainType.SHUFERSAL
         self.name = "Generic Product"
@@ -323,6 +325,218 @@ class TestStockServiceNoMocks(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(updated_product.get_expiration_dates().keys()), 1)
         self.assertIn(new_date, updated_product.get_expiration_dates().keys())
         self.assertNotIn(old_date, updated_product.get_expiration_dates().keys())
+
+    async def test_update_date_quantity(self):
+        initial_qty = 10
+        target_date = date.today() + timedelta(days=5) 
+
+        product = await self.service.add_product(
+            name="Milk",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=initial_qty,
+            barcode=self.barcode,
+            expiration_date=target_date,
+            location=None,
+            nickname=None
+        )
+
+        new_qty = 4
+        updated_product = await self.service.update_date_quantity(
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            product_id=product.get_id(),
+            date=target_date,
+            new_quantity=new_qty
+        )
+
+        repo_products = await self._product_repo.list_all_by_home(self.home.get_id())
+        self.assertEqual(len(repo_products), 1)
+        self.assertEqual(repo_products[0].get_quantity(), new_qty)
+        self.assertEqual(updated_product.get_quantity(), new_qty)
+
+        await self.service.update_date_quantity(
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            product_id=product.get_id(),
+            date=target_date,
+            new_quantity=0 # Assuming 0 triggers removal in your domain logic
+        )        
+        # Verify product is gone (since it had only one date)
+        repo_products = await self._product_repo.list_all_by_home(self.home.get_id())
+        self.assertEqual(len(repo_products), 0)
+
+    async def test_update_nickname(self):
+        # Setup
+        product = await self.service.add_product(
+            name="Cottage Cheese",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=1,
+            barcode=None,
+            expiration_date=date.today(),
+            location=None,
+            nickname="Old Nickname"
+        )
+
+        # Test Update
+        new_nick = "My Favorite Cheese"
+        await self.service.update_nickname(
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            product_id=product.get_id(),
+            new_nickname=new_nick
+        )
+        # Verify
+        repo_product = await self._product_repo.get_by_id(product.get_id())
+        self.assertEqual(repo_product.get_id(), product.get_id())
+        self.assertEqual(repo_product.get_nickname(), new_nick)
+
+
+    async def test_filter_by_expiration_type(self):
+        """
+        Tests the logic where we filter specifically for EXPIRED items.
+        We create 3 scenarios:
+        1. Fully Expired Product
+        2. Fully Valid Product
+        3. Mixed Product (Some items expired, some valid)
+        """
+        # Date Setup
+        expired_date = date.today() - timedelta(days=10)
+        valid_date = date.today() + timedelta(days=10)
+
+        # 1. expired date addition
+        mixed_product = await self.service.add_product(
+            name="Mixed Milk",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=5,
+            barcode="111",
+            expiration_date=expired_date, # Expired
+            location=None,
+            nickname=None
+        )
+        #valid date addition
+        await self.service.add_product(
+            name="Mixed Milk",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=3,
+            barcode="111",
+            expiration_date=valid_date, # Valid
+            location=None,
+            nickname=None
+        )
+
+        # 2. Add Fully Valid Product
+        await self.service.add_product(
+            name="Fresh Bread",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=1,
+            barcode="222",
+            expiration_date=valid_date,
+            location=None,
+            nickname=None
+        )
+
+        # --- EXECUTE FILTER (Show only EXPIRED) ---
+        filtered_dtos = await self.service.filter_by_expiration_type(
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            filter_type=ExpirationType.EXPIRED
+        )
+
+        # Should only find 1 DTO (The Mixed Product), because "Fresh Bread" has 0 expired items
+        self.assertEqual(len(filtered_dtos), 1)
+        
+        dto = filtered_dtos[0]
+        self.assertEqual(dto.original_name, "Mixed Milk")
+        # The DTO quantity should reflect ONLY the expired items (5), not the total (8)
+        self.assertEqual(dto.quantity, 5) 
+        self.assertEqual(len(dto.items), 1)
+        self.assertEqual(dto.items[0].expiration_date, expired_date)
+
+
+    async def test_filter_by_location(self):
+        # Setup: Add Fridge item
+        await self.service.add_product(
+            name="Butter",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=1,
+            barcode="111",
+            expiration_date=None,
+            location=LocationType.FRIDGE,
+            nickname=None
+        )
+
+        await self.service.add_product(
+            name="Milk",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=1,
+            barcode="111",
+            expiration_date=None,
+            location=LocationType.FRIDGE,
+            nickname=None
+        )
+
+        # Setup: Add Pantry item
+        await self.service.add_product(
+            name="Rice",
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            quantity=1,
+            barcode="222",
+            expiration_date=None,
+            location=LocationType.PANTRY,
+            nickname=None
+        )
+
+        # Test: Filter Fridge
+        fridge_items = await self.service.filter_by_location(
+            self.user_id, self.home.get_id(), LocationType.FRIDGE
+        )
+        self.assertEqual(len(fridge_items), 2)
+        self.assertEqual(fridge_items[0].get_original_name(), "Butter")
+
+        # Test: Filter Pantry
+        pantry_items = await self.service.filter_by_location(
+            self.user_id, self.home.get_id(), LocationType.PANTRY
+        )
+        self.assertEqual(len(pantry_items), 1)
+        self.assertEqual(pantry_items[0].get_original_name(), "Rice")
+
+    async def test_search_product(self):
+        # Setup names
+        await self.service.add_product(
+            name="Coca Cola Zero", 
+            user_id=self.user_id, home_id=self.home.get_id(), quantity=1, barcode=None, expiration_date=None, location=None, nickname=None
+        )
+        prod2 = await self.service.add_product(
+            name="Pepsi Max", 
+            user_id=self.user_id, home_id=self.home.get_id(), quantity=1, barcode=None, expiration_date=None, location=None, nickname=None
+        )
+
+        # Test: Partial Match
+        results = await self.service.search_product(self.user_id, self.home.get_id(), "Cola")
+        prod1 = results[0]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(prod1.get_original_name(), "Coca Cola Zero")
+        # Test: No Match
+        results = await self.service.search_product(self.user_id, self.home.get_id(), "Sprite")
+        self.assertEqual(len(results), 0)
+        await self.service.update_nickname(
+            user_id=self.user_id,
+            home_id=self.home.get_id(),
+            product_id=prod2.get_id(),
+            new_nickname="cola drink"
+        )
+        results = await self.service.search_product(self.user_id, self.home.get_id(), "cola")
+        self.assertEqual(len(results), 2)  # Both products should match now
+    
+
         
 
 
