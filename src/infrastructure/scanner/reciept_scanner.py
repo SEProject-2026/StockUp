@@ -5,193 +5,177 @@ import re
 import pandas as pd
 import numpy as np
 from bidi.algorithm import get_display
+from pdf2image import convert_from_path
+import os
 
-class ReceiptParserV14:
+class ReceiptParser:
     def __init__(self):
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+        
+        # עדכן לנתיב שלך
+        self.poppler_path = r'C:\Program Files\poppler-25.12.0\poppler-25.12.0\Library\bin' 
 
-    def enhance_image(self, image_path):
-        img = cv2.imread(image_path)
-        if img is None: raise Exception("Image not found")
-        
+    def load_file(self, file_path):
+        if not os.path.exists(file_path): raise Exception(f"File not found: {file_path}")
+        if file_path.lower().endswith('.pdf'):
+            print("Converting PDF to High-Res Images (300 DPI)...")
+            try:
+                abs_path = os.path.abspath(file_path)
+                pil_images = convert_from_path(abs_path, dpi=300, poppler_path=self.poppler_path)
+                return [cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR) for img in pil_images]
+            except Exception as e: raise Exception(f"PDF Error: {e}")
+        else:
+            try:
+                img = cv2.imdecode(np.fromfile(file_path, np.uint8), cv2.IMREAD_COLOR)
+                if img is None: raise Exception("Empty image")
+                return [img]
+            except Exception as e: raise Exception(f"Image Error: {e}")
+
+    def enhance_image(self, img):
+        if img is None: return None
         height, width = img.shape[:2]
-        # חיתוך 45% מהשמאל
-        crop_start_x = int(width * 0.45)
-        cropped_img = img[:, crop_start_x:width]
-        
-        gray = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2GRAY)
-        img_resized = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
-        
+        # crop_start_x = int(width) # חיתוך מחירים
+        # cropped_img = img[:, crop_start_x:width]
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        scale = 2.5 if width < 1000 else 1.0 
+        img_resized = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
         blurred = cv2.GaussianBlur(img_resized, (3, 3), 0)
-        enhanced = cv2.adaptiveThreshold(
-            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY, 31, 5
-        )
-        return enhanced
+        return cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)
 
     def clean_ocr_text(self, text):
-        text = text.replace('|', '1').replace('l', '1').replace('I', '1').replace(']', '1').replace('[', '1')
-        text = text.replace('o', '0').replace('O', '0').replace('S', '5')
-        text = text.replace(',', '.') 
+        text = text.replace('|', '1').replace('l', '1').replace('I', '1').replace(']', '1').replace('[', '1').replace('n', 'ח')
+        text = text.replace('o', '0').replace('O', '0').replace('S', '5').replace(',', '.').replace('״', '"').replace('״', '"')
         return text
 
-    def parse_receipt(self, image_path):
-        print(f"Scanning V14 (Remove Line Numbers): {image_path}...")
-        processed_img = self.enhance_image(image_path)
+    def parse_receipt(self, file_path):
+        print(f"Processing: {file_path}...")
+        images = self.load_file(file_path)
+        all_results = {"header": [], "products": []}
         
+        # משתנה גלובלי (בין דפים) שיזכור אם הטבלה כבר התחילה
+        self.table_started_global = False 
+        
+        for i, img in enumerate(images):
+            print(f"Analyzing Page {i+1}...")
+            page_data = self._process_single_page(img)
+            all_results["header"].extend(page_data["header"])
+            all_results["products"].extend(page_data["products"])
+            
+        return all_results
+
+    def _process_single_page(self, original_img):
+        processed_img = self.enhance_image(original_img)
+        if processed_img is None: return {"header": [], "products": []}
+
         d = pytesseract.image_to_data(processed_img, lang='heb+eng', config=r'--oem 3 --psm 6', output_type=Output.DICT)
-        
         df = pd.DataFrame(d)
+        if df.empty: return {"header": [], "products": []}
+
         df = df[df['text'].str.strip() != '']
         df['text'] = df['text'].astype(str)
-        df['line_group'] = (df['top'] / 20).astype(int) 
+        df['line_group'] = (df['top'] / 25).astype(int) 
 
         products = []
         header_lines = []
-        table_started = False
         
-        blacklist = ['2006', '2024', '2025', '300', '400', '500', '250', '1000', '52149', '7401964', '8455125', '010']
+        # מילות מפתח שמודיעות לנו: "הנה התחילה הטבלה"
+        header_keywords = ['שם פריט', 'ברקוד', 'כמות', 'מחיר', 'ש. פריט', 'מידה', 'תיאור']
         
+        # רשימה שחורה למספרים סוררים שבכל זאת עברו
+        blacklist = ['2006', '2024', '2025', '300', '400', '500', '250', '1000', '52149', '010', '190', '557756376', '1000150']
+
         for line_id, group in df.groupby('line_group'):
-            row_words = group.sort_values('left') # מיון משמאל לימין (בתמונה)
-            
-            # --- שלב 1: הסרת מספר שורה ---
-            # בקבלה עברית, מספר השורה הוא בצד ימין (הכי רחוק ב-X).
-            # בגלל החיתוך שעשינו, הוא עכשיו המילה האחרונה או הראשונה בטקסט (תלוי איך Tesseract קורא).
-            # בדרך כלל הוא המילה הראשונה ב-List הממוין (left הכי קטן = שמאל), אבל בעברית זה הפוך.
-            # נבדוק את שני הקצוות.
-            
-            if len(row_words) > 1:
-                # בדיקת המילה הכי ימנית (left הכי גדול)
-                last_word = self.clean_ocr_text(row_words.iloc[-1]['text'])
-                # בדיקת המילה הכי שמאלית (left הכי קטן)
-                first_word = self.clean_ocr_text(row_words.iloc[0]['text'])
-
-                # אם זה מספר קטן (1-30), נעיף אותו
-                if first_word.isdigit() and int(first_word) <= 30:
-                    row_words = row_words.iloc[1:]
-                elif last_word.isdigit() and int(last_word) <= 30:
-                    row_words = row_words.iloc[:-1]
-
-            full_line_text = " ".join(row_words['text'])
+            row_words = group.sort_values('left')
+            reversed_row_list = row_words['text'].to_list()[::-1]
+            full_line_text = " ".join(reversed_row_list)
             clean_line = self.clean_ocr_text(full_line_text)
-            
-            # Anchor Logic
-            if not table_started:
-                if re.search(r'729\d{8,12}', clean_line):
-                    table_started = True
+            to_print = " ".join([f"[{i}] {w}" for i, w in enumerate(reversed_row_list)])
+            print(f"clean_line: {line_id}. {to_print}") 
+
+            # --- לוגיקת HEADER SKIP (התיקון החדש) ---
+            if not self.table_started_global:
+                # 1. בדיקה אם זו שורת כותרת (מכילה מילים כמו "שם פריט")
+                if any(k in full_line_text for k in header_keywords):
+                    self.table_started_global = True
+                    header_lines.append(full_line_text)
+                    continue # מדלגים על שורת הכותרת עצמה
+
+                # 2. בדיקה אם זה מוצר ראשון מובהק (ברקוד 729 ארוך)
+                # זה תופס את המוצר הראשון גם אם ה-OCR פספס את הכותרת
+                if re.search(r'\b729\d{9,10}\b', clean_line):
+                    self.table_started_global = True
+                    # לא עושים continue, כי השורה הזו היא כבר מוצר!
                 else:
+                    # זה עדיין זבל של Header (טלפונים, כתובות וכו')
                     header_lines.append(full_line_text)
                     continue
+            
+            # --- מכאן והלאה: קוד המוצרים הרגיל ---
+            if len(reversed_row_list) < 6:
+                continue
+                    
+            barcode = reversed_row_list[1] 
+            quantity = 1.0
+            unit_type = ""
 
-            # --- זיהוי ברקוד ---
-            numbers = re.findall(r'\b\d+\b', clean_line)
-            barcode = None
-            
-            # ארוך
-            longs = [n for n in numbers if len(n) >= 7 and n not in blacklist]
-            if longs:
-                best = max(longs, key=len)
-                for b in longs:
-                    if b.startswith('729'): best = b; break
-                if len(best) == 14 and best.startswith('729'): best = best[:-1]
-                barcode = best
-            
-            # קצר
-            elif not barcode:
-                shorts = [n for n in numbers if 2 <= len(n) <= 6 and n not in blacklist]
-                for sb in shorts:
-                    # תנאי מרוכך לירקות: 3 ספרות ומעלה
-                    if (len(sb) >= 3 or clean_line.startswith(sb) or clean_line.endswith(sb)) and int(sb) > 30:
-                        barcode = sb
-                        break
-            
-            if barcode:
-                # --- חילוץ כמות משופר ---
-                
-                # מוצאים הכל כולל שברים בלי נקודה (044)
-                all_nums_str = re.findall(r'\b\d+\.?\d*\b', clean_line)
-                candidates = []
-                
-                for s in all_nums_str:
-                    try:
-                        val = float(s)
-                        if s == barcode or str(int(val)) == barcode: continue
-                        
-                        # סינון אחוזים (38% בשמנת)
-                        if s in ['38', '5', '3']: # אחוזי שומן נפוצים
-                             # בדיקה אם יש לידם '%' בטקסט המקורי - קשה לדעת כאן
-                             # נסתמך על זה שאחוז הוא מספר שלם, וכמות היא לרוב 1.0
-                             pass
-
-                        if val < 50: candidates.append(val)
-                    except: pass
-                
-                quantity = 1.0
+            """
+            clean_line: 66. [0] 4 [1] 2757535 [2] בורקס [3] פילו [4] אצבעות [5] גבינה [6] שלושת [7] האופים [8] 700 [9] גרם [10] יח" [11] 1.00 [12] 15.30 [13] 10      
+            clean_line: 68. [0] 5 [1] 8715700419732 [2] קטשופ [3] היינץ [4] 700 [5] גרם [6] יח' [7] 1.00 [8] 9.00 [9] 8.00 [10] 8.28
+            clean_line: 69. [0] 16 [1] 138 [2] ק"ג [3] 0.44 [4] 6.90 [5] 3.04
+            clean_line: 70. [0] בטטה
+            clean_line: 71. [0] 17 [1] 2680369 [2] חזה [3] שלם [4] טרי [5] מהדרין [6] ק"ג [7] 1.44 [8] 39.90 [9] 57.45
+            """
+            def found_kg(line):
+                for w in line:
+                    kgs = ["קג", 'ק"ג', "קילוגרם", "קילוגרמים"]
+                    for k in kgs:
+                        if k in w:
+                            return "ק\"ג"
+                    
+            is_kg_found = found_kg(reversed_row_list)
+            if not is_kg_found:
                 unit_type = "יחידה"
+                # look for quantity like "1.00" or "2.00" or "1.000" or "2.000"
+                qty_matches = re.findall(r'\b(\d+\.00{1,3})\b', full_line_text)
+                if qty_matches:
+                    try:
+                        quantity = float(qty_matches[0])
+                    except:
+                        quantity = 1.0
 
-                if candidates:
-                    candidates.sort() # מהקטן לגדול
-                    
-                    # --- תיקון: טיפול ב-044 (0.44) ---
-                    # אם המספר מתחיל ב-0 אבל הוא לא שבר (למשל 044 שנקרא כ-44.0 או 0.0)
-                    # נחפש מחרוזות שמתחילות ב-0
-                    for s in all_nums_str:
-                        if s.startswith('0') and len(s) > 1 and '.' not in s:
-                             # מצאנו 044 -> נהפוך ל-0.44
-                             try:
-                                 new_val = float("0." + s[1:])
-                                 candidates.insert(0, new_val) # דוחפים להתחלה כי זה קטן
-                             except: pass
+            else:
+                unit_type = "ק\"ג"
+                # look for quantity like "0.44" or "1.20" or "2.506" or "0.500"
+                qty_matches = re.findall(r'\b(\d+\.\d{2,3})\b', full_line_text)
+                if qty_matches:
+                    try:
+                        quantity = float(qty_matches[0])
+                    except:
+                        quantity = 1.0
+                        
+            print(f"-> Detected Product - Barcode: {barcode}, Quantity: {quantity}, Unit: {unit_type} , Line: {full_line_text}")
 
-                    # סינון אפסים
-                    candidates = [c for c in candidates if c > 0]
-                    
-                    if candidates:
-                        best = candidates[0]
-                        
-                        # אם הכמות היא 38 (מהשמנת) ויש גם 2.0 -> ניקח 2.0
-                        if best > 10 and len(candidates) > 1:
-                            best = candidates[1]
-                        
-                        # תיקון 200 -> 2.00
-                        if best >= 50: best = best / 100
-                        
-                        quantity = best
-                        
-                        if quantity < 1.0: unit_type = "ק\"ג"
-                        elif quantity.is_integer(): unit_type = "יחידה"
-                        else: unit_type = "ק\"ג"
-
-                if quantity <= 0.01: quantity = 1.0
-                if 'קג' in full_line_text.replace('"', ''): unit_type = "ק\"ג"
-
-                products.append({
-                    "barcode": barcode,
-                    "quantity": quantity,
-                    "unit": unit_type,
-                    "line": full_line_text
-                })
+            products.append({
+                "barcode": barcode,
+                "quantity": quantity,
+                "unit": unit_type,
+                "line": full_line_text
+            })
 
         return {"header": header_lines, "products": products}
 
 if __name__ == "__main__":
-    parser = ReceiptParserV14()
-    image_path = r'C:\Users\User\final_project\StockUp\src\infrastructure\scanner\1766055302690-f2d35fe9-a16c-4635-806f-5b93b00c1ab6_1.jpg'
+    parser = ReceiptParser()
+    file_path = r'C:\Users\User\final_project\StockUp\src\infrastructure\scanner\reciept_rami_levi_full.pdf' 
     
     try:
-        data = parser.parse_receipt(image_path)
-        
-        print("\n=== HEADER ===")
-        for l in data['header']: print(get_display(l))
-
-        print("\n" + "="*80)
+        data = parser.parse_receipt(file_path)
+        print(f"\n[FINAL] Found {len(data['products'])} products.")
+        print("="*80)
         print(f"| {'Barcode':<15} | {'Qty':<5} | {'Unit':<6} | {'Original Line'}")
         print("="*80)
-        
         for p in data['products']:
-            orig = get_display(p['line'])
+            orig = get_display(p['line'][:40])
             print(f"| {p['barcode']:<15} | {p['quantity']:<5} | {p['unit']:<6} | {orig}")
-            
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"\n[FATAL ERROR] {e}")
