@@ -48,16 +48,13 @@ class InMemoryProductRepository(IProductRepository):
                 results.append(p)
         return results
 
-    async def get_by_expiration_filter(self, home_id: uuid.UUID, filter_type: ExpirationType) -> List[Product]:
+    # might need to implement or delete if not needed later, for now same as list_all_by_home    
+    async def get_by_expiration_filter(self, home_id: uuid.UUID, home_expiration_range: int, filter_type: ExpirationType) -> List[Product]:
         results = []
-
         for p in self._products_db.values():
             if p.get_home_id() != home_id:
                 continue
-            
-            exp_type = p.get_expiration_type()
-            if exp_type == filter_type:
-                results.append(p)
+            results.append(p)
         return results
     
     async def get_by_location(self, home_id: uuid.UUID, location: LocationType) -> List[Product]:

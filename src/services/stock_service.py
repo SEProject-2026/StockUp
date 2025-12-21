@@ -2,6 +2,7 @@ from sys import exception
 from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
+from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
 from src.domain.smart_home.catalog_item import CatalogItem
 from src.domain.smart_home.product import Product
 from src.repositories.i_catalog_repositoy import ICatalogRepository
@@ -44,7 +45,7 @@ class StockService:
             await self._product_repository.save(new_product_entity)
         else:
             existing_product = products[0]
-            await existing_product.update_quantity(quantity + existing_product.get_quantity(), expiration_date)
+            await existing_product.add_to_existing_product(expiration_date, quantity, home_expr_range)
             await self._product_repository.update(existing_product)
         return existing_product if len(products) > 0 else new_product_entity
 
@@ -56,14 +57,14 @@ class StockService:
     ###########################################################################################
 
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> Optional[Product]:
-        valid_member_response = await self._check_access(user_id, home_id)
         
+        await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
             raise ValueError("Product not found in this home")
         
-        product_total_quantity = await product.update_quantity_and_removal(date)
-        if product_total_quantity > 0:
+        product = await product.remove_product_date(date)
+        if product.get_quantity() > 0:
             await self._product_repository.update(product)
             return product
         else:
@@ -71,15 +72,15 @@ class StockService:
             return None
 
 
-    async def update_stock_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> Optional[Product]:
+    async def update_date_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> Optional[Product]:
 
         await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.get_home_id() != home_id:
             raise ValueError("Product not found")
         
-        product_total_quantity = await product.update_quantity(date, new_quantity)
-        if product_total_quantity > 0:
+        product = await product.update_date_quantity(date, new_quantity)
+        if product.get_quantity() > 0:
             await self._product_repository.update(product)
             return product
         else:
@@ -96,6 +97,7 @@ class StockService:
 
         product.update_expiration_date(old_date, new_date, expiration_range)
         await self._product_repository.update(product)
+        return product
         
 
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:
@@ -110,11 +112,48 @@ class StockService:
         return product
 
 
-    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[Product]:
+    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[ProductDTO]:
        
         await self._check_access(user_id, home_id)
-        filtered_products = await self._product_repository.get_by_expiration_filter(home_id, filter_type)
-        return filtered_products
+        products = await self._product_repository.list_all_by_home(home_id)
+        filtered_dtos = []
+        for p in products:
+            dto = self._create_filtered_dto(p, filter_type)
+            if dto:
+                filtered_dtos.append(dto)
+        return filtered_dtos
+    
+
+    def _create_filtered_dto(self, product: Product, filter_type: ExpirationType) -> Optional[ProductDTO]:
+
+        product_dates = product.get_expiration_dates()
+        filtered_items = []
+        view_quantity = 0
+
+        for exp_date, (date_quantity, exp_type) in product_dates.items():
+            if exp_type == filter_type:
+                filtered_items.append(ProductItemDTO(
+                    expiration_date=exp_date,
+                    quantity=date_quantity,
+                    status=exp_type
+                ))
+                view_quantity += date_quantity
+
+        if not filtered_items:
+            return None
+        filtered_items.sort(key=lambda x: x.expiration_date or date.max)
+
+        # use view_quantity for  total, not product.get_quantity()
+        return ProductDTO(
+            id=product.get_id(),
+            home_id=product.get_home_id(),
+            original_name=product.get_original_name(),
+            nickname=product.get_nickname(),
+            barcode=product.get_barcode(),
+            location=product.get_location(),
+            quantity=view_quantity, 
+            items=filtered_items
+        )
 
 
     async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> List[Product]:
@@ -123,15 +162,13 @@ class StockService:
         filtered_products = await self._product_repository.get_by_location(home_id, location)
         return filtered_products
 
-
     """searches for products based on product name or nickname."""
     async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> List[Product]:
   
         await self._check_access(user_id, home_id)
-        search_results = await self._product_repository.search_by_name(home_id, query)
-            
+        search_results = await self._product_repository.search_by_name(home_id, query)            
         return search_results
-    
+
 
     async def search_product_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[str]:
 

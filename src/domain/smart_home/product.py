@@ -99,7 +99,7 @@ class Product:
     def get_location(self) -> Optional[LocationType]:
         return self._location
 
-    def get_expiration_dates(self) -> Optional[date]:
+    def get_expiration_dates(self) -> dict[date, tuple[int, ExpirationType]]:
         return self._expiration_dates_to_quantity 
     
     # Setters
@@ -138,31 +138,33 @@ class Product:
             raise ValueError("Quantity cannot be negative.")
         self._quantity = new_quantity
 
-    async def update_quantity_and_removal(self, expiration_date: date) -> int:
+    async def remove_product_date(self, expiration_date: date) -> 'Product':
         if expiration_date in self._expiration_dates_to_quantity:
             date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
             del self._expiration_dates_to_quantity[expiration_date]
             self._quantity = self._quantity - date_quantity 
-            return self._quantity
+            return self
         else:
             raise ValueError(f"item of date {expiration_date} not found for this product.")
         
-    async def update_quantity(self, expiration_date: date, new_quantity: int) -> int:
+    async def update_date_quantity(self, expiration_date: date, new_quantity: int) -> 'Product':
         if not isinstance(new_quantity, int):
             raise ValueError("Quantity must be a number.")
         if new_quantity < 0:
             raise ValueError("Quantity cannot be negative.")
         elif new_quantity == 0:
-            return await self.update_quantity_and_removal(expiration_date)
+            return await self.remove_product_date(expiration_date)
         else:
             if expiration_date in self._expiration_dates_to_quantity:
                 _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
                 self._expiration_dates_to_quantity[expiration_date] = (new_quantity, expiration_type)
                 self._quantity = sum(q for q, _ in self._expiration_dates_to_quantity.values())
-                return self._quantity
+                return self
             else:
                 raise ValueError(f"item of date {expiration_date} not found for this product.")
-
+            
+    async def add_to_existing_product(self, expiration_date: date, new_quantity: int, expiration_range: int) -> None:
+        if expiration_date in self._expiration_dates_to_quantity:
     def set_location(self, new_location: LocationType) -> None:
         self._location = new_location
 
