@@ -35,12 +35,18 @@ class IProductRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_by_name(self, home_id: UUID, name: str) -> Optional[Product]:
+        """Retrieves a product by its name within a specific home."""
+        pass
+
+    @abstractmethod
     async def search_by_name(self, home_id: UUID, query: str) -> List[Product]:
         """Searches products in a home by name or nickname."""
         pass
 
     @abstractmethod
-    async def get_by_expiration_filter(self, home_id: UUID, filter_type: ExpirationType) -> List[Product]:
+    # might delete later if not needed    
+    async def get_by_expiration_filter(self, home_id: UUID, home_expiration_range: int, filter_type: ExpirationType) -> List[Product]:
         """
         Retrieves products based on expiration status.
         filter_type options: 'EXPIRED', 'NEAR_EXPIRATION', 'FRESH'
