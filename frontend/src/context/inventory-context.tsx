@@ -7,13 +7,13 @@ import React, {
 
 export type Category = "fridge" | "freezer" | "pantry";
 
+
 export type InventoryItem = {
   id: string;
   name: string;
   category: Category;
   quantity: number;
   expiresAt?: string;
-  homeId: string; 
 };
 
 type InventoryContextValue = {

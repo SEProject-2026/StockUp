@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +21,7 @@ import { router } from "expo-router";
 import HomeCard from "@/src/components/homes/HomeCard";
 import AddHomeCard from "@/src/components/homes/AddHomeCard";
 import SpacerCard from "@/src/components/homes/SpacerCard";
+import { createHome, getMyHomes } from "@/src/api/homes";
 
 type Home = {
   id: string;
@@ -38,14 +41,25 @@ const TEXT = "#111827";
 const MUTED = "#6B7280";
 const BORDER = "#E5E7EB";
 
+function isAuthErrorMessage(msg?: string) {
+  if (!msg) return false;
+  const s = msg.toLowerCase();
+  return s.includes("401") || s.includes("not authenticated") || s.includes("unauthorized") || s.includes("token");
+}
+
 export default function HomesScreen() {
   const [homes, setHomes] = useState<Home[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const sortedHomes = useMemo(() => {
-    return [...homes].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+    return [...homes].sort(
+      (a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)
+    );
   }, [homes]);
 
   const gridData: GridItem[] = useMemo(() => {
@@ -59,8 +73,49 @@ export default function HomesScreen() {
   }, [sortedHomes]);
 
   const openHome = useCallback((homeId: string) => {
-    router.push({ pathname: "../home/[homeId]", params: { homeId } });
+    router.push({ pathname: "/home/[homeId]", params: { homeId } });
   }, []);
+
+  const mapDtoToHome = useCallback((dto: any): Home => {
+    return {
+      id: String(dto.id ?? dto.home_id ?? dto.uuid),
+      name: dto.name ?? dto.home_name ?? dto.homeName ?? "בית ללא שם",
+      membersCount: dto.membersCount ?? dto.members_count ?? 1,
+      updatedAt: dto.updatedAt ?? dto.updated_at ?? new Date().toISOString(),
+    };
+  }, []);
+
+
+  const loadHomes = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    try {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+
+      const res = await getMyHomes();
+
+      console.log("getMyHomes() raw:", res);
+      ///
+      const list = (res.data ?? []).map(mapDtoToHome);
+      setHomes(list);
+    } catch (e: any) {
+      const msg = e?.message ?? "לא הצלחתי לטעון בתים";
+      if (isAuthErrorMessage(msg)) {
+        Alert.alert("צריך להתחבר", "כדי לראות/ליצור בתים צריך להתחבר.", [
+          { text: "להתחברות", onPress: () => router.replace("/login") },
+          { text: "ביטול", style: "cancel" },
+        ]);
+        return;
+      }
+      Alert.alert("שגיאה", msg);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [mapDtoToHome]);
+
+  useEffect(() => {
+    loadHomes("initial");
+  }, [loadHomes]);
 
   const onCreateHome = useCallback(async () => {
     const name = newName.trim();
@@ -70,23 +125,31 @@ export default function HomesScreen() {
     try {
       setSaving(true);
 
-      const created: Home = {
-        id: String(Date.now()),
-        name,
-        membersCount: 1,
-        updatedAt: new Date().toISOString(),
-      };
+      const res = await createHome({ name });
+      const dto = res.data;
+
+      if (!dto?.id) throw new Error(res.message || "Create home failed");
+
+      const created: Home = mapDtoToHome(dto);
 
       setHomes((prev) => [created, ...prev]);
       setNewName("");
       setCreateOpen(false);
       openHome(created.id);
-    } catch {
-      Alert.alert("שגיאה", "לא הצלחתי ליצור בית כרגע.");
+    } catch (e: any) {
+      const msg = e?.message ?? "לא הצלחתי ליצור בית כרגע.";
+      if (isAuthErrorMessage(msg)) {
+        Alert.alert("צריך להתחבר", "כדי ליצור בית צריך להתחבר.", [
+          { text: "להתחברות", onPress: () => router.replace("/login") },
+          { text: "ביטול", style: "cancel" },
+        ]);
+        return;
+      }
+      Alert.alert("שגיאה", msg);
     } finally {
       setSaving(false);
     }
-  }, [newName, openHome]);
+  }, [newName, openHome, mapDtoToHome]);
 
   const renderItem = useCallback(
     ({ item }: { item: GridItem }) => {
@@ -114,7 +177,12 @@ export default function HomesScreen() {
 
       {/* Body */}
       <View style={styles.body}>
-        {sortedHomes.length === 0 ? (
+        {loading ? (
+          <View style={styles.centerLoader}>
+            <ActivityIndicator size="large" color={BRAND_PRIMARY} />
+            <Text style={styles.loaderText}>טוען בתים…</Text>
+          </View>
+        ) : sortedHomes.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <Ionicons name="home" size={22} color={BRAND_PRIMARY} />
@@ -145,6 +213,12 @@ export default function HomesScreen() {
               columnWrapperStyle={{ gap: 12 }}
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 24, gap: 12 }}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => loadHomes("refresh")}
+                />
+              }
             />
           </>
         )}
@@ -157,7 +231,7 @@ export default function HomesScreen() {
         animationType="fade"
         onRequestClose={() => setCreateOpen(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setCreateOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => !saving && setCreateOpen(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
               <Text style={styles.modalTitle}>בית חדש</Text>
@@ -223,6 +297,14 @@ const styles = StyleSheet.create({
   },
 
   body: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
+
+  centerLoader: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loaderText: { color: MUTED, fontWeight: "700" },
 
   sectionTitle: {
     fontSize: 12,

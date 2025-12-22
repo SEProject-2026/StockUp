@@ -101,6 +101,11 @@ class Product:
 
     def get_expiration_dates(self) -> Optional[date]:
         return self._expiration_dates_to_quantity 
+    def get_expiration_type(self, expiration_date: date) -> Optional[ExpirationType]:
+        if expiration_date in self._expiration_dates_to_quantity:
+            _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
+            return expiration_type
+        return None
     
     # Setters
     def set_nickname(self, new_nickname: str) -> None:
@@ -159,9 +164,11 @@ class Product:
                 _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
                 self._expiration_dates_to_quantity[expiration_date] = (new_quantity, expiration_type)
                 self._quantity = sum(q for q, _ in self._expiration_dates_to_quantity.values())
-                return self._quantity
             else:
-                raise ValueError(f"item of date {expiration_date} not found for this product.")
+                #fix needed(always FRESH)
+                self._expiration_dates_to_quantity[expiration_date] = (new_quantity, ExpirationType.FRESH)
+                self._quantity += new_quantity
+            return self._quantity
 
     def set_location(self, new_location: LocationType) -> None:
         self._location = new_location

@@ -44,7 +44,7 @@ class StockService:
             await self._product_repository.save(new_product_entity)
         else:
             existing_product = products[0]
-            await existing_product.update_quantity(quantity + existing_product.get_quantity(), expiration_date)
+            await existing_product.update_quantity( expiration_date, quantity + existing_product.get_quantity())
             await self._product_repository.update(existing_product)
         return existing_product if len(products) > 0 else new_product_entity
 
@@ -96,6 +96,7 @@ class StockService:
 
         product.update_expiration_date(old_date, new_date, expiration_range)
         await self._product_repository.update(product)
+        return product
         
 
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:

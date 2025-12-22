@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import ItemForm from "@/src/components/add-item/ItemForm";
 import PrimaryButton from "@/src/ui/PrimaryButton";
 import ScreenHeader from "@/src/layout/ScreenHeader";
+import { addProduct } from "@/src/api/stock";
 
 const BRAND_PRIMARY = "#0284C7";
 const BRAND_TEXT = "#111827";
@@ -47,8 +48,14 @@ export default function AddItemScreen() {
       }
     }
   };
+  const locationMap: Record<string, "FRIDGE" | "FREEZER" | "PANTRY"> = {
+    fridge: "FRIDGE",
+    freezer: "FREEZER",
+    pantry: "PANTRY",
+  };
 
-   const onAdd = () => {
+
+   const onAdd = async () => {
     if (!currentHomeId) {
       Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
       return;
@@ -68,15 +75,26 @@ export default function AddItemScreen() {
       ? expiresAt.toISOString().slice(0, 10)
       : undefined;
 
-    addItem({
-      name: name.trim(),
-      category,
-      quantity: qty,
-      expiresAt: formattedExpires,
-      homeId: currentHomeId,
-    });
+   console.log("ADD homeId:", currentHomeId);
 
-    router.back();
+
+    const res = await addProduct(currentHomeId, {
+        name: name.trim(),
+        quantity: qty,
+        barcode: barcode.trim() ? barcode.trim() : null,
+        expiration_date: formattedExpires,
+        location: locationMap[category],
+        nickname: null,
+      });
+    console.log("ADD sent location:", locationMap[category]);
+    console.log("ADD response location:", (res as any)?.data?.location);
+
+      if (res.status !== "success") {
+        Alert.alert("שגיאה", res.message ?? "הוספה נכשלה");
+        return;
+      }
+
+      router.back();
   };
 
   return (
