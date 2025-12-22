@@ -184,8 +184,7 @@ async def filter_by_expiration(
 ):
     try:
         results = await stock_service.filter_by_expiration_type(user_id, home_id, type)
-        dtos = [ProductDTO.from_domain(p) for p in results]
-        return GeneralResponse(status="success", data=dtos)
+        return GeneralResponse(status="success", data=results)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     

@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { CategoryKey } from "@/app/inventory/inventory";
+import {CategoryKey} from "@/app/inventory/inventory";
 
 
 type StatusFilter = "all" | "soon" | "expired";

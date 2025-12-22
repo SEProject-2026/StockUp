@@ -1,5 +1,5 @@
-// app/inventory/index.tsx (או איפה שנמצא InventoryScreen שלך)
-import React, { useCallback, useMemo, useState } from "react";
+// app/inventory/index.tsx
+import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,15 +28,34 @@ import {
   type ExpirationType,
 } from "@/src/api/stock";
 
-type InventoryRow = InventoryItem & {
-  productId: string;
-  expirationDate: string | null; // חשוב לשרת
-  originalName: string;
-  status?: string; // ExpirationType מהשרת
+export type GroupedInventory = {
+  key: string;
+  name: string;
+  category: "fridge" | "freezer" | "pantry";
+  totalQuantity: number;
+  items: InventoryItem[];
 };
 
-type CategoryKey = Category | "all";
+type InventoryRow = InventoryItem & {
+  productId: string;
+  expirationDate: string | null;
+  originalName: string;
+  status?: string;
+};
+
+export type CategoryKey = Category | "all";
 type StatusFilter = "all" | "soon" | "expired";
+
+function useDebouncedValue<T>(value: T, delayMs = 400) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+
+  return debounced;
+}
 
 function mapLocationToCategory(location?: string | null): Category {
   switch ((location ?? "").toUpperCase()) {
@@ -65,7 +84,6 @@ function categoryToLocationType(cat: Category): LocationType {
 }
 
 function statusFilterToExpirationType(sf: StatusFilter): ExpirationType {
-  // התאמה לשמות השרת אצלך
   if (sf === "soon") return "GOING_TO_EXPIRE";
   return "EXPIRED";
 }
@@ -86,7 +104,7 @@ function dtoToRows(dto: ProductDTO): InventoryRow[] {
       const exp = it.expiration_date ? String(it.expiration_date) : null;
 
       return {
-        id: `${dto.id}__${exp ?? "none"}`, // rowId
+        id: `${dto.id}__${exp ?? "none"}`,
         name: displayName,
         quantity: it.quantity,
         category: mapLocationToCategory(dto.location),
@@ -99,7 +117,6 @@ function dtoToRows(dto: ProductDTO): InventoryRow[] {
     });
   }
 
-  // fallback אם אין items
   return [
     {
       id: `${dto.id}__none`,
@@ -127,7 +144,9 @@ export function InventoryScreenBase({
   const currentHomeId = homeId ? String(homeId) : undefined;
 
   const [rows, setRows] = useState<InventoryRow[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
 
   const [selectedTab, setSelectedTab] = useState<CategoryKey>(initialCategory);
   const [search, setSearch] = useState("");
@@ -137,92 +156,131 @@ export function InventoryScreenBase({
 
   const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
 
-  // ✅ מבצע קריאה לשרת לפי הפילטרים שבמסך
-  const loadInventory = useCallback(async () => {
-    if (!currentHomeId) {
-      setRows([]);
-      setLoading(false);
-      return;
-    }
+  const debouncedSearch = useDebouncedValue(search, 400);
+  const requestSeqRef = useRef(0);
 
-    try {
-      setLoading(true);
-
-      const q = search.trim();
-      let products: ProductDTO[] = [];
-
-      // עדיפות: Search > Expiration > Location > All
-      if (q) {
-        const res = await searchStock(currentHomeId, q);
-        products = res.data ?? [];
-      } else if (statusFilter !== "all") {
-        const expType = statusFilterToExpirationType(statusFilter);
-        const res = await filterStockByExpiration(currentHomeId, expType);
-        products = res.data ?? [];
-      } else if (effectiveCategory !== "all") {
-        const loc = categoryToLocationType(effectiveCategory);
-        const res = await filterStockByLocation(currentHomeId, loc);
-        products = res.data ?? [];
-      } else {
-        const res = await getAllStock(currentHomeId);
-        products = res.data ?? [];
+  const loadInventory = useCallback(
+    async (opts?: { forceInitialSpinner?: boolean }) => {
+      if (!currentHomeId) {
+        setRows([]);
+        setInitialLoading(false);
+        setIsSearching(false);
+        return;
       }
 
-      // המר ל-rows
-      let newRows = products.flatMap(dtoToRows);
+      const mySeq = ++requestSeqRef.current;
 
-      // פילטרים “משלימים” מקומיים (כי בשרת אין קומבינציה של פילטרים)
-      if (effectiveCategory !== "all") {
-        newRows = newRows.filter((r) => r.category === effectiveCategory);
+      const showBigSpinner = opts?.forceInitialSpinner ?? false;
+
+      try {
+        if (showBigSpinner || initialLoading) {
+          setInitialLoading(true);
+        } else {
+          setIsSearching(true);
+        }
+
+        const q = debouncedSearch.trim();
+        let products: ProductDTO[] = [];
+
+        if (q.length >= 2) {
+          const res = await searchStock(currentHomeId, q);
+          if (mySeq !== requestSeqRef.current) return;
+          products = res.data ?? [];
+        } else if (statusFilter !== "all") {
+          const expType = statusFilterToExpirationType(statusFilter);
+          const res = await filterStockByExpiration(currentHomeId, expType);
+          if (mySeq !== requestSeqRef.current) return;
+          products = res.data ?? [];
+        } else if (effectiveCategory !== "all") {
+          const loc = categoryToLocationType(effectiveCategory);
+          const res = await filterStockByLocation(currentHomeId, loc);
+          if (mySeq !== requestSeqRef.current) return;
+          products = res.data ?? [];
+        } else {
+          const res = await getAllStock(currentHomeId);
+          if (mySeq !== requestSeqRef.current) return;
+          products = res.data ?? [];
+        }
+
+        let newRows = products.flatMap(dtoToRows);
+
+        if (effectiveCategory !== "all") {
+          newRows = newRows.filter((r) => r.category === effectiveCategory);
+        }
+
+        if (q.length >= 2) {
+          const qq = q.toLowerCase();
+          newRows = newRows.filter(
+            (r) =>
+              r.name.toLowerCase().includes(qq) ||
+              r.originalName.toLowerCase().includes(qq)
+          );
+        }
+
+        if (statusFilter !== "all") {
+          const wanted = statusFilterToExpirationType(statusFilter);
+          newRows = newRows.filter(
+            (r) => String(r.status ?? "").toUpperCase() === wanted
+          );
+        }
+
+        setRows(newRows);
+      } catch (e: any) {
+        if (mySeq !== requestSeqRef.current) return;
+        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון מלאי");
+        setRows([]);
+      } finally {
+        if (mySeq === requestSeqRef.current) {
+          setInitialLoading(false);
+          setIsSearching(false);
+        }
       }
-
-      if (q) {
-        const qq = q.toLowerCase();
-        newRows = newRows.filter(
-          (r) =>
-            r.name.toLowerCase().includes(qq) ||
-            r.originalName.toLowerCase().includes(qq)
-        );
-      }
-
-      if (statusFilter !== "all") {
-        const wanted = statusFilterToExpirationType(statusFilter);
-        newRows = newRows.filter((r) => String(r.status ?? "").toUpperCase() === wanted);
-      }
-
-      setRows(newRows);
-    } catch (e: any) {
-      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון מלאי");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentHomeId, effectiveCategory, search, statusFilter]);
-
-  // ✅ טוען בכל כניסה למסך
-  useFocusEffect(
-    React.useCallback(() => {
-      loadInventory();
-    }, [loadInventory])
+    },
+    [currentHomeId, debouncedSearch, effectiveCategory, initialLoading, statusFilter]
   );
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadInventory({ forceInitialSpinner: true });
+    }, [currentHomeId])
+  );
+
+  useEffect(() => {
+    if (!currentHomeId) return;
+    if (initialLoading) return; 
+    loadInventory();
+  }, [loadInventory, currentHomeId, initialLoading]);
+
   const groupedItems = useMemo(() => {
-    // כאן כבר לא חייבים לסנן שוב, אבל אפשר להשאיר קיבוץ בלבד
     const map = new Map<
       string,
-      { key: string; name: string; category: Category; totalQuantity: number; items: InventoryRow[] }
+      {
+        key: string;
+        name: string;
+        category: Category;
+        totalQuantity: number;
+        items: InventoryRow[];
+      }
     >();
 
     for (const r of rows) {
       const key = `${r.name}__${r.category}`;
       const g =
-        map.get(key) ?? { key, name: r.name, category: r.category, totalQuantity: 0, items: [] as InventoryRow[] };
+        map.get(key) ?? {
+          key,
+          name: r.name,
+          category: r.category,
+          totalQuantity: 0,
+          items: [] as InventoryRow[],
+        };
       g.totalQuantity += r.quantity;
       g.items.push(r);
       map.set(key, g);
     }
 
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "he"));
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, "he")
+    );
   }, [rows]);
 
   const handleChangeQty = useCallback(
@@ -234,7 +292,9 @@ export function InventoryScreenBase({
       const next = current.quantity + delta;
       if (next < 0) return;
 
-      setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, quantity: next } : r)));
+      setRows((prev) =>
+        prev.map((r) => (r.id === rowId ? { ...r, quantity: next } : r))
+      );
 
       try {
         await updateProductQuantity(currentHomeId, current.productId, {
@@ -262,7 +322,11 @@ export function InventoryScreenBase({
           style: "destructive",
           onPress: async () => {
             try {
-              await removeProduct(currentHomeId, current.productId, current.expirationDate);
+              await removeProduct(
+                currentHomeId,
+                current.productId,
+                current.expirationDate
+              );
               setRows((prev) => prev.filter((r) => r.id !== rowId));
             } catch (e: any) {
               Alert.alert("שגיאה", e?.message ?? "לא הצלחתי למחוק");
@@ -276,7 +340,10 @@ export function InventoryScreenBase({
   );
 
   const handleSaveEdit = useCallback(
-    async (rowId: string, values: { name: string; quantity: number; expiresAt?: string }) => {
+    async (
+      rowId: string,
+      values: { name: string; quantity: number; expiresAt?: string }
+    ) => {
       if (!currentHomeId) return;
 
       const current = rows.find((r) => r.id === rowId);
@@ -289,7 +356,9 @@ export function InventoryScreenBase({
 
       try {
         if (newName && newName !== current.name) {
-          await updateProductNickname(currentHomeId, current.productId, { nickname: newName });
+          await updateProductNickname(currentHomeId, current.productId, {
+            nickname: newName,
+          });
         }
 
         if (newExp !== oldExp) {
@@ -316,7 +385,11 @@ export function InventoryScreenBase({
   );
 
   const handleBack = () => {
-    if (currentHomeId) router.replace({ pathname: "/home/[homeId]", params: { homeId: currentHomeId } });
+    if (currentHomeId)
+      router.replace({
+        pathname: "/home/[homeId]",
+        params: { homeId: currentHomeId },
+      });
     else router.back();
   };
 
@@ -333,7 +406,7 @@ export function InventoryScreenBase({
       <View style={{ flex: 1 }}>
         <ScreenHeader title={title} onBack={handleBack} />
 
-        {!currentHomeId || loading ? (
+        {!currentHomeId ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#0284C7" />
           </View>
@@ -348,22 +421,38 @@ export function InventoryScreenBase({
               statusFilter={statusFilter}
               onChangeStatusFilter={setStatusFilter}
               filtersVisible={true}
+              // להציג אינדיקציה קטנה בתוך הבר:
+              // isSearching={isSearching}
             />
 
-            <GroupedInventoryList
-              groupedItems={groupedItems as any}
-              onChangeQty={handleChangeQty}
-              onEditItem={(it: any) => setItemToEdit(it)}
-              onDeleteItem={handleDelete}
-              onAddItem={() =>
-                router.push({
-                  pathname: "/inventory/add-item",
-                  params: currentHomeId ? { homeId: currentHomeId } : {},
-                })
-              }
-            />
+            {initialLoading ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color="#0284C7" />
+              </View>
+            ) : (
+              <>
+                {isSearching && (
+                  <View style={styles.searchingRow}>
+                    <ActivityIndicator size="small" color="#0284C7" />
+                  </View>
+                )}
 
-            <BottomNavBar activeTab="inventory" />
+                <GroupedInventoryList
+                  groupedItems={groupedItems as any}
+                  onChangeQty={handleChangeQty}
+                  onEditItem={(it: any) => setItemToEdit(it)}
+                  onDeleteItem={handleDelete}
+                  onAddItem={() =>
+                    router.push({
+                      pathname: "/inventory/add-item",
+                      params: currentHomeId ? { homeId: currentHomeId } : {},
+                    })
+                  }
+                />
+
+                <BottomNavBar activeTab="inventory" />
+              </>
+            )}
           </>
         )}
       </View>
@@ -386,4 +475,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F4F4F4" },
   gradientBackground: { ...StyleSheet.absoluteFillObject },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  searchingRow: {
+    paddingTop: 10,
+    paddingBottom: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

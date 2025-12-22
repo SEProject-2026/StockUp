@@ -47,6 +47,9 @@ export const GroupedInventoryList: React.FC<Props> = ({
       data={groupedItems}
       keyExtractor={(group) => group.key}
       contentContainerStyle={styles.listContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="none"
+
       ListEmptyComponent={
         <Text style={styles.emptyText}>
           לא נמצאו פריטים בקטגוריה / חיפוש הזה.

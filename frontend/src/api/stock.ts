@@ -9,7 +9,7 @@ export type GeneralResponse<T> = {
 export type ProductItemDTO = {
   expiration_date: string | null; // "YYYY-MM-DD"
   quantity: number;
-  status: string; // ExpirationType
+  status: string; 
 };
 
 export type ProductDTO = {
@@ -18,7 +18,7 @@ export type ProductDTO = {
   original_name: string;
   nickname?: string | null;
   barcode?: string | null;
-  location?: string | null; // LocationType
+  location?: string | null; 
   quantity: number;
   items: ProductItemDTO[];
 };
@@ -37,7 +37,7 @@ export type AddProductPayload = {
   quantity: number;
   barcode?: string | null;
   expiration_date?: string | null; // "YYYY-MM-DD"
-  location?: string | null;        // LocationType (אם יש)
+  location?: string | null;    
   nickname?: string | null;
 };
 
@@ -48,14 +48,12 @@ export async function addProduct(homeId: string, payload: AddProductPayload) {
   });
 }
 
-// ✅ תואם ל-backend: GET /stock/all עם X-Home-ID
 export async function getAllStock(homeId: string) {
   return stockFetch<GeneralResponse<ProductDTO[]>>(homeId, "/stock/all", {
     method: "GET",
   });
 }
 
-// PATCH quantity: דורש expiration_date + new_quantity
 export async function updateProductQuantity(
   homeId: string,
   productId: string,
@@ -95,7 +93,6 @@ function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) 
 }
 }
 
-// DELETE: דורש expiration_date כ-query
 export async function removeProduct(
   homeId: string,
   productId: string,
@@ -111,7 +108,7 @@ export async function removeProduct(
 // Search & Filter (GET)
 // ----------------------
 
-export type LocationType = "FRIDGE" | "FREEZER" | "PANTRY" | "OTHER";
+export type LocationType = "FRIDGE" | "FREEZER" | "PANTRY"| "CLEANING_SUPPLIES" | "OTHER";
 export type ExpirationType = "FRESH" | "GOING_TO_EXPIRE" | "EXPIRED";
 
 export async function searchStock(homeId: string, query: string) {
