@@ -56,7 +56,7 @@ async def update_quantity(
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        updated_product = await stock_service.update_stock_quantity(
+        updated_product = await stock_service.update_date_quantity(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
