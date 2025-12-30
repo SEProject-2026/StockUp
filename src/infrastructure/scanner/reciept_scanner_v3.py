@@ -20,6 +20,8 @@ class ReceiptParser:
         
         pytesseract.pytesseract.tesseract_cmd = os.path.join(base_dir, tesseract_rel)
         self.poppler_path = os.path.join(base_dir, poppler_rel)
+        self.table_started_global = False
+        self.table_ended_global = False
 
     def load_file(self, file_path):
         """
@@ -66,7 +68,7 @@ class ReceiptParser:
             try:
                 abs_path = os.path.abspath(file_path)
                 images = convert_from_path(
-                            file_path,
+                            abs_path,
                             dpi=300,
                             poppler_path=self.poppler_path
                         )
@@ -131,7 +133,7 @@ class ReceiptParser:
 
 
     def clean_ocr_text(self, text):
-        text = text.replace('|', '1').replace('l', '1').replace('I', '1').replace(']', '1').replace('[', '1').replace('n', 'ח')
+        text = text.replace('|', '1').replace('l', '1').replace('I', '1').replace(']', '1').replace('[', '1').replace('n', 'ח').replace('\u200f', "")
         text = text.replace('o', '0').replace('O', '0').replace('S', '5').replace(',', '.').replace('״', '"').replace('״', '"').replace('/', '7')
         return text
 
@@ -148,7 +150,7 @@ class ReceiptParser:
             print(f"Analyzing Page {i+1}...")
             # מעבירים את הפריט (תמונה או DataFrame) ואת הדגל
             page_data = self._process_single_page(item, is_digital)
-            
+            self.table_started_global = False  # איפוס לדף הבא
             all_results["header"].extend(page_data["header"])
             all_results["products"].extend(page_data["products"])
             all_results["chain name"] = page_data["chain name"] or all_results["chain name"]
@@ -230,7 +232,7 @@ class ReceiptParser:
             'סה"כ', 'מע"מ', 'מזומן', 'אשראי', 'חתימה', 'לקוח', 'עמוד', 'דף', 
             'סוכן', 'אספקה', 'חוסרים', 'ממחסן', 'ויזה', 'כאל', 'שיק', 'בנק', 'בבית'
         ]
-        stop_keywords = ['סה"כ לתשלום', 'סה"כ כולל מע"מ', 'כרטיס', 'ויזה', 'שיק', 'מאסטרקארד', 'אשראי', 'חוסרים']
+        stop_keywords = ['סה"כ לתשלום', 'סה"כ כולל מע"מ', 'כרטיס', 'ויזה', 'שיק', 'מאסטרקארד', 'אשראי', 'חוסרים', 'וויזה', 'כאל']
 
         chain_name_found = False
         ch = ""
@@ -238,19 +240,20 @@ class ReceiptParser:
 
         for line_id, group in df.groupby('line_group'):
             row_words = group.sort_values('left')
-            conf = row_words['conf'].astype(float).mean() if 'conf' in row_words.columns else 100.0
             reversed_row_list = [self.clean_ocr_text(w) for w in row_words['text'].to_list()[::-1]] if not is_digital else [self.clean_ocr_text(str(w)[::-1]) if not (re.match(r'\b(\d+\.\d{2,3})\b', str(w)) or str(w).isdigit()) else str(w) for w in row_words['text'].to_list()[::-1]]
             full_line_text = " ".join(reversed_row_list)
 
-            # to_print = [f"[{i}] {w}" for i, w in enumerate(clean_line.split(" "))]
-            # # הדפסה לדיבוג - כדי לראות מה הוא קורא
-            # print(f"DEBUG Line: confident?:{conf} Words: {to_print}")
+            to_print = [f"[{i}] {w}" for i, w in enumerate(reversed_row_list)]
+            # הדפסה לדיבוג - כדי לראות מה הוא קורא
+            # print(f"DEBUG Line: {to_print}")
 
             if not chain_name_found:
                 ch = self._chain_name_in_line(full_line_text)
                 if ch != "רשת לא מזוהה":
                     chain_name_found = True
 
+            if self.table_ended_global:
+                continue
             # --- תיקון: בדיקת תחילת טבלה *לפני* הסינון הגלובלי ---
             # זה מונע את המצב שבו המילה "מע"מ" בכותרת גורמת לדילוג על פתיחת הטבלה
             if not self.table_started_global:
@@ -271,9 +274,10 @@ class ReceiptParser:
                     header_lines.append(full_line_text)
                     continue
 
-            # --- בדיקת סיום טבלה ---
-            if any(k in full_line_text for k in stop_keywords):
-                print(f"Table ended by Stop Keywords: {full_line_text}") # לדיבוג
+            if any(s in full_line_text for s in stop_keywords):
+                print(f"Table ended by Stop Keywords: {full_line_text}") 
+                self.table_ended_global = True # חשוב: מסמן שהטבלה נגמרה
+                # אופציונלי: אם אתה רוצה להפסיק לעבד את העמוד הזה לגמרי:
                 break
             
             # --- לוגיקת HEADER SKIP (עכשיו היא רצה רק בתוך הטבלה או בדפים הבאים) ---
@@ -289,11 +293,11 @@ class ReceiptParser:
             possible_barcodes = []
 
             for w in reversed_row_list:
-                w = w.replace('\u200f', "").strip()  # הסרת תווים לא נראים
                 if w.isdigit():
                     possible_barcodes.append(w)
-                else:
-                    break
+                # else:
+                #     print(f"Non-digit word encountered, stopping barcode search at: {w}")
+                #     break
 
             if not possible_barcodes:
                 continue
@@ -309,6 +313,7 @@ class ReceiptParser:
             #     print(f"Skipping line due to invalid barcode: {barcode}")
             #     continue
             if not barcode or len(str(barcode)) < 2:
+                # print(f"Skipping line due to invalid barcode: {barcode}")
                 continue
 
             quantity = 1.0
@@ -368,8 +373,8 @@ class ReceiptParser:
 
 if __name__ == "__main__":
     parser = ReceiptParser()
-    file_path = r'src\infrastructure\scanner\reciept_mahsanei_hashuk_full_2_check_problem_mixing_text.pdf'
-        
+    file_path = r'src\infrastructure\scanner\reciept_rami_levi_full_3.pdf'
+
     try:
         data = parser.parse_receipt(file_path)
         # removing pics from local dir
