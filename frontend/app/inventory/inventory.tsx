@@ -32,12 +32,6 @@ export function InventoryScreenBase({
     hideTabs,
   });
 
-  useFocusEffect(
-    useCallback(() => {
-      inv.loadInventory("initial");
-    }, [inv.loadInventory])
-  );
-
   const handleBack = () => {
     if (currentHomeId) {
       router.replace({
@@ -87,6 +81,7 @@ export function InventoryScreenBase({
               <>
                 <GroupedInventoryList
                   groupedItems={inv.groupedItems as any}
+                  searchQuery={inv.search}
                   onChangeQty={inv.changeQty}
                   onEditItem={(it: any) => inv.setItemToEdit(it)}
                   onDeleteItem={inv.deleteRow}

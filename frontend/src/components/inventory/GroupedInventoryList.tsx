@@ -1,5 +1,5 @@
 // components/inventory/GroupedInventoryList.tsx
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,8 +9,15 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { GroupedInventory } from "@/app/inventory/inventory";
 import { InventoryItem } from "@/src/context/inventory-context";
+
+type GroupedInventory = {
+  key: string;
+  name: string;
+  category: InventoryItem["category"]; 
+  totalQuantity: number;
+  items: InventoryItem[];
+};
 
 const BRAND_TEXT = "#111827";
 const BRAND_MUTED = "#6B7280";
@@ -18,6 +25,7 @@ const BRAND_BLUE_SOFT = "#F0FAFF";
 
 type Props = {
   groupedItems: GroupedInventory[];
+  searchQuery: string;
   onChangeQty: (id: string, delta: number) => void;
   onEditItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
@@ -26,14 +34,15 @@ type Props = {
 
 export const GroupedInventoryList: React.FC<Props> = ({
   groupedItems,
+  searchQuery,
   onChangeQty,
   onEditItem,
   onDeleteItem,
   onAddItem,
 }) => {
-  const [expandedGroups, setExpandedGroups] = useState<
-    Record<string, boolean>
-  >({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const listRef = useRef<FlatList<GroupedInventory>>(null);
+  const isSearching = searchQuery.trim().length >= 2;
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((prev) => ({
@@ -44,27 +53,41 @@ export const GroupedInventoryList: React.FC<Props> = ({
 
   return (
     <FlatList
+      ref={listRef}
       data={groupedItems}
       keyExtractor={(group) => group.key}
       contentContainerStyle={styles.listContent}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="none"
 
+      /** זה מונע את הקפיצה */
+    removeClippedSubviews={false}
+    maintainVisibleContentPosition={{
+      minIndexForVisible: 1,
+      autoscrollToTopThreshold: 40,
+    }}
+
+
       ListEmptyComponent={
         <Text style={styles.emptyText}>
           לא נמצאו פריטים בקטגוריה / חיפוש הזה.
         </Text>
       }
+
       renderItem={({ item: group }) => (
         <GroupedInventoryRow
           group={group}
-          expanded={!!expandedGroups[group.key]}
-          onToggle={() => toggleGroup(group.key)}
+          expanded={isSearching ? false : !!expandedGroups[group.key]}
+          onToggle={() => {
+            if (isSearching) return;
+            toggleGroup(group.key);
+          }}
           onChangeQty={onChangeQty}
           onEditItem={onEditItem}
           onDeleteItem={onDeleteItem}
         />
       )}
+
       ListFooterComponent={
         <TouchableOpacity style={styles.addCard} onPress={onAddItem}>
           <View style={styles.addIconCircle}>
@@ -81,6 +104,7 @@ export const GroupedInventoryList: React.FC<Props> = ({
     />
   );
 };
+
 
 type RowProps = {
   group: GroupedInventory;
@@ -104,14 +128,27 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
       ? "מקרר"
       : group.category === "freezer"
       ? "מקפיא"
-      : "מזווה";
+      : group.category === "pantry"
+      ? "מזווה"
+      : group.category === "cleaning supplies"
+      ? "חומרי ניקוי"
+      : group.category === "other"
+      ? "אחר"
+      : String(group.category);
 
   const categoryColor =
     group.category === "fridge"
       ? "#0284C7"
       : group.category === "freezer"
       ? "#6366F1"
-      : "#F97316";
+      : group.category === "pantry"
+      ? "#F97316"
+      : group.category === "cleaning supplies"
+      ? "#10B981"
+      : group.category === "other"
+      ? "#6B7280"
+      : "#6B7280";
+
 
   return (
     <View style={styles.groupCard}>
@@ -155,12 +192,12 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
         <View style={styles.groupChildrenContainer}>
           {group.items
             .slice()
-            .sort((a, b) => {
+            .sort((a: InventoryItem, b: InventoryItem) => {
               const aDate = a.expiresAt ?? "";
               const bDate = b.expiresAt ?? "";
               return aDate.localeCompare(bDate);
             })
-            .map((item) => (
+            .map((item: InventoryItem) => (
               <View key={item.id} style={styles.batchRow}>
                 <View style={styles.batchInfo}>
                   <Ionicons

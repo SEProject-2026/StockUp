@@ -46,11 +46,14 @@ export function useInventoryData(params: {
   const [itemToEdit, setItemToEdit] = useState<InventoryRow | null>(null);
 
   const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
+
   const debouncedSearch = useDebouncedValue(search, 400);
 
   const requestSeqRef = useRef(0);
 
   const prevSigRef = useRef<string>("");
+
+  const didInitialLoadRef = useRef<string | null>(null);
 
   const fetchProducts = useCallback(
     async (q: string, effCat: CategoryKey, sf: StatusFilter): Promise<ProductDTO[]> => {
@@ -106,13 +109,7 @@ export function useInventoryData(params: {
 
   const loadInventory = useCallback(
     async (mode: LoadMode = "soft") => {
-      if (!homeId) {
-        setRows([]);
-        prevSigRef.current = "";
-        setInitialLoading(false);
-        setIsSearching(false);
-        return;
-      }
+      if (!homeId) return;
 
       const mySeq = ++requestSeqRef.current;
       const q = debouncedSearch.trim();
@@ -152,13 +149,39 @@ export function useInventoryData(params: {
     ]
   );
 
+  useEffect(() => {
+    if (homeId) return;
+
+    setRows([]);
+    prevSigRef.current = "";
+    setInitialLoading(false);
+    setIsSearching(false);
+    didInitialLoadRef.current = null;
+  }, [homeId]);
+
+  useEffect(() => {
+    if (!homeId) return;
+
+    if (didInitialLoadRef.current !== homeId) {
+      didInitialLoadRef.current = homeId;
+      loadInventory("initial");
+    }
+  }, [homeId, loadInventory]);
+
+  useEffect(() => {
+    if (!homeId) return;
+    if (didInitialLoadRef.current !== homeId) return;
+
+    loadInventory("soft");
+  }, [homeId, debouncedSearch, effectiveCategory, statusFilter, loadInventory]);
+
   const groupedItems = useMemo(() => {
     const map = new Map<
       string,
       {
         key: string;
         name: string;
-        category: "fridge" | "freezer" | "pantry";
+        category: InventoryRow["category"];
         totalQuantity: number;
         items: InventoryRow[];
       }
@@ -195,10 +218,9 @@ export function useInventoryData(params: {
       const next = current.quantity + delta;
       if (next < 0) return;
 
-      // אופטימי
       const optimistic = rows.map((r) => (r.id === rowId ? { ...r, quantity: next } : r));
       setRows(optimistic);
-      prevSigRef.current = rowsSignature(optimistic); 
+      prevSigRef.current = rowsSignature(optimistic);
 
       try {
         await updateProductQuantity(homeId, current.productId, {
@@ -283,12 +305,6 @@ export function useInventoryData(params: {
     [homeId, rows, loadInventory]
   );
 
-  useEffect(() => {
-    if (!homeId) return;
-    if (initialLoading) return;
-    loadInventory("soft");
-  }, [homeId, initialLoading, loadInventory]);
-
   return {
     rows,
     groupedItems,
@@ -307,7 +323,7 @@ export function useInventoryData(params: {
     itemToEdit,
     setItemToEdit,
 
-    loadInventory,
+    loadInventory, 
     changeQty,
     deleteRow,
     saveEdit,
