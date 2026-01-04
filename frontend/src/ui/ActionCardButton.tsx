@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#3A6EA5",
+    backgroundColor: "#14365aff",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 11,
     fontWeight: "600",
-    color: "#3A6EA5",
+    color: "#14365aff",
     textAlign: "right",
   },
 });

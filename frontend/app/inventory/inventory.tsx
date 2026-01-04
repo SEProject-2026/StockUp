@@ -1,6 +1,5 @@
-// app/inventory/index.tsx
-import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
-import { View, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import React, { useCallback } from "react";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -12,124 +11,8 @@ import { InventoryFiltersBar } from "@/src/components/inventory/InventoryFilters
 import { GroupedInventoryList } from "@/src/components/inventory/GroupedInventoryList";
 import { EditItemModal } from "@/src/components/inventory/EditItemModal";
 
-import { Category, InventoryItem } from "@/src/context/inventory-context";
-
-import {
-  getAllStock,
-  searchStock,
-  filterStockByLocation,
-  filterStockByExpiration,
-  updateProductQuantity,
-  updateProductExpiration,
-  updateProductNickname,
-  removeProduct,
-  type ProductDTO,
-  type LocationType,
-  type ExpirationType,
-} from "@/src/api/stock";
-
-export type GroupedInventory = {
-  key: string;
-  name: string;
-  category: "fridge" | "freezer" | "pantry";
-  totalQuantity: number;
-  items: InventoryItem[];
-};
-
-type InventoryRow = InventoryItem & {
-  productId: string;
-  expirationDate: string | null;
-  originalName: string;
-  status?: string;
-};
-
-export type CategoryKey = Category | "all";
-type StatusFilter = "all" | "soon" | "expired";
-
-function useDebouncedValue<T>(value: T, delayMs = 400) {
-  const [debounced, setDebounced] = useState(value);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(id);
-  }, [value, delayMs]);
-
-  return debounced;
-}
-
-function mapLocationToCategory(location?: string | null): Category {
-  switch ((location ?? "").toUpperCase()) {
-    case "FRIDGE":
-      return "fridge";
-    case "FREEZER":
-      return "freezer";
-    case "PANTRY":
-      return "pantry";
-    default:
-      return "pantry";
-  }
-}
-
-function categoryToLocationType(cat: Category): LocationType {
-  switch (cat) {
-    case "fridge":
-      return "FRIDGE";
-    case "freezer":
-      return "FREEZER";
-    case "pantry":
-      return "PANTRY";
-    default:
-      return "PANTRY";
-  }
-}
-
-function statusFilterToExpirationType(sf: StatusFilter): ExpirationType {
-  if (sf === "soon") return "GOING_TO_EXPIRE";
-  return "EXPIRED";
-}
-
-function toIsoDateOnly(s?: string | null) {
-  if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const d = new Date(s);
-  if (Number.isNaN(+d)) return null;
-  return d.toISOString().slice(0, 10);
-}
-
-function dtoToRows(dto: ProductDTO): InventoryRow[] {
-  const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
-
-  if (dto.items?.length) {
-    return dto.items.map((it) => {
-      const exp = it.expiration_date ? String(it.expiration_date) : null;
-
-      return {
-        id: `${dto.id}__${exp ?? "none"}`,
-        name: displayName,
-        quantity: it.quantity,
-        category: mapLocationToCategory(dto.location),
-        expiresAt: exp ?? undefined,
-        productId: String(dto.id),
-        expirationDate: exp,
-        originalName: dto.original_name,
-        status: it.status,
-      };
-    });
-  }
-
-  return [
-    {
-      id: `${dto.id}__none`,
-      name: displayName,
-      quantity: dto.quantity ?? 0,
-      category: mapLocationToCategory(dto.location),
-      expiresAt: undefined,
-      productId: String(dto.id),
-      expirationDate: null,
-      originalName: dto.original_name,
-    },
-  ];
-}
+import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
+import { useInventoryData } from "@/src/hooks/useInventoryData";
 
 export function InventoryScreenBase({
   initialCategory = "all",
@@ -143,254 +26,27 @@ export function InventoryScreenBase({
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
   const currentHomeId = homeId ? String(homeId) : undefined;
 
-  const [rows, setRows] = useState<InventoryRow[]>([]);
-
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
-
-  const [selectedTab, setSelectedTab] = useState<CategoryKey>(initialCategory);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const [itemToEdit, setItemToEdit] = useState<InventoryRow | null>(null);
-
-  const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
-
-  const debouncedSearch = useDebouncedValue(search, 400);
-  const requestSeqRef = useRef(0);
-
-  const loadInventory = useCallback(
-    async (opts?: { forceInitialSpinner?: boolean }) => {
-      if (!currentHomeId) {
-        setRows([]);
-        setInitialLoading(false);
-        setIsSearching(false);
-        return;
-      }
-
-      const mySeq = ++requestSeqRef.current;
-
-      const showBigSpinner = opts?.forceInitialSpinner ?? false;
-
-      try {
-        if (showBigSpinner || initialLoading) {
-          setInitialLoading(true);
-        } else {
-          setIsSearching(true);
-        }
-
-        const q = debouncedSearch.trim();
-        let products: ProductDTO[] = [];
-
-        if (q.length >= 2) {
-          const res = await searchStock(currentHomeId, q);
-          if (mySeq !== requestSeqRef.current) return;
-          products = res.data ?? [];
-        } else if (statusFilter !== "all") {
-          const expType = statusFilterToExpirationType(statusFilter);
-          const res = await filterStockByExpiration(currentHomeId, expType);
-          if (mySeq !== requestSeqRef.current) return;
-          products = res.data ?? [];
-        } else if (effectiveCategory !== "all") {
-          const loc = categoryToLocationType(effectiveCategory);
-          const res = await filterStockByLocation(currentHomeId, loc);
-          if (mySeq !== requestSeqRef.current) return;
-          products = res.data ?? [];
-        } else {
-          const res = await getAllStock(currentHomeId);
-          if (mySeq !== requestSeqRef.current) return;
-          products = res.data ?? [];
-        }
-
-        let newRows = products.flatMap(dtoToRows);
-
-        if (effectiveCategory !== "all") {
-          newRows = newRows.filter((r) => r.category === effectiveCategory);
-        }
-
-        if (q.length >= 2) {
-          const qq = q.toLowerCase();
-          newRows = newRows.filter(
-            (r) =>
-              r.name.toLowerCase().includes(qq) ||
-              r.originalName.toLowerCase().includes(qq)
-          );
-        }
-
-        if (statusFilter !== "all") {
-          const wanted = statusFilterToExpirationType(statusFilter);
-          newRows = newRows.filter(
-            (r) => String(r.status ?? "").toUpperCase() === wanted
-          );
-        }
-
-        setRows(newRows);
-      } catch (e: any) {
-        if (mySeq !== requestSeqRef.current) return;
-        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון מלאי");
-        setRows([]);
-      } finally {
-        if (mySeq === requestSeqRef.current) {
-          setInitialLoading(false);
-          setIsSearching(false);
-        }
-      }
-    },
-    [currentHomeId, debouncedSearch, effectiveCategory, initialLoading, statusFilter]
-  );
+  const inv = useInventoryData({
+    homeId: currentHomeId,
+    initialCategory,
+    hideTabs,
+  });
 
   useFocusEffect(
-    React.useCallback(() => {
-      loadInventory({ forceInitialSpinner: true });
-    }, [currentHomeId])
-  );
-
-  useEffect(() => {
-    if (!currentHomeId) return;
-    if (initialLoading) return; 
-    loadInventory();
-  }, [loadInventory, currentHomeId, initialLoading]);
-
-  const groupedItems = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        key: string;
-        name: string;
-        category: Category;
-        totalQuantity: number;
-        items: InventoryRow[];
-      }
-    >();
-
-    for (const r of rows) {
-      const key = `${r.name}__${r.category}`;
-      const g =
-        map.get(key) ?? {
-          key,
-          name: r.name,
-          category: r.category,
-          totalQuantity: 0,
-          items: [] as InventoryRow[],
-        };
-      g.totalQuantity += r.quantity;
-      g.items.push(r);
-      map.set(key, g);
-    }
-
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, "he")
-    );
-  }, [rows]);
-
-  const handleChangeQty = useCallback(
-    async (rowId: string, delta: number) => {
-      if (!currentHomeId) return;
-      const current = rows.find((r) => r.id === rowId);
-      if (!current) return;
-
-      const next = current.quantity + delta;
-      if (next < 0) return;
-
-      setRows((prev) =>
-        prev.map((r) => (r.id === rowId ? { ...r, quantity: next } : r))
-      );
-
-      try {
-        await updateProductQuantity(currentHomeId, current.productId, {
-          expiration_date: current.expirationDate,
-          new_quantity: next,
-        });
-      } catch (e: any) {
-        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לעדכן כמות");
-        await loadInventory();
-      }
-    },
-    [currentHomeId, rows, loadInventory]
-  );
-
-  const handleDelete = useCallback(
-    (rowId: string) => {
-      if (!currentHomeId) return;
-      const current = rows.find((r) => r.id === rowId);
-      if (!current) return;
-
-      Alert.alert("מחיקה", `למחוק את "${current.name}"?`, [
-        { text: "ביטול", style: "cancel" },
-        {
-          text: "מחק",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await removeProduct(
-                currentHomeId,
-                current.productId,
-                current.expirationDate
-              );
-              setRows((prev) => prev.filter((r) => r.id !== rowId));
-            } catch (e: any) {
-              Alert.alert("שגיאה", e?.message ?? "לא הצלחתי למחוק");
-              await loadInventory();
-            }
-          },
-        },
-      ]);
-    },
-    [currentHomeId, rows, loadInventory]
-  );
-
-  const handleSaveEdit = useCallback(
-    async (
-      rowId: string,
-      values: { name: string; quantity: number; expiresAt?: string }
-    ) => {
-      if (!currentHomeId) return;
-
-      const current = rows.find((r) => r.id === rowId);
-      if (!current) return;
-
-      const newName = values.name.trim();
-      const newQty = values.quantity;
-      const newExp = toIsoDateOnly(values.expiresAt ?? null);
-      const oldExp = current.expirationDate;
-
-      try {
-        if (newName && newName !== current.name) {
-          await updateProductNickname(currentHomeId, current.productId, {
-            nickname: newName,
-          });
-        }
-
-        if (newExp !== oldExp) {
-          await updateProductExpiration(currentHomeId, current.productId, {
-            old_date: oldExp,
-            new_date: newExp,
-          });
-        }
-
-        if (newQty !== current.quantity) {
-          await updateProductQuantity(currentHomeId, current.productId, {
-            expiration_date: newExp,
-            new_quantity: newQty,
-          });
-        }
-
-        setItemToEdit(null);
-        await loadInventory();
-      } catch (e: any) {
-        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לשמור שינויים");
-      }
-    },
-    [currentHomeId, rows, loadInventory]
+    useCallback(() => {
+      inv.loadInventory("initial");
+    }, [inv.loadInventory])
   );
 
   const handleBack = () => {
-    if (currentHomeId)
+    if (currentHomeId) {
       router.replace({
         pathname: "/home/[homeId]",
         params: { homeId: currentHomeId },
       });
-    else router.back();
+    } else {
+      router.back();
+    }
   };
 
   return (
@@ -414,34 +70,26 @@ export function InventoryScreenBase({
           <>
             <InventoryFiltersBar
               hideTabs={hideTabs}
-              selectedTab={selectedTab}
-              onChangeTab={setSelectedTab}
-              search={search}
-              onChangeSearch={setSearch}
-              statusFilter={statusFilter}
-              onChangeStatusFilter={setStatusFilter}
+              selectedTab={inv.selectedTab}
+              onChangeTab={inv.setSelectedTab}
+              search={inv.search}
+              onChangeSearch={inv.setSearch}
+              statusFilter={inv.statusFilter}
+              onChangeStatusFilter={inv.setStatusFilter}
               filtersVisible={true}
-              // להציג אינדיקציה קטנה בתוך הבר:
-              // isSearching={isSearching}
             />
 
-            {initialLoading ? (
+            {inv.initialLoading ? (
               <View style={styles.center}>
                 <ActivityIndicator size="large" color="#0284C7" />
               </View>
             ) : (
               <>
-                {isSearching && (
-                  <View style={styles.searchingRow}>
-                    <ActivityIndicator size="small" color="#0284C7" />
-                  </View>
-                )}
-
                 <GroupedInventoryList
-                  groupedItems={groupedItems as any}
-                  onChangeQty={handleChangeQty}
-                  onEditItem={(it: any) => setItemToEdit(it)}
-                  onDeleteItem={handleDelete}
+                  groupedItems={inv.groupedItems as any}
+                  onChangeQty={inv.changeQty}
+                  onEditItem={(it: any) => inv.setItemToEdit(it)}
+                  onDeleteItem={inv.deleteRow}
                   onAddItem={() =>
                     router.push({
                       pathname: "/inventory/add-item",
@@ -458,10 +106,10 @@ export function InventoryScreenBase({
       </View>
 
       <EditItemModal
-        visible={!!itemToEdit}
-        item={itemToEdit as any}
-        onClose={() => setItemToEdit(null)}
-        onSave={handleSaveEdit}
+        visible={!!inv.itemToEdit}
+        item={inv.itemToEdit as any}
+        onClose={() => inv.setItemToEdit(null)}
+        onSave={inv.saveEdit}
       />
     </SafeAreaView>
   );
@@ -475,11 +123,4 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F4F4F4" },
   gradientBackground: { ...StyleSheet.absoluteFillObject },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  searchingRow: {
-    paddingTop: 10,
-    paddingBottom: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

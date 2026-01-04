@@ -119,7 +119,7 @@ export default function HomesScreen() {
 
   const onCreateHome = useCallback(async () => {
     const name = newName.trim();
-    if (!name) return Alert.alert("חסר שם", "כתבי שם לבית החדש.");
+    if (!name) return Alert.alert("חסר שם", "בחר שם לבית החדש.");
     if (name.length < 2) return Alert.alert("שם קצר מדי", "שם הבית צריך להיות לפחות 2 תווים.");
 
     try {
@@ -189,7 +189,7 @@ export default function HomesScreen() {
             </View>
             <Text style={styles.emptyTitle}>אין לך עדיין בתים</Text>
             <Text style={styles.emptySubtitle}>
-              הוסיפי בית חדש כדי להתחיל לנהל מלאי משותף.
+              הוסף בית חדש כדי להתחיל לנהל מלאי משותף.
             </Text>
 
             <TouchableOpacity

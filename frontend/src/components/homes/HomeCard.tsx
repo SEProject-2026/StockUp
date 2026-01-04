@@ -6,7 +6,7 @@ type Home = {
   id: string;
   name: string;
   membersCount: number;
-  updatedAt: string; // ISO
+  updatedAt: string; 
 };
 
 const BRAND_PRIMARY = "#0284C7";

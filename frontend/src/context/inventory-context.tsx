@@ -5,7 +5,7 @@ import React, {
   ReactNode,
 } from "react";
 
-export type Category = "fridge" | "freezer" | "pantry";
+export type Category = "fridge" | "freezer" | "pantry" | "cleaning supplies" | "other";
 
 
 export type InventoryItem = {

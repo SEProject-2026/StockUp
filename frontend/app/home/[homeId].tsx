@@ -1,5 +1,5 @@
 // app/home/[homeId].tsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,8 +33,12 @@ function locationToCategory(location?: string | null): Category {
       return "freezer";
     case "PANTRY":
       return "pantry";
+    case "CLEANING_SUPPLIES":
+      return "cleaning supplies";
+    case "OTHER":
+      return "other";
     default:
-      return "pantry";
+      return "other";
   }
 }
 
@@ -52,7 +56,6 @@ function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
     }));
   }
 
-  // fallback אם אין items
   return [
     {
       id: `${dto.id}__none`,
@@ -69,25 +72,22 @@ export default function HomeDashboardScreen() {
   const currentHomeId = String(homeId);
 
   const [homeItems, setHomeItems] = useState<HomeItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const homeAreasScrollRef = useRef<ScrollView>(null);
+  const didAutoScrollAreas = useRef(false);
 
   const loadHome = useCallback(async () => {
     if (!currentHomeId) return;
 
     try {
-      setLoading(true);
       const res = await getAllStock(currentHomeId);
       const products = res.data ?? [];
       setHomeItems(products.flatMap(productDtoToHomeItems));
     } catch (e: any) {
       Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון נתוני בית");
       setHomeItems([]);
-    } finally {
-      setLoading(false);
     }
   }, [currentHomeId]);
 
-  // טוען בכניסה למסך וגם בכל חזרה למסך (כדי שיהיה סנכרון אחרי הוספה)
   useEffect(() => {
     loadHome();
   }, [loadHome]);
@@ -105,12 +105,16 @@ export default function HomeDashboardScreen() {
     let fridge = 0,
       freezer = 0,
       pantry = 0,
+      cleaningSupplies = 0,
+      other = 0,
       expiringSoon = 0;
 
     homeItems.forEach((item) => {
       if (item.category === "fridge") fridge++;
       if (item.category === "freezer") freezer++;
       if (item.category === "pantry") pantry++;
+      if (item.category === "cleaning supplies") cleaningSupplies++;
+      if (item.category === "other") other++;
 
       if (item.expiresAt) {
         const exp = new Date(item.expiresAt);
@@ -120,7 +124,7 @@ export default function HomeDashboardScreen() {
       }
     });
 
-    return { total: homeItems.length, fridge, freezer, pantry, expiringSoon };
+    return { total: homeItems.length, fridge, freezer, pantry, cleaningSupplies, other, expiringSoon };
   }, [homeItems]);
 
   const expiringSoonItems = useMemo(() => {
@@ -159,31 +163,82 @@ export default function HomeDashboardScreen() {
           {/* home areas */}
           <View style={styles.horizontalSection}>
             <ScrollView
+              ref={homeAreasScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
-              contentOffset={{ x: 150, y: 0 }}
+              onContentSizeChange={() => {
+                if (didAutoScrollAreas.current) return;
+                didAutoScrollAreas.current = true;
+
+                requestAnimationFrame(() => {
+                  homeAreasScrollRef.current?.scrollToEnd({ animated: false });
+                });
+              }}
             >
               <SideTitleCard label={"אזורי\nהבית"} />
+
               <CategoryAreaButton
                 label="מקרר"
                 value={stats.fridge}
                 icon="snow-outline"
-                onPress={() => router.push({ pathname: "/inventory/fridge", params: { homeId: currentHomeId } })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "fridge", homeId: currentHomeId },
+                  })
+                }
               />
+
               <CategoryAreaButton
                 label="מקפיא"
                 value={stats.freezer}
                 icon="cube-outline"
-                onPress={() => router.push({ pathname: "/inventory/freezer", params: { homeId: currentHomeId } })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "freezer", homeId: currentHomeId },
+                  })
+                }
               />
+
               <CategoryAreaButton
                 label="מזווה"
                 value={stats.pantry}
                 icon="restaurant-outline"
-                onPress={() => router.push({ pathname: "/inventory/pantry", params: { homeId: currentHomeId } })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "pantry", homeId: currentHomeId },
+                  })
+                }
+              />
+
+              <CategoryAreaButton
+                label="ציוד ניקוי"
+                value={stats.cleaningSupplies}
+                icon="water-outline"
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "cleaning-supplies", homeId: currentHomeId },
+                  })
+                }
+              />
+
+              <CategoryAreaButton
+                label="אחר"
+                value={stats.other}
+                icon="ellipsis-horizontal-outline"
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "other", homeId: currentHomeId },
+                  })
+                }
               />
             </ScrollView>
+
           </View>
 
           {/* quick actions */}
@@ -208,7 +263,6 @@ export default function HomeDashboardScreen() {
             </ScrollView>
           </View>
 
-          {/* אפשר להראות spinner קטן אם תרצי – כרגע נשאר UI רגיל */}
           <ExpiringSoonCard items={expiringSoonItems as any} />
         </ScrollView>
 

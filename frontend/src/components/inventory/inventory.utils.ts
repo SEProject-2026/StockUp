@@ -1,0 +1,105 @@
+import { Category, InventoryItem } from "@/src/context/inventory-context";
+import type { ProductDTO, LocationType, ExpirationType } from "@/src/api/stock";
+
+export type InventoryRow = InventoryItem & {
+  productId: string;
+  expirationDate: string | null;
+  originalName: string;
+  status?: string;
+};
+
+export type CategoryKey = Category | "all";
+export type StatusFilter = "all" | "soon" | "expired";
+
+export function mapLocationToCategory(location?: string | null): Category {
+  switch ((location ?? "").toUpperCase()) {
+    case "FRIDGE":
+      return "fridge";
+    case "FREEZER":
+      return "freezer";
+    case "PANTRY":
+      return "pantry";
+    case "CLEANING_SUPPLIES":
+      return "cleaning supplies";
+    case "OTHER":
+      return "other"; 
+    default:
+      return "other";
+  }
+}
+
+export function categoryToLocationType(cat: Category): LocationType {
+  switch (cat) {
+    case "fridge":
+      return "FRIDGE";
+    case "freezer":
+      return "FREEZER";
+    case "pantry":
+      return "PANTRY";
+    case "cleaning supplies":
+      return "CLEANING_SUPPLIES";
+    case "other":
+      return "OTHER";
+    default:
+      return "OTHER";
+  }
+}
+
+export function statusFilterToExpirationType(sf: StatusFilter): ExpirationType {
+  if (sf === "soon") return "GOING_TO_EXPIRE";
+  return "EXPIRED";
+}
+
+export function toIsoDateOnly(s?: string | null) {
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const d = new Date(s);
+  if (Number.isNaN(+d)) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+export function dtoToRows(dto: ProductDTO): InventoryRow[] {
+  const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
+
+  if (dto.items?.length) {
+    return dto.items.map((it) => {
+      const exp = it.expiration_date ? String(it.expiration_date) : null;
+
+      return {
+        id: `${dto.id}__${exp ?? "none"}`,
+        name: displayName,
+        quantity: it.quantity,
+        category: mapLocationToCategory(dto.location),
+        expiresAt: exp ?? undefined,
+        productId: String(dto.id),
+        expirationDate: exp,
+        originalName: dto.original_name,
+        status: it.status,
+      };
+    });
+  }
+
+  return [
+    {
+      id: `${dto.id}__none`,
+      name: displayName,
+      quantity: dto.quantity ?? 0,
+      category: mapLocationToCategory(dto.location),
+      expiresAt: undefined,
+      productId: String(dto.id),
+      expirationDate: null,
+      originalName: dto.original_name,
+    },
+  ];
+}
+
+export function rowsSignature(rows: InventoryRow[]) {
+  const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id));
+  return sorted
+    .map(
+      (r) =>
+        `${r.id}:${r.quantity}:${r.expiresAt ?? ""}:${r.name}:${r.status ?? ""}`
+    )
+    .join("|");
+}

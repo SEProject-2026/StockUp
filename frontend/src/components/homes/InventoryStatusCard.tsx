@@ -7,6 +7,8 @@ const BRAND_BLUE_SOFT = "#F0FAFF";
 const BRAND_RED = "#c43131ff";
 
 export type Stats = {
+  other: number;
+  cleaningSupplies: number;
   total: number;
   fridge: number;
   freezer: number;
