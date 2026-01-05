@@ -124,7 +124,7 @@ async def update_nickname(
 @router.delete("/{product_id}", response_model=GeneralResponse)
 async def remove_product(
     product_id: UUID,
-    expiration_date: date, # In DELETE, we usually pass params in Query String
+    expiration_date: Optional[date]= Query(None), # In DELETE, we usually pass params in Query String
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):

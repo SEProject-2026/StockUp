@@ -188,7 +188,8 @@ export function useInventoryData(params: {
     >();
 
     for (const r of rows) {
-      const key = `${r.name}__${r.category}`;
+      const key = `${r.category}__${r.name}`;
+
       const g =
         map.get(key) ?? {
           key,
@@ -203,9 +204,7 @@ export function useInventoryData(params: {
       map.set(key, g);
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, "he")
-    );
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "he"));
   }, [rows]);
 
   const changeQty = useCallback(

@@ -81,27 +81,27 @@ export async function updateProductNickname(
   productId: string,
   payload: { nickname: string }
 ) {
-function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) {
-  return authFetch<T>(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-      "X-Home-ID": homeId,
-    },
+  return stockFetch<GeneralResponse<ProductDTO>>(homeId, `/stock/${productId}/nickname`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }
-}
+
 
 export async function removeProduct(
   homeId: string,
   productId: string,
   expiration_date: string | null
 ) {
-  const q = encodeURIComponent(expiration_date ?? "");
-  return stockFetch<GeneralResponse<ProductDTO | null>>(homeId, `/stock/${productId}?expiration_date=${q}`, {
-    method: "DELETE",
-  });
+  const qs = expiration_date
+    ? `?expiration_date=${encodeURIComponent(expiration_date)}`
+    : "";
+
+  return stockFetch<GeneralResponse<ProductDTO | null>>(
+    homeId,
+    `/stock/${productId}${qs}`,
+    { method: "DELETE" }
+  );
 }
 
 // ----------------------

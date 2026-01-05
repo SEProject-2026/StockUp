@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@/src/config/api";
 import { getAccessToken } from "@/src/auth/token";
+import { getSelectedHomeId } from "@/app/home/selected-home";
 
 export type ApiErrorShape = { detail?: string; message?: string; status?: string; [k: string]: any };
 
@@ -13,10 +14,7 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -26,20 +24,18 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) throw new Error(await parseError(res));
-
   return (await res.json()) as T;
 }
 
-export async function authFetch<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = await getAccessToken();
+export async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const [token, homeId] = await Promise.all([getAccessToken(), getSelectedHomeId()]);
+
   return apiFetch<T>(path, {
     ...options,
     headers: {
       ...(options.headers ?? {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(homeId ? { "X-Home-ID": homeId } : {}),
     },
   });
 }

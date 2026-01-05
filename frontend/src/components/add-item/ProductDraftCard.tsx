@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TextInput, Platform, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TextInput, Platform, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "@/src/ui/PrimaryButton";
 import type { Category } from "./types";
+import SuggestionsList from "@/src/components/add-item/SuggestionsList";
+import type { CatalogItem } from "@/src/api/catalog";
 
 const BRAND_PRIMARY = "#0284C7";
 const BRAND_BLUE_SOFT = "#F0FAFF";
@@ -19,25 +21,39 @@ export default function ProductDraftCard(props: {
   editing: boolean;
   barcode: string;
   name: string;
+  nickname: string;
   quantity: string;
   category: Category;
   expiresAt?: Date;
   categoryOptions: Array<{ key: Category; label: string; icon: keyof typeof Ionicons.glyphMap }>;
+
   onChangeBarcode: (v: string) => void;
   onChangeName: (v: string) => void;
+  onChangeNickname: (v: string) => void;
   onChangeQuantity: (v: string) => void;
+
   onPressCategory: () => void;
   onPressScan: () => void;
   onPressDate: () => void;
   onClearDate: () => void;
+
   onAddToList: () => void;
   onCancelEdit: () => void;
   addDisabled: boolean;
+
+  suggestions: CatalogItem[];
+  nameLoading: boolean;
+
+  selectedCatalogItem: CatalogItem | null;
+  onClearSelectedCatalogItem: () => void;
+  onPickSuggestion: (item: CatalogItem) => void;
 }) {
   const meta = useMemo(
     () => props.categoryOptions.find((x) => x.key === props.category) ?? props.categoryOptions[0],
     [props.category, props.categoryOptions]
   );
+
+  const showOriginalUnderNickname = props.nickname.trim().length > 0 && props.selectedCatalogItem?.name;
 
   return (
     <View style={styles.card}>
@@ -54,15 +70,58 @@ export default function ProductDraftCard(props: {
         </TouchableOpacity>
       </View>
 
-      <Field label="שם מוצר">
+      <Field label="שם מוצר (חיפוש)">
+        <View style={styles.inputRow}>
+          <TextInput
+            value={props.name}
+            onChangeText={props.onChangeName}
+            placeholder="התחילי להקליד..."
+            placeholderTextColor="#9CA3AF"
+            style={[styles.input, { flex: 1 }]}
+            textAlign="right"
+          />
+
+          {props.nameLoading ? (
+            <View style={styles.loaderWrap}>
+              <ActivityIndicator />
+            </View>
+          ) : null}
+        </View>
+
+        {props.selectedCatalogItem ? (
+          <View style={styles.chipRow}>
+            <View style={styles.selectedChipBox}>
+              <Text style={styles.selectedChipText} numberOfLines={1}>
+                {props.selectedCatalogItem.name}
+              </Text>
+              <TouchableOpacity
+                onPress={props.onClearSelectedCatalogItem}
+                style={styles.selectedChipX}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="close" size={14} color={BRAND_MUTED} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
+        {!props.selectedCatalogItem ? (
+          <SuggestionsList items={props.suggestions} onPick={props.onPickSuggestion} />
+        ) : null}
+      </Field>
+
+      <Field label="כינוי במלאי (אופציונלי)">
         <TextInput
-          value={props.name}
-          onChangeText={props.onChangeName}
-          placeholder="למשל: חלב 3%"
+          value={props.nickname}
+          onChangeText={props.onChangeNickname}
+          placeholder="למשל: חלב טרה"
           placeholderTextColor="#9CA3AF"
           style={styles.input}
           textAlign="right"
         />
+        {showOriginalUnderNickname ? (
+          <Text style={styles.helperText}>יוצג גם השם המקורי מתחת לכינוי במלאי</Text>
+        ) : null}
       </Field>
 
       <View style={styles.row2}>
@@ -182,6 +241,8 @@ const styles = StyleSheet.create({
 
   label: { fontSize: 12, color: BRAND_MUTED, textAlign: "right", paddingHorizontal: 2 },
 
+  helperText: { fontSize: 12, color: BRAND_MUTED, textAlign: "right", paddingHorizontal: 2, marginTop: 2 },
+
   input: {
     borderWidth: 1,
     borderColor: BRAND_BORDER,
@@ -191,6 +252,34 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: BRAND_TEXT,
+  },
+
+  inputRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
+  loaderWrap: { width: 26, alignItems: "center", justifyContent: "center" },
+
+  chipRow: { marginTop: 8, alignItems: "flex-end" },
+  selectedChipBox: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: BRAND_BLUE_SOFT,
+    borderWidth: 1,
+    borderColor: "#D7EDF9",
+    maxWidth: "100%",
+  },
+  selectedChipText: { fontSize: 12, fontWeight: "900", color: BRAND_TEXT, textAlign: "right", maxWidth: 260 },
+  selectedChipX: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: BRAND_BORDER,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   row2: { flexDirection: "row-reverse", alignItems: "flex-start" },

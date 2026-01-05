@@ -15,6 +15,8 @@ import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 import { getAllStock, type ProductDTO } from "@/src/api/stock";
 import type { Category } from "@/src/context/inventory-context";
 
+import { setSelectedHomeId } from "./selected-home";
+
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
 type HomeItem = {
@@ -70,6 +72,12 @@ function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
 export default function HomeDashboardScreen() {
   const { homeId } = useLocalSearchParams<{ homeId: string }>();
   const currentHomeId = String(homeId);
+
+  useEffect(() => {
+    if (!currentHomeId) return;
+    setSelectedHomeId(currentHomeId).catch(() => {
+    });
+  }, [currentHomeId]);
 
   const [homeItems, setHomeItems] = useState<HomeItem[]>([]);
   const homeAreasScrollRef = useRef<ScrollView>(null);
@@ -238,7 +246,6 @@ export default function HomeDashboardScreen() {
                 }
               />
             </ScrollView>
-
           </View>
 
           {/* quick actions */}

@@ -144,6 +144,16 @@ class Product:
         self._quantity = new_quantity
 
     async def remove_product_date(self, expiration_date: Optional[date]) -> 'Product':
+        # case: product without expiration date
+        if expiration_date is None:
+            if None in self._expiration_dates_to_quantity:
+                date_quantity, _ = self._expiration_dates_to_quantity.pop(None)
+                self._quantity -= date_quantity
+                return self
+            else:
+                raise ValueError("Product has no item without expiration date.")
+            
+        # case: product with expiration date
         if expiration_date in self._expiration_dates_to_quantity:
             date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
             del self._expiration_dates_to_quantity[expiration_date]

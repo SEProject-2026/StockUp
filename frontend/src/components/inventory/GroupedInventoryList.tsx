@@ -1,4 +1,3 @@
-// components/inventory/GroupedInventoryList.tsx
 import React, { useState, useRef } from "react";
 import {
   View,
@@ -14,7 +13,7 @@ import { InventoryItem } from "@/src/context/inventory-context";
 type GroupedInventory = {
   key: string;
   name: string;
-  category: InventoryItem["category"]; 
+  category: InventoryItem["category"];
   totalQuantity: number;
   items: InventoryItem[];
 };
@@ -29,7 +28,7 @@ type Props = {
   onChangeQty: (id: string, delta: number) => void;
   onEditItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
-  onAddItem: () => void; // NEW
+  onAddItem: () => void;
 };
 
 export const GroupedInventoryList: React.FC<Props> = ({
@@ -40,7 +39,9 @@ export const GroupedInventoryList: React.FC<Props> = ({
   onDeleteItem,
   onAddItem,
 }) => {
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    {}
+  );
   const listRef = useRef<FlatList<GroupedInventory>>(null);
   const isSearching = searchQuery.trim().length >= 2;
 
@@ -59,21 +60,16 @@ export const GroupedInventoryList: React.FC<Props> = ({
       contentContainerStyle={styles.listContent}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="none"
-
-      /** זה מונע את הקפיצה */
-    removeClippedSubviews={false}
-    maintainVisibleContentPosition={{
-      minIndexForVisible: 1,
-      autoscrollToTopThreshold: 40,
-    }}
-
-
+      removeClippedSubviews={false}
+      maintainVisibleContentPosition={{
+        minIndexForVisible: 1,
+        autoscrollToTopThreshold: 40,
+      }}
       ListEmptyComponent={
         <Text style={styles.emptyText}>
           לא נמצאו פריטים בקטגוריה / חיפוש הזה.
         </Text>
       }
-
       renderItem={({ item: group }) => (
         <GroupedInventoryRow
           group={group}
@@ -87,7 +83,6 @@ export const GroupedInventoryList: React.FC<Props> = ({
           onDeleteItem={onDeleteItem}
         />
       )}
-
       ListFooterComponent={
         <TouchableOpacity style={styles.addCard} onPress={onAddItem}>
           <View style={styles.addIconCircle}>
@@ -104,7 +99,6 @@ export const GroupedInventoryList: React.FC<Props> = ({
     />
   );
 };
-
 
 type RowProps = {
   group: GroupedInventory;
@@ -132,9 +126,7 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
       ? "מזווה"
       : group.category === "cleaning supplies"
       ? "חומרי ניקוי"
-      : group.category === "other"
-      ? "אחר"
-      : String(group.category);
+      : "אחר";
 
   const categoryColor =
     group.category === "fridge"
@@ -145,14 +137,10 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
       ? "#F97316"
       : group.category === "cleaning supplies"
       ? "#10B981"
-      : group.category === "other"
-      ? "#6B7280"
       : "#6B7280";
-
 
   return (
     <View style={styles.groupCard}>
-      {/* שורת מוצר ראשית – כרטיס / קובייה */}
       <View style={styles.itemRow}>
         <View style={[styles.itemStrip, { backgroundColor: categoryColor }]} />
         <Pressable style={styles.itemMain} onPress={onToggle}>
@@ -187,72 +175,86 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
         </Pressable>
       </View>
 
-      {/* רשומות פנימיות */}
       {expanded && (
         <View style={styles.groupChildrenContainer}>
           {group.items
             .slice()
-            .sort((a: InventoryItem, b: InventoryItem) => {
-              const aDate = a.expiresAt ?? "";
-              const bDate = b.expiresAt ?? "";
-              return aDate.localeCompare(bDate);
-            })
-            .map((item: InventoryItem) => (
-              <View key={item.id} style={styles.batchRow}>
-                <View style={styles.batchInfo}>
-                  <Ionicons
-                    name="time-outline"
-                    size={14}
-                    color={BRAND_MUTED}
-                  />
-                  <Text style={styles.batchInfoText}>
-                    {item.expiresAt
-                      ? `תוקף: ${item.expiresAt}`
-                      : "ללא תאריך תוקף"}
-                  </Text>
-                </View>
+            .sort((a: any, b: any) =>
+              (a.expiresAt ?? "").localeCompare(b.expiresAt ?? "")
+            )
+            .map((item: any) => {
+              const showOriginal =
+                item.originalName &&
+                item.originalName.trim() &&
+                item.originalName !== group.name;
 
-                <View style={styles.batchActions}>
-                  <View style={styles.qtyControl}>
-                    <TouchableOpacity
-                      style={styles.qtyButton}
-                      onPress={() => onChangeQty(item.id, -1)}
-                    >
-                      <Text style={styles.qtyButtonText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.qtyValue}>{item.quantity}</Text>
-                    <TouchableOpacity
-                      style={styles.qtyButton}
-                      onPress={() => onChangeQty(item.id, 1)}
-                    >
-                      <Text style={styles.qtyButtonText}>+</Text>
-                    </TouchableOpacity>
+              return (
+                <View key={item.id} style={styles.batchRow}>
+                  <View style={styles.batchInfo}>
+                    <View style={styles.batchTextCol}>
+                      {showOriginal ? (
+                        <Text style={styles.batchOriginalText} numberOfLines={1}>
+                          {item.originalName}
+                        </Text>
+                      ) : null}
+
+                      <View style={styles.batchDateRow}>
+                        <Ionicons
+                          name="time-outline"
+                          size={14}
+                          color={BRAND_MUTED}
+                        />
+                        <Text style={styles.batchInfoText}>
+                          {item.expiresAt
+                            ? `תוקף: ${item.expiresAt}`
+                            : "ללא תאריך תוקף"}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
 
-                  <TouchableOpacity
-                    style={styles.batchIconButton}
-                    onPress={() => onEditItem(item)}
-                  >
-                    <Ionicons
-                      name="create-outline"
-                      size={18}
-                      color="#0369A1"
-                    />
-                  </TouchableOpacity>
+                  <View style={styles.batchActions}>
+                    <View style={styles.qtyControl}>
+                      <TouchableOpacity
+                        style={styles.qtyButton}
+                        onPress={() => onChangeQty(item.id, -1)}
+                      >
+                        <Text style={styles.qtyButtonText}>−</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.qtyValue}>{item.quantity}</Text>
+                      <TouchableOpacity
+                        style={styles.qtyButton}
+                        onPress={() => onChangeQty(item.id, 1)}
+                      >
+                        <Text style={styles.qtyButtonText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                  <TouchableOpacity
-                    style={styles.batchIconButton}
-                    onPress={() => onDeleteItem(item.id)}
-                  >
-                    <Ionicons
-                      name="trash-outline"
-                      size={18}
-                      color="#DC2626"
-                    />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.batchIconButton}
+                      onPress={() => onEditItem(item)}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={18}
+                        color="#0369A1"
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.batchIconButton}
+                      onPress={() => onDeleteItem(item.id)}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color="#DC2626"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
         </View>
       )}
     </View>
@@ -272,9 +274,7 @@ const styles = StyleSheet.create({
     color: BRAND_MUTED,
     fontSize: 14,
   },
-  groupCard: {
-    marginBottom: 8,
-  },
+  groupCard: { marginBottom: 8 },
   groupHeaderRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -285,10 +285,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#0369A1",
   },
-  groupCountText: {
-    fontSize: 12,
-    color: BRAND_MUTED,
-  },
+  groupCountText: { fontSize: 12, color: BRAND_MUTED },
   groupChildrenContainer: {
     marginHorizontal: 10,
     marginTop: 4,
@@ -298,27 +295,52 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     gap: 4,
   },
+
   batchRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 6,
   },
+
   batchInfo: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
+
+  batchTextCol: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+    flex: 1,
+  },
+
+  batchDateRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 6,
-    flex: 1,
+    marginTop: 2,
   },
+
   batchInfoText: {
     fontSize: 12,
     color: BRAND_MUTED,
+    textAlign: "right",
   },
+
+  batchOriginalText: {
+    fontSize: 12,
+    color: BRAND_TEXT,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+
   batchActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    marginLeft: 8,
   },
+
   batchIconButton: {
     width: 28,
     height: 28,
@@ -329,27 +351,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
+
   itemRow: {
     flexDirection: "row",
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 1,
     overflow: "hidden",
   },
-  itemStrip: {
-    width: 4,
-  },
-  itemMain: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
+  itemStrip: { width: 4 },
+  itemMain: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
   itemHeaderRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
@@ -374,10 +386,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  itemMetaText: {
-    fontSize: 12,
-    color: BRAND_MUTED,
-  },
+  itemMetaText: { fontSize: 12, color: BRAND_MUTED },
+
   qtyControl: {
     flexDirection: "row",
     alignItems: "center",
@@ -401,7 +411,6 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 14,
     fontWeight: "700",
-    lineHeight: 16,
   },
   qtyValue: {
     minWidth: 18,
@@ -411,7 +420,6 @@ const styles = StyleSheet.create({
     color: "#0369A1",
   },
 
-  /* כרטיס הוספת מוצר */
   addCard: {
     marginTop: 12,
     borderRadius: 16,
@@ -423,11 +431,6 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 1,
   },
   addIconCircle: {
     width: 32,

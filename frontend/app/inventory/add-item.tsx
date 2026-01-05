@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -17,10 +17,45 @@ import CategoryPickerModal from "@/src/components/add-item/CategoryPickerModal";
 import BarcodeScannerModal from "@/src/components/add-item/BarcodeScannerModal";
 import DatePickerModal from "@/src/components/add-item/DatePickerModal";
 
+import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
+import { searchCatalog, getCatalogByBarcode, type CatalogItem } from "@/src/api/catalog";
+
 const BRAND_BG = "#F4F4F4";
 
 function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+function normalizeCatalogList(raw: any): CatalogItem[] {
+  const arr =
+    Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.results)
+      ? raw.results
+      : [];
+
+  return arr
+    .map((x: any) => ({
+      name: x.name ?? x.product_name ?? x.original_name ?? "",
+      barcode: x.barcode ?? x.code ?? null,
+      brand: x.brand ?? null,
+      chain: x.chain ?? null,
+    }))
+    .filter((x: CatalogItem) => x.name);
+}
+
+function normalizeCatalogOne(raw: any): CatalogItem | null {
+  if (!raw) return null;
+  const name = raw.name ?? raw.product_name ?? raw.original_name ?? "";
+  if (!name) return null;
+  return {
+    name,
+    barcode: raw.barcode ?? raw.code ?? null,
+    brand: raw.brand ?? null,
+    chain: raw.chain ?? null,
+  };
 }
 
 export default function BatchAddItemsScreen() {
@@ -29,40 +64,123 @@ export default function BatchAddItemsScreen() {
 
   const initialCategory = useMemo<Category>(() => routeToCategory(categoryParam), [categoryParam]);
 
-  // Draft (שדות הטופס)
   const [editingId, setEditingId] = useState<string | null>(null);
+
   const [barcode, setBarcode] = useState("");
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
+
   const [quantity, setQuantity] = useState("");
   const [category, setCategory] = useState<Category>(initialCategory);
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
 
-  // Pending list
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
+
+  const [suggestions, setSuggestions] = useState<CatalogItem[]>([]);
+  const [nameLoading, setNameLoading] = useState(false);
+
   const [pending, setPending] = useState<DraftItem[]>([]);
 
-  // Modals
   const [catOpen, setCatOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
-  const canAddToList = name.trim().length > 0 && Number(quantity) > 0;
+  const selectedName = selectedCatalogItem?.name ?? name.trim();
+  const canAddToList = selectedName.length > 0 && Number(quantity) > 0;
+
+  const debouncedName = useDebouncedValue(name.trim(), 250);
+  const debouncedBarcode = useDebouncedValue(barcode.trim(), 300);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (editingId) return;
+      if (debouncedBarcode.length < 8) return;
+
+      try {
+        const resp = await getCatalogByBarcode(debouncedBarcode);
+        if (cancelled) return;
+
+        const item = normalizeCatalogOne(resp.data);
+        if (item?.name) {
+          setSelectedCatalogItem(item);
+          if (item.barcode) setBarcode(item.barcode);
+          setSuggestions([]);
+          setName("");
+        }
+      } catch {}
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedBarcode, editingId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (editingId) {
+        setSuggestions([]);
+        return;
+      }
+
+      if (selectedCatalogItem) {
+        setSuggestions([]);
+        return;
+      }
+
+      if (debouncedName.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      setNameLoading(true);
+      try {
+        const resp = await searchCatalog(debouncedName);
+        if (cancelled) return;
+
+        const items = normalizeCatalogList(resp.data);
+        setSuggestions(items.slice(0, 10));
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setNameLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedName, editingId, selectedCatalogItem]);
 
   function resetDraft(keepCategory = true) {
     setEditingId(null);
     setBarcode("");
     setName("");
+    setNickname("");
     setQuantity("");
     if (!keepCategory) setCategory(initialCategory);
     setExpiresAt(undefined);
+
+    setSelectedCatalogItem(null);
+    setSuggestions([]);
+    setNameLoading(false);
   }
 
   function loadItemToDraft(item: DraftItem) {
     setEditingId(item.id);
     setBarcode(item.barcode ?? "");
+    setSelectedCatalogItem(null);
     setName(item.name);
+    setNickname(item.nickname ?? "");
     setQuantity(String(item.quantity));
     setCategory(item.category);
     setExpiresAt(item.expiresAt);
+
+    setSuggestions([]);
+    setNameLoading(false);
   }
 
   function upsertDraftToList() {
@@ -74,10 +192,13 @@ export default function BatchAddItemsScreen() {
       return;
     }
 
+    const finalName = (selectedCatalogItem?.name ?? name.trim()).trim();
+
     const newItem: DraftItem = {
       id: editingId ?? uid(),
       barcode: barcode.trim() ? barcode.trim() : null,
-      name: name.trim(),
+      name: finalName,
+      nickname: nickname.trim() ? nickname.trim() : null,
       quantity: qty,
       category,
       expiresAt,
@@ -117,7 +238,7 @@ export default function BatchAddItemsScreen() {
           barcode: item.barcode ? item.barcode : null,
           expiration_date: formattedExpires,
           location: locationMap[item.category],
-          nickname: null,
+          nickname: item.nickname ?? null,
         });
 
         if (res.status !== "success") throw new Error(res.message ?? "הוספה נכשלה");
@@ -161,12 +282,18 @@ export default function BatchAddItemsScreen() {
             editing={!!editingId}
             barcode={barcode}
             name={name}
+            nickname={nickname}
             quantity={quantity}
             category={category}
             expiresAt={expiresAt}
             categoryOptions={CATEGORY_OPTIONS}
             onChangeBarcode={setBarcode}
-            onChangeName={setName}
+            onChangeName={(v) => {
+              setName(v);
+              if (selectedCatalogItem) setSelectedCatalogItem(null);
+              if (v.trim().length < 2) setSuggestions([]);
+            }}
+            onChangeNickname={setNickname}
             onChangeQuantity={setQuantity}
             onPressCategory={() => setCatOpen(true)}
             onPressScan={() => setScanOpen(true)}
@@ -175,6 +302,16 @@ export default function BatchAddItemsScreen() {
             onAddToList={upsertDraftToList}
             onCancelEdit={() => resetDraft(true)}
             addDisabled={!canAddToList}
+            suggestions={suggestions}
+            nameLoading={nameLoading}
+            selectedCatalogItem={selectedCatalogItem}
+            onClearSelectedCatalogItem={() => setSelectedCatalogItem(null)}
+            onPickSuggestion={(item) => {
+              setSelectedCatalogItem(item);
+              if (item.barcode) setBarcode(item.barcode);
+              setSuggestions([]);
+              setName("");
+            }}
           />
 
           <PendingList

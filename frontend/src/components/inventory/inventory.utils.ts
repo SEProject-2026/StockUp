@@ -5,6 +5,7 @@ export type InventoryRow = InventoryItem & {
   productId: string;
   expirationDate: string | null;
   originalName: string;
+  hasNickname: boolean;
   status?: string;
 };
 
@@ -22,7 +23,7 @@ export function mapLocationToCategory(location?: string | null): Category {
     case "CLEANING_SUPPLIES":
       return "cleaning supplies";
     case "OTHER":
-      return "other"; 
+      return "other";
     default:
       return "other";
   }
@@ -60,7 +61,9 @@ export function toIsoDateOnly(s?: string | null) {
 }
 
 export function dtoToRows(dto: ProductDTO): InventoryRow[] {
-  const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
+  const nick = dto.nickname?.trim() ? dto.nickname.trim() : "";
+  const hasNickname = nick.length > 0;
+  const displayName = hasNickname ? nick : dto.original_name;
 
   if (dto.items?.length) {
     return dto.items.map((it) => {
@@ -75,6 +78,7 @@ export function dtoToRows(dto: ProductDTO): InventoryRow[] {
         productId: String(dto.id),
         expirationDate: exp,
         originalName: dto.original_name,
+        hasNickname,
         status: it.status,
       };
     });
@@ -90,6 +94,7 @@ export function dtoToRows(dto: ProductDTO): InventoryRow[] {
       productId: String(dto.id),
       expirationDate: null,
       originalName: dto.original_name,
+      hasNickname,
     },
   ];
 }
@@ -99,7 +104,7 @@ export function rowsSignature(rows: InventoryRow[]) {
   return sorted
     .map(
       (r) =>
-        `${r.id}:${r.quantity}:${r.expiresAt ?? ""}:${r.name}:${r.status ?? ""}`
+        `${r.id}:${r.productId}:${r.quantity}:${r.expiresAt ?? ""}:${r.name}:${r.originalName}:${r.hasNickname ? 1 : 0}:${r.status ?? ""}`
     )
     .join("|");
 }

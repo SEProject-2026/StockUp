@@ -1,3 +1,4 @@
+from pathlib import Path
 from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from src.services.user_service import UserService
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
@@ -73,7 +74,16 @@ class AppContainer:
     def get_catalog_provider():
         """Creates (if needed) and returns the Catalog Repository"""
         if AppContainer._catalog_provider_instance is None:
-            AppContainer._catalog_provider_instance = CsvCatalogProvider(r"src\data\master_db.csv")
+            project_root = Path(__file__).resolve().parents[2] 
+            csv_path = project_root / "src" / "data" / "master_db.csv"
+
+            if not csv_path.exists():
+                alt = project_root / "data" / "master_db.csv"
+                if alt.exists():
+                    csv_path = alt
+
+            AppContainer._catalog_provider_instance = CsvCatalogProvider(str(csv_path))
+
         return AppContainer._catalog_provider_instance
     
     @staticmethod
