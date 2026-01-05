@@ -143,7 +143,7 @@ class Product:
             raise ValueError("Quantity cannot be negative.")
         self._quantity = new_quantity
 
-    async def remove_product_date(self, expiration_date: date) -> 'Product':
+    async def remove_product_date(self, expiration_date: Optional[date]) -> 'Product':
         if expiration_date in self._expiration_dates_to_quantity:
             date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
             del self._expiration_dates_to_quantity[expiration_date]

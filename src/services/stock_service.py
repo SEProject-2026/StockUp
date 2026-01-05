@@ -53,7 +53,7 @@ class StockService:
         raise NotImplementedError("Not implemented yet")
     ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> Optional[Product]:
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
         
         await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
