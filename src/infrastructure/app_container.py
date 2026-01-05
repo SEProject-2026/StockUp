@@ -7,7 +7,7 @@ from src.services.management_service import ManagementService
 
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
-from src.infrastructure.repositories.in_memory_catalog_repository import InMemoryCatalogRepository
+from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
 
 class AppContainer:
     """
@@ -21,10 +21,9 @@ class AppContainer:
     _user_service_instance = None
     _home_repo_instance = None
     _product_repo_instance = None
-    _catalog_repo_instance = None
+    _catalog_provider_instance = None
     _stock_service_instance = None
     
-    # הוספת משתנה סינגלטון ל-ManagementService
     _management_service_instance = None 
 
     @staticmethod
@@ -71,11 +70,11 @@ class AppContainer:
         return AppContainer._product_repo_instance
     
     @staticmethod
-    def get_catalog_repository():
+    def get_catalog_provider():
         """Creates (if needed) and returns the Catalog Repository"""
-        if AppContainer._catalog_repo_instance is None:
-            AppContainer._catalog_repo_instance = InMemoryCatalogRepository()
-        return AppContainer._catalog_repo_instance
+        if AppContainer._catalog_provider_instance is None:
+            AppContainer._catalog_provider_instance = CsvCatalogProvider(r"src\data\master_db.csv")
+        return AppContainer._catalog_provider_instance
     
     @staticmethod
     def get_stock_service():
@@ -85,13 +84,13 @@ class AppContainer:
         if AppContainer._stock_service_instance is None:
             home_repo = AppContainer.get_home_repository()
             product_repo = AppContainer.get_product_repository()
-            catalog_repo = AppContainer.get_catalog_repository()
+            catalog_repo = AppContainer.get_catalog_provider()
             
             # Injection happens here
             AppContainer._stock_service_instance = StockService(
                 home_repository=home_repo,
                 product_repository=product_repo,
-                catalog_repository=catalog_repo
+                catalog_provider=catalog_repo
             )
             
         return AppContainer._stock_service_instance

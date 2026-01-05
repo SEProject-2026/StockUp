@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from src.domain.smart_home.home import Home
-from src.infrastructure.repositories.in_memory_catalog_repository import InMemoryCatalogRepository
+from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
 from src.services.stock_service import StockService 
@@ -154,12 +154,12 @@ class TestStockServiceNoMocks(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self._home_repo = InMemoryHomeRepository()
         self._product_repo = InMemoryProductRepository()
-        self._catalog_repo = InMemoryCatalogRepository()
+        self._catalog_provider = CsvCatalogProvider(r"src\data\master_db.csv")
 
         self.service = StockService(
             home_repository=self._home_repo,
             product_repository=self._product_repo,
-            catalog_repository=self._catalog_repo
+            catalog_provider=self._catalog_provider
         )
 
         self.user_id = uuid4()
