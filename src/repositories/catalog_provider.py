@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # === DTO (Data Transfer Object) ===
 class CatalogItem(BaseModel):
@@ -13,8 +13,7 @@ class CatalogItem(BaseModel):
     manufacturer: Optional[str] = None
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
 
-    class Config:
-        frozen = True  # Makes the object immutable
+    model_config = ConfigDict(from_attributes=True)
 
 # === Interface ===
 class ICatalogProvider(ABC):

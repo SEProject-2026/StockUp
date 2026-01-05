@@ -1,6 +1,8 @@
+from unittest.mock import AsyncMock, patch
 import pytest
 from datetime import date
 from fastapi.testclient import TestClient
+from src.repositories.catalog_provider import CatalogItem
 from src.main import app
 from src.infrastructure.app_container import AppContainer
 
@@ -202,3 +204,104 @@ def test_filter_by_location():
     data = response.json()["data"]
     assert len(data) == 1
     assert data[0]["original_name"] == "Ice Cream"
+
+
+def test_update_expiration_date():
+    """
+    Test updating the expiration date of a product.
+    """
+    token, home_id = setup_user_and_home(client)
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    today_str = str(date.today())
+    
+    # 1. Add Product
+    add_res = client.post("/stock/add", json={
+        "name": "Milk", "quantity": 1, "expiration_date": today_str
+    }, headers=headers)
+    product_id = add_res.json()["data"]["id"]
+    
+    # 2. Update Expiration Date
+    new_date = "2026-12-31"
+    response = client.patch(f"/stock/{product_id}/expiration", json={
+        "old_date": today_str,
+        "new_date": new_date
+    }, headers=headers)
+    
+    assert response.status_code == 200
+    # Verify the items list contains the new date
+    items = response.json()["data"]["items"]
+    assert items[0]["expiration_date"] == new_date
+
+def test_get_all_products():
+    """
+    Test retrieving all products for a specific home.
+    """
+    token, home_id = setup_user_and_home(client)
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # Add 2 different products
+    client.post("/stock/add", json={"name": "Banana", "quantity": 5}, headers=headers)
+    client.post("/stock/add", json={"name": "Apple", "quantity": 3}, headers=headers)
+    
+    response = client.get("/stock/all", headers=headers)
+    
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert len(data) == 2
+    
+    # Verify names exist in response
+    names = [p["original_name"] for p in data]
+    assert "Banana" in names
+    assert "Apple" in names
+
+def test_catalog_search_autocomplete():
+    """
+    Test the External Catalog Search (Autocomplete).
+    We MOCK the service to avoid depending on the real CSV file during tests.
+    """
+    token, home_id = setup_user_and_home(client)
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # Mock data to return
+    mock_items = [
+        CatalogItem(barcode="111", name="Mock Milk 3%", manufacturer="Tnuva", chain_source="GLOBAL"),
+        CatalogItem(barcode="222", name="Mock Soy Milk", manufacturer="Tnuva", chain_source="GLOBAL")
+    ]
+    
+    # We patch the 'stock_service' specifically inside the stock_routes module
+    with patch("src.api.routes.stock_routes.stock_service.search_product_by_name_external_db", new_callable=AsyncMock) as mock_search:
+        mock_search.return_value = mock_items
+        
+        # Call the API
+        response = client.get("/stock/catalog/search", params={"query": "Milk"}, headers=headers)
+        
+        assert response.status_code == 200
+        data = response.json()["data"]
+        
+        # Verify the API returned what our Mock provided
+        assert len(data) == 2
+        assert data[0]["name"] == "Mock Milk 3%"
+        assert data[0]["barcode"] == "111"
+
+def test_catalog_barcode_lookup():
+    """
+    Test the External Barcode Lookup (Scanning).
+    We MOCK the service to simulate finding a product.
+    """
+    token, home_id = setup_user_and_home(client)
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # Mock item
+    mock_item = CatalogItem(barcode="7290123", name="Scanned Bamba", manufacturer="Osem")
+    
+    with patch("src.api.routes.stock_routes.stock_service.search_product_by_barcode_external_db", new_callable=AsyncMock) as mock_lookup:
+        mock_lookup.return_value = mock_item
+        
+        # Call the API
+        response = client.get("/stock/catalog/barcode/7290123", headers=headers)
+        
+        assert response.status_code == 200
+        data = response.json()["data"]
+        
+        assert data["name"] == "Scanned Bamba"
+        assert data["manufacturer"] == "Osem"
