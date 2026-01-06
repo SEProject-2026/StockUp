@@ -1,14 +1,8 @@
 // frontend/app/processing.tsx
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, Image, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
 import InfoBox from "@/src/ui/InfoBox";
@@ -16,9 +10,12 @@ import ScreenHeader from "@/src/layout/ScreenHeader";
 import PrimaryButton from "@/src/ui/PrimaryButton";
 
 import { getSelectedHomeId } from "../home/selected-home";
-import { scanReceipt } from "@/src/api/stock"; // ✅ תתאימי לנתיב של הקובץ שבו יש scanReceipt
+import { scanReceipt } from "@/src/api/stock";
+import { setLastScannedReceipt } from "@/src/context/receipt-scan-store";
 
 export default function ReceiptProcessingScreen() {
+  const router = useRouter();
+
   const { imageUri, fileName, mimeType } = useLocalSearchParams<{
     imageUri?: string;
     fileName?: string;
@@ -34,10 +31,14 @@ export default function ReceiptProcessingScreen() {
 
     (async () => {
       try {
+        console.log("[processing] mount: fetching selected home id...");
         const id = await getSelectedHomeId();
+        console.log("[processing] selected home id:", id);
+
         if (!id) throw new Error("לא נבחר בית פעיל. חזרי למסך הבית ובחרי בית.");
         if (mounted) setHomeId(id);
       } catch (e: any) {
+        console.log("[processing] failed to load home id:", e);
         if (mounted) setError(e?.message ?? "שגיאה בטעינת בית נבחר");
       }
     })();
@@ -48,44 +49,50 @@ export default function ReceiptProcessingScreen() {
   }, []);
 
   useEffect(() => {
-    if (!homeId || !imageUri || started || error) return;
+    if (!homeId || !imageUri) return;
 
-    let cancelled = false;
-    setStarted(true);
+    let isMounted = true;
 
     (async () => {
       try {
+        console.log("[processing] starting scanReceipt...");
+
         const res = await scanReceipt(homeId, {
           fileUri: imageUri,
           fileName: fileName ?? null,
           mimeType: mimeType ?? null,
         });
 
-        if (cancelled) return;
+        console.log("[processing] scanReceipt raw response:", res);
 
-        if (!res?.data) {
-          throw new Error("לא התקבלו תוצאות סריקה מהשרת");
+        if (!isMounted) return;
+
+        const payload = res?.data;
+        if (!payload) {
+          throw new Error("scanReceipt returned empty payload");
         }
 
-        // Navigate to review screen with the receipt payload
-        router.replace({
-          pathname: "/receipts/review",
-          params: {
-            receipt: encodeURIComponent(JSON.stringify(res.data)),
-          },
-        });
+        console.log("[processing] saving receipt to store");
+        setLastScannedReceipt(payload);
+
+        console.log("[processing] navigating to /receipts/review");
+        router.replace("/receipts/review");
+
       } catch (e: any) {
-        if (cancelled) return;
+        if (!isMounted) return;
+        console.log("[processing] scanReceipt ERROR:", e);
         setError(e?.message ?? "Scanning failed");
       }
     })();
 
     return () => {
-      cancelled = true;
+      isMounted = false;
+      console.log("[processing] component unmounted");
     };
-  }, [homeId, imageUri, fileName, mimeType, started, error]);
+  }, [homeId, imageUri]);
 
   const onRetry = () => {
+    console.log("[processing] retry clicked");
     setError(null);
     setStarted(false);
   };
@@ -99,7 +106,6 @@ export default function ReceiptProcessingScreen() {
         style={styles.gradient}
       />
 
-      {/* HEADER */}
       <ScreenHeader title="מעבד את הקבלה" onBack={() => router.back()} />
 
       <View style={styles.content}>
@@ -107,9 +113,7 @@ export default function ReceiptProcessingScreen() {
           <>
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color="#0284C7" />
-              <Text style={styles.loadingText}>
-                קורא את הקבלה ומזהה את הפריטים...
-              </Text>
+              <Text style={styles.loadingText}>קורא את הקבלה ומזהה את הפריטים...</Text>
             </View>
 
             {imageUri && (
@@ -137,31 +141,12 @@ export default function ReceiptProcessingScreen() {
   );
 }
 
-// ---------- Styles ----------
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
-  gradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  loadingRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: "#4B5563",
-    textAlign: "right",
-  },
+  safeArea: { flex: 1, backgroundColor: "#F9FAFB" },
+  gradient: { ...StyleSheet.absoluteFillObject },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  loadingRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8, marginBottom: 16 },
+  loadingText: { fontSize: 13, color: "#4B5563", textAlign: "right" },
   previewBox: {
     marginTop: 8,
     borderRadius: 16,
@@ -172,17 +157,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  previewTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#111827",
-    textAlign: "right",
-    marginBottom: 8,
-  },
-  previewImage: {
-    width: "100%",
-    height: 500,
-    borderRadius: 12,
-    backgroundColor: "#E5E7EB",
-  },
+  previewTitle: { fontSize: 12, fontWeight: "600", color: "#111827", textAlign: "right", marginBottom: 8 },
+  previewImage: { width: "100%", height: 500, borderRadius: 12, backgroundColor: "#E5E7EB" },
 });

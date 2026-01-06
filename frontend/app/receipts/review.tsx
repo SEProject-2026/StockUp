@@ -1,5 +1,5 @@
-// app/receipts/review.tsx
-import React, { useMemo, useState } from "react";
+// frontend/app/receipts/review.tsx
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,9 @@ import { router, useLocalSearchParams } from "expo-router";
 
 import PrimaryButton from "@/src/ui/PrimaryButton";
 import { getSelectedHomeId } from "../home/selected-home";
-import { addProduct } from "@/src/api/stock"; // ✅ מהקובץ שהדבקת עם addProduct
+import { addProduct } from "@/src/api/stock";
+
+import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 const BRAND_BG = "#F4F4F4";
@@ -38,10 +40,6 @@ function uuid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-/**
- * 👇 טריק תאימות:
- * מעבירים גם `title` וגם `children` ל-PrimaryButton
- */
 function PrimaryButtonCompat(props: {
   title: string;
   onPress: () => void;
@@ -49,7 +47,6 @@ function PrimaryButtonCompat(props: {
   disabled?: boolean;
 }) {
   const { title, onPress, leftIcon, disabled } = props;
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Btn: any = PrimaryButton;
 
@@ -66,28 +63,25 @@ function PrimaryButtonCompat(props: {
 function parseReceiptParam(receiptParam?: string): any | null {
   if (!receiptParam) return null;
   try {
+    return JSON.parse(receiptParam);
+  } catch {}
+  try {
     return JSON.parse(decodeURIComponent(receiptParam));
-  } catch {
-    return null;
-  }
+  } catch {}
+  try {
+    return JSON.parse(decodeURIComponent(decodeURIComponent(receiptParam)));
+  } catch {}
+  return null;
 }
 
-/**
- * מנסה לחלץ מערך של פריטים מה-receipt שמגיע מהשרת.
- * תומך בכמה מבנים נפוצים:
- * - receipt.items
- * - receipt.detected_items
- * - receipt.data.items (אם עטפתם)
- */
 function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
   if (!receipt) return [];
 
-  const rawItems =
-    receipt.items ??
-    receipt.detected_items ??
-    receipt?.data?.items ??
-    [];
+  // השרת שלך מחזיר GeneralResponse: {status,message,data: ReceiptDTO}
+  // אז פה נתמוך גם בקבלה עטופה
+  const inner = receipt?.data ?? receipt;
 
+  const rawItems = inner.items ?? inner.detected_items ?? inner?.data?.items ?? [];
   if (!Array.isArray(rawItems)) return [];
 
   return rawItems
@@ -98,6 +92,7 @@ function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
       const unit = it.unit ? String(it.unit) : undefined;
 
       if (!name) return null;
+
       return {
         id: uuid(),
         name,
@@ -109,19 +104,24 @@ function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
 }
 
 export default function ReceiptReviewDetectedProductsScreen() {
-  // ✅ עכשיו אנחנו מקבלים receipt (ולא homeId)
   const { receipt } = useLocalSearchParams<{ receipt?: string }>();
 
-  const receiptObj = useMemo(() => parseReceiptParam(receipt), [receipt]);
+  // 1) אם הגיע param (בכל זאת) ננסה לפרסר
+  const receiptFromParam = useMemo(() => parseReceiptParam(receipt), [receipt]);
 
-  // ✅ init items from receipt
-  const [items, setItems] = useState<DetectedItem[]>(
-    () => mapReceiptToDetectedItems(receiptObj)
-  );
+  // 2) אם לא הגיע param – ניקח מה-store (זה ה-flow הראשי החדש)
+  const receiptObj = useMemo(() => {
+    return receiptFromParam ?? consumeLastScannedReceipt();
+  }, [receiptFromParam]);
 
+  const [items, setItems] = useState<DetectedItem[]>([]);
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setItems(mapReceiptToDetectedItems(receiptObj));
+  }, [receiptObj]);
 
   const totalCount = useMemo(() => items.length, [items.length]);
 
@@ -141,7 +141,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
-    // ולידציה
     const payload = items.map((x) => ({
       name: x.name.trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
@@ -161,10 +160,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
         return;
       }
 
-      // מוסיפים כל פריט בנפרד (בשלב הזה זה הכי קל)
-      const results = await Promise.allSettled(
-        payload.map((p) => addProduct(homeId, p))
-      );
+      const results = await Promise.allSettled(payload.map((p) => addProduct(homeId, p)));
 
       const ok = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.length - ok;
@@ -175,10 +171,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
         return;
       }
 
-      Alert.alert(
-        "נוספו חלקית",
-        `נוספו ${ok} מוצרים, נכשלו ${failed}. אפשר לנסות שוב או לבדוק פריטים בעייתיים.`
-      );
+      Alert.alert("נוספו חלקית", `נוספו ${ok} מוצרים, נכשלו ${failed}.`);
     } catch (e: any) {
       Alert.alert("נכשל", e?.message ?? "לא הצלחנו להוסיף למלאי. נסי שוב.");
     } finally {
@@ -189,7 +182,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.appTitle}>StockUp</Text>
@@ -201,7 +193,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
           </Pressable>
         </View>
 
-        {/* כותרת + הוסף */}
         <View style={styles.sectionHeaderRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sectionTitle}>מוצרים שזוהו</Text>
@@ -214,7 +205,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
           </Pressable>
         </View>
 
-        {/* אם אין receipt / אין פריטים */}
         {!receiptObj && (
           <View style={styles.emptyCard}>
             <View style={styles.emptyIcon}>
@@ -227,7 +217,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
           </View>
         )}
 
-        {/* LIST */}
         <View style={{ gap: 10 }}>
           {items.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -260,7 +249,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
           )}
         </View>
 
-        {/* CTA */}
         <PrimaryButtonCompat
           title={saving ? "מוסיף למלאי..." : "אישור והוספה למלאי"}
           onPress={onConfirmAddAll}
@@ -268,7 +256,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
           disabled={items.length === 0 || saving}
         />
 
-        {/* Modals */}
         <EditItemModal
           item={editItem}
           onClose={() => setEditItem(null)}
@@ -466,12 +453,7 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BRAND_BG },
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24,
-    gap: 18,
-  },
+  container: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24, gap: 18 },
 
   headerRow: { flexDirection: "row-reverse", alignItems: "center" },
   appTitle: { fontSize: 22, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
@@ -487,11 +469,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  sectionHeaderRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 10,
-  },
+  sectionHeaderRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
   sectionSubtitle: { fontSize: 12, color: TEXT_MUTED, textAlign: "right", marginTop: 4 },
 
@@ -551,19 +529,8 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 14, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
   emptyText: { fontSize: 12, color: TEXT_MUTED, textAlign: "right", marginTop: 4 },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 16 },
+  modalCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 16, borderWidth: 1, borderColor: "#E5E7EB" },
   modalTitle: { fontSize: 16, fontWeight: "800", color: TEXT_DARK, textAlign: "right" },
 
   fieldLabel: { marginTop: 2, fontSize: 12, color: TEXT_MUTED, textAlign: "right" },
@@ -580,12 +547,7 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
   },
 
-  modalActions: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 14,
-  },
+  modalActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8, marginTop: 14 },
   dangerBtn: {
     flexDirection: "row-reverse",
     alignItems: "center",
@@ -595,11 +557,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: BRAND_PINK_SOFT,
   },
-  secondaryBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: BRAND_BLUE_SOFT,
-  },
+  secondaryBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: BRAND_BLUE_SOFT },
   modalBtnText: { fontSize: 13, fontWeight: "800", color: TEXT_DARK },
 });
