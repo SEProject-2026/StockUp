@@ -9,7 +9,7 @@ from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
 from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
-from infrastructure.scanner.receipt_scanner import ReceiptScanner
+from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
 
 class StockService:
@@ -54,10 +54,10 @@ class StockService:
         """Processes a receipt image (OCR) and returns detected items for verification."""
         await self._check_access(user_id, home_id)
         scanner = ReceiptScanner()
-        chain_name, scanned_items = await scanner.parse_receipt(file_path)
-        items = self._catalog_provider.get_items_by_barcodes(scanned_items.keys(), chain_name)
-        receipt_items_dto = [ReceiptItemDTO(i.barcode, i.name, scanned_items[i.barcode][0], scanned_items[i.barcode][1]) for i in items]
-        receipt_dto = ReceiptDTO(uuid4(), home_id, user_id, chain_name, receipt_items_dto)
+        chain_name, scanned_items = scanner.parse_receipt(file_path)
+        items = await self._catalog_provider.get_items_by_barcodes(scanned_items.keys(), chain_name)
+        receipt_items_dto = [ReceiptItemDTO(barcode=i.barcode, name=i.name, quantity=scanned_items[i.barcode][0], unit=scanned_items[i.barcode][1]) for i in items]
+        receipt_dto = ReceiptDTO(id=uuid4(), home_id=home_id, user_id=user_id, chain=chain_name, items=receipt_items_dto)
         return receipt_dto
         
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:

@@ -313,9 +313,9 @@ class ReceiptScanner:
 
             full_line_text = " ".join(reversed_row_list)
 
-            to_print = [f"[{i}] {w}" for i, w in enumerate(reversed_row_list)]
             # הדפסה לדיבוג - כדי לראות מה הוא קורא
-            print(f"DEBUG Line: {to_print}")
+            # to_print = [f"[{i}] {w}" for i, w in enumerate(reversed_row_list)]
+            # print(f"DEBUG Line: {to_print}")
 
             if not chain_name_found:
                 ch = self._chain_name_in_line(full_line_text)
@@ -331,7 +331,7 @@ class ReceiptScanner:
                 if any(k in full_line_text for k in header_keywords):
                     self.table_started_global = True
                     header_lines.append(full_line_text)
-                    print("Table started by Header Keywords") # לדיבוג
+                    # print("Table started by Header Keywords") # לדיבוג
                     continue 
 
                 # 2. האם זה ברקוד 729? (גיבוי למקרה שהכותרת לא זוהתה)
@@ -344,7 +344,7 @@ class ReceiptScanner:
                     continue
 
             if any(s in full_line_text for s in stop_keywords):
-                print(f"Table ended by Stop Keywords: {full_line_text}") 
+                # print(f"Table ended by Stop Keywords: {full_line_text}") 
                 self.table_ended_global = True # חשוב: מסמן שהטבלה נגמרה
                 # אופציונלי: אם אתה רוצה להפסיק לעבד את העמוד הזה לגמרי:
                 break
@@ -392,7 +392,7 @@ class ReceiptScanner:
             is_kg_found = found_kg(reversed_row_list)
             
             if not is_kg_found:
-                unit_type = "unit"
+                unit_type = "UNIT"
                 # try to find quantity in format X.000 or X.00 or X.0
                 qty_matches = re.findall(r'\b(\d+\.0{1,3})\b', full_line_text)
                 if qty_matches:
@@ -401,7 +401,7 @@ class ReceiptScanner:
                         if quantity == 0.0: quantity = 1.0
                     except: quantity = 1.0
             else:
-                unit_type = "kg"
+                unit_type = "KG"
                 qty_matches = re.findall(r'\b(\d+\.\d{2,3})\b', full_line_text)
                 if qty_matches:
                     try: 
