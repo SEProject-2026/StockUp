@@ -1,28 +1,39 @@
 // components/inventory/InventoryFiltersBar.tsx
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  Modal,
+  Pressable,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { CategoryKey } from "@/app/inventory/inventory";
-
+import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
 
 type StatusFilter = "all" | "soon" | "expired";
-
-const TABS = [
-  { key: "fridge", label: "מקרר" },
-  { key: "freezer", label: "מקפיא" },
-  { key: "pantry", label: "מזווה" },
-  { key: "all", label: "הכול" },
-] as const;
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 const BRAND_TEXT = "#111827";
 const BRAND_MUTED = "#6B7280";
+const ACCENT = "#0284C7";
+
+const CATEGORIES: Array<{
+  key: CategoryKey;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}> = [
+  { key: "all", label: "הכול", icon: "apps-outline" },
+  { key: "fridge", label: "מקרר", icon: "snow-outline" },
+  { key: "freezer", label: "מקפיא", icon: "cube-outline" },
+  { key: "pantry", label: "מזווה", icon: "restaurant-outline" },
+  { key: "cleaning supplies", label: "חומרי ניקוי", icon: "water-outline" },
+  { key: "other", label: "אחר", icon: "ellipsis-horizontal-outline" },
+];
+
+const QUICK_KEYS: CategoryKey[] = ["all", "fridge", "freezer", "pantry"];
 
 type Props = {
   hideTabs?: boolean;
@@ -32,7 +43,6 @@ type Props = {
   onChangeSearch: (value: string) => void;
   statusFilter: StatusFilter;
   onChangeStatusFilter: (value: StatusFilter) => void;
-  /** האם להציג את כל אפשרויות הסינון (חיפוש + תוקף) */
   filtersVisible?: boolean;
 };
 
@@ -46,33 +56,71 @@ export const InventoryFiltersBar: React.FC<Props> = ({
   onChangeStatusFilter,
   filtersVisible = true,
 }) => {
+  const [catOpen, setCatOpen] = useState(false);
+
+  const selected = useMemo(
+    () => CATEGORIES.find((c) => c.key === selectedTab) ?? CATEGORIES[0],
+    [selectedTab]
+  );
+
+  const quickCats = useMemo(
+    () => CATEGORIES.filter((c) => QUICK_KEYS.includes(c.key)),
+    []
+  );
+
+  const extraCats = useMemo(
+    () => CATEGORIES.filter((c) => !QUICK_KEYS.includes(c.key)),
+    []
+  );
+
+  const selectedIsExtra = !QUICK_KEYS.includes(selectedTab);
+  const selectedExtra = selectedIsExtra ? selected : null;
+
   return (
     <>
-      {/* טאבים של קטגוריות – תמיד כשלא hideTabs */}
       {!hideTabs && (
-        <View style={styles.tabsContainer}>
-          <View style={styles.tabsRow}>
-            {TABS.map((tab) => {
-              const active = tab.key === selectedTab;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={[styles.tab, active && styles.tabActive]}
-                  onPress={() => onChangeTab(tab.key as CategoryKey)}
-                >
-                  <Text
-                    style={[styles.tabText, active && styles.tabTextActive]}
-                  >
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        <View style={styles.categoryContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryChipsRow}
+          >
+            {quickCats.map((c) => (
+              <CategoryChip
+                key={c.key}
+                label={c.label}
+                icon={c.icon}
+                active={selectedTab === c.key}
+                onPress={() => onChangeTab(c.key)}
+              />
+            ))}
+
+            {selectedExtra && (
+              <CategoryChip
+                key={`selected-extra-${selectedExtra.key}`}
+                label={selectedExtra.label}
+                icon={selectedExtra.icon}
+                active={true}
+                onPress={() => setCatOpen(true)}
+                style={{ borderStyle: "dashed" }}
+              />
+            )}
+
+            <CategoryChip
+              label="עוד"
+              icon="chevron-down"
+              active={false}
+              onPress={() => setCatOpen(true)}
+              style={{ marginRight: 6 }}
+            />
+          </ScrollView>
+
+          <Text style={styles.selectedHint}>
+            נבחר: <Text style={styles.selectedHintStrong}>{selected.label}</Text>
+          </Text>
         </View>
       )}
 
-      {/* פאנל פילטרים – יופיע רק כשהמשתמש לוחץ על אייקון הפילטר במסך */}
       {filtersVisible && (
         <>
           {/* Search */}
@@ -87,7 +135,7 @@ export const InventoryFiltersBar: React.FC<Props> = ({
             />
           </View>
 
-          {/* date filter */}
+          {/* status filter */}
           <View style={styles.filterRow}>
             <View style={styles.filtersLeft}>
               <FilterChip
@@ -113,9 +161,89 @@ export const InventoryFiltersBar: React.FC<Props> = ({
           </View>
         </>
       )}
+
+      <Modal
+        visible={catOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCatOpen(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setCatOpen(false)} />
+
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>בחירת קטגוריה</Text>
+            <TouchableOpacity onPress={() => setCatOpen(false)} activeOpacity={0.8}>
+              <Ionicons name="close" size={20} color={BRAND_MUTED} />
+            </TouchableOpacity>
+          </View>
+
+          {CATEGORIES.map((c) => {
+            const active = c.key === selectedTab;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                style={[styles.sheetRow, active && styles.sheetRowActive]}
+                onPress={() => {
+                  onChangeTab(c.key);
+                  setCatOpen(false);
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={styles.sheetRowRight}>
+                  <View style={styles.sheetRowLabelWrap}>
+                    <Text style={[styles.sheetRowText, active && styles.sheetRowTextActive]}>
+                      {c.label}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={18} color={ACCENT} />}
+                  </View>
+
+                  <Ionicons
+                    name={c.icon}
+                    size={18}
+                    color={active ? ACCENT : BRAND_MUTED}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+        </View>
+      </Modal>
     </>
   );
 };
+
+function CategoryChip({
+  label,
+  icon,
+  active,
+  onPress,
+  style,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  active: boolean;
+  onPress: () => void;
+  style?: any;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.catChip, active && styles.catChipActive, style]}
+      activeOpacity={0.85}
+    >
+      <Ionicons
+        name={icon}
+        size={16}
+        color={active ? "#FFFFFF" : BRAND_MUTED}
+      />
+      <Text style={[styles.catChipText, active && styles.catChipTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 function FilterChip({
   label,
@@ -132,10 +260,9 @@ function FilterChip({
     <TouchableOpacity
       onPress={onPress}
       style={[styles.filterChip, active && styles.filterChipActive, style]}
+      activeOpacity={0.85}
     >
-      <Text
-        style={[styles.filterChipText, active && styles.filterChipTextActive]}
-      >
+      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -143,40 +270,51 @@ function FilterChip({
 }
 
 const styles = StyleSheet.create({
-  tabsContainer: {
+  categoryContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 4,
   },
-  tabsRow: {
+  categoryChipsRow: {
     flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  catChip: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: BRAND_BLUE_SOFT,
     borderRadius: 999,
-    padding: 4,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  tab: {
-    flex: 1,
     paddingVertical: 8,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabActive: {
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  tabText: {
-    fontSize: 13,
-    color: BRAND_MUTED,
+  catChipActive: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
   },
-  tabTextActive: {
-    color: BRAND_TEXT,
+  catChipText: {
+    fontSize: 12,
+    color: BRAND_MUTED,
     fontWeight: "600",
   },
+  catChipTextActive: {
+    color: "#FFFFFF",
+  },
+  selectedHint: {
+    marginTop: 6,
+    textAlign: "right",
+    fontSize: 12,
+    color: BRAND_MUTED,
+  },
+  selectedHintStrong: {
+    color: BRAND_TEXT,
+    fontWeight: "800",
+  },
+
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -201,6 +339,7 @@ const styles = StyleSheet.create({
     color: BRAND_TEXT,
     textAlign: "right",
   },
+
   filterRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
@@ -219,6 +358,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
   },
+
   filterChip: {
     flexDirection: "row-reverse",
     alignItems: "center",
@@ -230,8 +370,8 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   filterChipActive: {
-    backgroundColor: "#0284C7",
-    borderColor: "#0284C7",
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
   },
   filterChipText: {
     fontSize: 12,
@@ -240,5 +380,74 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: "#FFFFFF",
     fontWeight: "600",
+  },
+
+  // Modal
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  sheet: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 18,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  sheetHeader: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 8,
+  },
+  sheetTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: BRAND_TEXT,
+    textAlign: "right",
+  },
+  sheetRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  sheetRowActive: {
+    backgroundColor: BRAND_BLUE_SOFT,
+  },
+  sheetRowRight: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  sheetRowLabelWrap: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+  },
+  sheetRowText: {
+    fontSize: 14,
+    color: BRAND_TEXT,
+    textAlign: "right",
+  },
+  sheetRowTextActive: {
+    fontWeight: "700",
+    color: ACCENT,
+  },
+  modalFooterHintWrap: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF2F7",
+  },
+  modalFooterHint: {
+    fontSize: 12,
+    color: BRAND_MUTED,
+    textAlign: "right",
+    lineHeight: 18,
   },
 });

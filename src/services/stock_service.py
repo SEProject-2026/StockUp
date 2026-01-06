@@ -3,21 +3,20 @@ from uuid import UUID
 from typing import List, Optional, Dict
 from datetime import date
 from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
-from src.domain.smart_home.catalog_item import CatalogItem
 from src.domain.smart_home.product import Product
-from src.repositories.i_catalog_repositoy import ICatalogRepository
 from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
+from src.repositories.catalog_provider import ICatalogProvider
+from src.repositories.catalog_provider import CatalogItem
 from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
-from src.response import Response
 
 class StockService:
  
     def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
-                  catalog_repository: ICatalogRepository):
+                  catalog_provider: ICatalogProvider):
         self._home_repository = home_repository
         self._product_repository = product_repository
-        self._catalog_repository = catalog_repository
+        self._catalog_provider = catalog_provider
 
     # ==========================================
     # 2. Stock Management (Inventory)
@@ -54,7 +53,7 @@ class StockService:
         raise NotImplementedError("Not implemented yet")
     ###########################################################################################
 
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date) -> Optional[Product]:
+    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
         
         await self._check_access(user_id, home_id)
         product = await self._product_repository.get_by_id(product_id)
@@ -168,11 +167,23 @@ class StockService:
         return search_results
 
 
-    async def search_product_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[str]:
+    async def search_product_by_name_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[CatalogItem]:
 
         await self._check_access(user_id, home_id)
-        search_results = await self._catalog_repository.search_by_name(query)
-        return [ci.__repr__() for ci in search_results]
+        search_results = await self._catalog_provider.search_items_by_name(query)
+        return search_results
+    
+    async def search_product_by_barcode_external_db(self, user_id: UUID, home_id: UUID, barcode: str, chain_name: Optional[ChainType] = None) -> Optional[CatalogItem]:
+
+        await self._check_access(user_id, home_id)
+        item = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+        return item
+    
+    async def get_home_products(self, user_id: UUID, home_id: UUID) -> List[Product]:
+        """Retrieves all products in the home's inventory."""
+        await self._check_access(user_id, home_id)
+        products = await self._product_repository.list_all_by_home(home_id)
+        return products
     
     #provides the expiration range for the home after verifying user access
     async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
@@ -183,6 +194,8 @@ class StockService:
         if not home.is_member(user_id):
             raise ValueError("User is not a member of the home")
         return home.get_expiration_range()
+    
+
     
     # ==========================================
     # 3. Shopping List (Active & Base Mode)

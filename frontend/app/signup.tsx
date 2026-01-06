@@ -18,9 +18,11 @@ import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import InfoBox from "@/src/ui/InfoBox";
 import AuthTextField from "@/src/ui/AuthTextField";
+import { register } from "@/src/api/auth";
 
 export default function SignupScreen() {
-  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [secure1, setSecure1] = useState(true);
@@ -28,35 +30,28 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
 
   const validation = useMemo(() => {
-    const usernameOk = username.trim().length > 3;
-    const passOk = password.length >= 6;
+    const passOk = password.length >= 8;
     const matchOk = password === confirm && confirm.length > 0;
 
-    let message = "";
-    if (!usernameOk) message = "שם משתמש חייב להכיל לפחות 4 תווים";
-    else if (!passOk) message = "הסיסמה חייבת להכיל לפחות 6 תווים";
-    else if (!matchOk) message = "הסיסמאות לא תואמות";
-
     return {
-      canSubmit: usernameOk && passOk && matchOk && !loading,
-      message,
+      canSubmit: passOk && matchOk && !loading,
     };
-  }, [username, password, confirm, loading]);
+  }, [name, email, password, confirm, loading]);
 
   async function onSignup() {
     if (!validation.canSubmit) {
-      if (validation.message) Alert.alert("לא ניתן להירשם", validation.message);
       return;
     }
 
     try {
       setLoading(true);
 
-      // TODO: כאן תחברי ל-backend (FastAPI) / auth service
-      // await authApi.signup({ fullName, email, password });
-
-      await new Promise((r) => setTimeout(r, 700));
-
+      await register({
+      email: email.trim().toLowerCase(),
+      name: name.trim(),
+      password,
+      password_confirm: confirm,
+    });
       Alert.alert("נרשמת בהצלחה", "אפשר להתחבר עכשיו", [
         { text: "להתחברות", onPress: () => router.replace("/login") },
       ]);
@@ -96,11 +91,19 @@ export default function SignupScreen() {
           <View style={styles.card}>
 
             <AuthTextField
-              label="שם משתמש"
-              value={username}
-              onChangeText={setUsername}
-              placeholder="לפחות 4 תווים"
+              label="שם"
+              value={name}
+              onChangeText={setName}
               leftIcon="person-circle-outline"
+              autoCapitalize="none"
+            />
+
+            <AuthTextField
+              label="אימייל"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="example@example.com"
+              leftIcon="mail-outline"
               autoCapitalize="none"
             />
             <AuthTextField
@@ -124,10 +127,6 @@ export default function SignupScreen() {
               onToggleSecure={() => setSecure2((p) => !p)}
               autoCapitalize="none"
             />
-
-            {validation.message ? (
-              <Text style={styles.hint}>{validation.message}</Text>
-            ) : null}
 
             <TouchableOpacity
               onPress={onSignup}
@@ -160,11 +159,6 @@ export default function SignupScreen() {
               <Text style={styles.secondaryBtnText}>להתחברות</Text>
             </TouchableOpacity>
           </View>
-
-          <InfoBox
-            icon="lock-closed-outline"
-            text="בשלב הבא נחבר הרשמה לשרת עם אימות (JWT) ושמירה מאובטחת במכשיר."
-          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -16,17 +16,17 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
+import { login } from "@/src/api/auth";
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const canSubmit = useMemo(() => {
-    const u = username.trim();
-    return u.length > 3 && password.length >= 6 && !loading;
-  }, [username, password, loading]);
+    return password.length >= 6 && !loading;
+  }, [email, password, loading]);
 
   async function onLogin() {
     if (!canSubmit) return;
@@ -34,10 +34,7 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      // backend
-
-      await new Promise((r) => setTimeout(r, 650));
-
+      await login({ email: email.trim().toLowerCase(), password });
       router.replace("/home/home"); 
     } catch (e: any) {
       Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");
@@ -70,14 +67,15 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.label}>שם משתמש</Text>
+            <Text style={styles.label}>אימייל</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="person-outline" size={18} color="#6B7280" />
+              <Ionicons name="mail-outline" size={18} color="#6B7280" />
               <TextInput
-                value={username}
-                onChangeText={setUsername}
+                value={email}
+                onChangeText={setEmail}
                 placeholderTextColor="#9CA3AF"
-                keyboardType="default"
+                placeholder="example@example.com"
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 textAlign="right"

@@ -1,7 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, status, Header, Query
 
 from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
@@ -124,7 +124,7 @@ async def update_nickname(
 @router.delete("/{product_id}", response_model=GeneralResponse)
 async def remove_product(
     product_id: UUID,
-    expiration_date: date, # In DELETE, we usually pass params in Query String
+    expiration_date: Optional[date]= Query(None), # In DELETE, we usually pass params in Query String
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
@@ -184,7 +184,90 @@ async def filter_by_expiration(
 ):
     try:
         results = await stock_service.filter_by_expiration_type(user_id, home_id, type)
-        dtos = [ProductDTO.from_domain(p) for p in results]
-        return GeneralResponse(status="success", data=dtos)
+        return GeneralResponse(status="success", data=results)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+
+
+@router.get("/all", response_model=GeneralResponse)
+async def get_all_products(
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+    service: StockService = Depends(AppContainer.get_stock_service)
+):
+    try:
+        products = await service.get_home_products(user_id=user_id, home_id=home_id)
+        
+        products_dtos = [ProductDTO.from_domain(p) for p in products]
+        
+        return GeneralResponse(
+            status="success",
+            data=products_dtos
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+
+@router.get("/catalog/search", response_model=GeneralResponse)
+async def search_global_catalog_by_name(
+    query: str = Query(..., min_length=2, description="Search term (e.g., 'Milk')"),
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Search for products in the global master catalog (CSV) by name.
+    Useful for autocomplete suggestions when adding a new product.
+    """
+    try:
+        results = await stock_service.search_product_by_name_external_db(
+            user_id=user_id, 
+            home_id=home_id, 
+            query=query
+        )
+        
+        # Convert Pydantic models to dicts for the JSON response
+        data = [item.model_dump() for item in results]
+        
+        return GeneralResponse(
+            status="success",
+            message=f"Found {len(results)} items",
+            data=data
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/catalog/barcode/{barcode}", response_model=GeneralResponse)
+async def get_global_product_by_barcode(
+    barcode: str = Path(..., description="The barcode to lookup"),
+    chain: Optional[str] = Query(None, description="Optional chain context (e.g., 'rami_levi')"),
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Lookup a specific product in the global master catalog by barcode.
+    If 'chain' is provided, it tries to find the chain-specific version first.
+    """
+    try:
+        item = await stock_service.search_product_by_barcode_external_db(
+            user_id=user_id, 
+            home_id=home_id, 
+            barcode=barcode,
+            chain_name=chain
+        )
+        
+        if not item:
+            return GeneralResponse(
+                status="success", 
+                message="Product not found in global catalog", 
+                data=None
+            )
+
+        return GeneralResponse(
+            status="success",
+            message="Product found",
+            data=item.model_dump()
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

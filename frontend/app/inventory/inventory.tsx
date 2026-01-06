@@ -1,157 +1,36 @@
-import React, { useMemo, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
+import React, { useCallback } from "react";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { useInventory, Category, InventoryItem } from "../../src/context/inventory-context";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+
+import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 
 import { InventoryFiltersBar } from "@/src/components/inventory/InventoryFiltersBar";
 import { GroupedInventoryList } from "@/src/components/inventory/GroupedInventoryList";
 import { EditItemModal } from "@/src/components/inventory/EditItemModal";
-import ScreenHeader from "@/src/layout/ScreenHeader";
 
-export type CategoryKey = Category | "all";
-type StatusFilter = "all" | "soon" | "expired";
-
-export type GroupedInventory = {
-  key: string;
-  name: string;
-  category: Category;
-  totalQuantity: number;
-  items: InventoryItem[];
-};
-
-type InventoryScreenBaseProps = {
-  initialCategory: CategoryKey;
-  hideTabs?: boolean;
-  title: string;
-};
+import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
+import { useInventoryData } from "@/src/hooks/useInventoryData";
 
 export function InventoryScreenBase({
-  initialCategory,
-  hideTabs,
-  title,
-}: InventoryScreenBaseProps) {
-  const { items, updateItem, removeItem } = useInventory();
-
+  initialCategory = "all",
+  title = "מלאי",
+  hideTabs = false,
+}: {
+  initialCategory?: CategoryKey;
+  title?: string;
+  hideTabs?: boolean;
+}) {
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
   const currentHomeId = homeId ? String(homeId) : undefined;
 
-  const [selectedTab, setSelectedTab] = useState<CategoryKey>(initialCategory);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
-
-  const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
-  const filtersVisible = true;
-
-  // ✅ 1) items רק של הבית הנוכחי
-  const itemsForHome = useMemo(() => {
-    // אם עדיין אין homeId על פריטים — זה יחזיר הכל (כדי לא לשבור).
-    // אם את רוצה לחייב בית: תחזירי [] כשאין homeId.
-    if (!currentHomeId) return items;
-    return items.filter((it: any) => it.homeId === currentHomeId);
-  }, [items, currentHomeId]);
-
-  // ✅ 2) חישוב groupedItems על itemsForHome ולא items
-  const { groupedItems } = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const filtered = itemsForHome.filter((item) => {
-      if (effectiveCategory !== "all" && item.category !== effectiveCategory) {
-        return false;
-      }
-
-      if (search && !item.name.includes(search)) {
-        return false;
-      }
-
-      if (statusFilter !== "all") {
-        if (!item.expiresAt) return false;
-
-        const exp = new Date(item.expiresAt);
-        exp.setHours(0, 0, 0, 0);
-        const diffDays =
-          (exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-
-        if (statusFilter === "soon" && !(diffDays >= 0 && diffDays <= 3)) {
-          return false;
-        }
-        if (statusFilter === "expired" && !(diffDays < 0)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-
-    const groupMap = new Map<string, GroupedInventory>();
-
-    filtered.forEach((item) => {
-      const key = `${item.name}__${item.category}`;
-      let group = groupMap.get(key);
-      if (!group) {
-        group = {
-          key,
-          name: item.name,
-          category: item.category,
-          totalQuantity: 0,
-          items: [],
-        };
-        groupMap.set(key, group);
-      }
-      group.totalQuantity += item.quantity;
-      group.items.push(item);
-    });
-
-    const groupedItems = Array.from(groupMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, "he")
-    );
-
-    return { groupedItems };
-  }, [itemsForHome, effectiveCategory, search, statusFilter]);
-
-  // ✅ 3) handlers עובדים על itemsForHome
-  const handleChangeQty = (id: string, delta: number) => {
-    const current = itemsForHome.find((it) => it.id === id);
-    if (!current) return;
-    const next = current.quantity + delta;
-    if (next < 1) return;
-    updateItem(id, { quantity: next });
-  };
-
-  const handleDelete = (id: string) => {
-    const current = itemsForHome.find((it) => it.id === id);
-    Alert.alert(
-      "מחיקת מוצר",
-      `למחוק את "${current?.name ?? "המוצר"}" מהמלאי?`,
-      [
-        { text: "ביטול", style: "cancel" },
-        { text: "מחק", style: "destructive", onPress: () => removeItem(id) },
-      ]
-    );
-  };
-
-  const handleSaveEdit = (
-    id: string,
-    values: { name: string; quantity: number; expiresAt?: string }
-  ) => {
-    updateItem(id, {
-      name: values.name,
-      quantity: values.quantity,
-      expiresAt: values.expiresAt,
-    });
-    setItemToEdit(null);
-  };
+  const inv = useInventoryData({
+    homeId: currentHomeId,
+    initialCategory,
+    hideTabs,
+  });
 
   const handleBack = () => {
     if (currentHomeId) {
@@ -159,10 +38,9 @@ export function InventoryScreenBase({
         pathname: "/home/[homeId]",
         params: { homeId: currentHomeId },
       });
-      return;
+    } else {
+      router.back();
     }
-
-    router.replace("/home/home");
   };
 
   return (
@@ -175,99 +53,69 @@ export function InventoryScreenBase({
         pointerEvents="none"
       />
 
-      <View style={styles.main}>
-        <ScreenHeader
-          title={title}
-          onBack={handleBack}
-        />
+      <View style={{ flex: 1 }}>
+        <ScreenHeader title={title} onBack={handleBack} />
 
-        <InventoryFiltersBar
-          hideTabs={hideTabs}
-          selectedTab={selectedTab}
-          onChangeTab={setSelectedTab}
-          search={search}
-          onChangeSearch={setSearch}
-          statusFilter={statusFilter}
-          onChangeStatusFilter={setStatusFilter}
-          filtersVisible={filtersVisible}
-        />
+        {!currentHomeId ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#0284C7" />
+          </View>
+        ) : (
+          <>
+            <InventoryFiltersBar
+              hideTabs={hideTabs}
+              selectedTab={inv.selectedTab}
+              onChangeTab={inv.setSelectedTab}
+              search={inv.search}
+              onChangeSearch={inv.setSearch}
+              statusFilter={inv.statusFilter}
+              onChangeStatusFilter={inv.setStatusFilter}
+              filtersVisible={true}
+            />
 
-        <GroupedInventoryList
-          groupedItems={groupedItems}
-          onChangeQty={handleChangeQty}
-          onEditItem={setItemToEdit}
-          onDeleteItem={handleDelete}
-          onAddItem={() =>
-            router.push({
-              pathname: "/inventory/add-item",
-              params: currentHomeId ? { homeId: currentHomeId } : {},
-            })
-          }
-        />
+            {inv.initialLoading ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color="#0284C7" />
+              </View>
+            ) : (
+              <>
+                <GroupedInventoryList
+                  groupedItems={inv.groupedItems as any}
+                  searchQuery={inv.search}
+                  onChangeQty={inv.changeQty}
+                  onEditItem={(it: any) => inv.setItemToEdit(it)}
+                  onDeleteItem={inv.deleteRow}
+                  onAddItem={() =>
+                    router.push({
+                      pathname: "/inventory/add-item",
+                      params: currentHomeId ? { homeId: currentHomeId } : {},
+                    })
+                  }
+                />
 
-        {/* לא חייב להעביר activeTab בכלל כי הוא יודע לנחש,
-            אבל בסדר להשאיר. */}
-        <BottomNavBar activeTab="inventory" />
+                <BottomNavBar activeTab="inventory" />
+              </>
+            )}
+          </>
+        )}
       </View>
 
       <EditItemModal
-        visible={!!itemToEdit}
-        item={itemToEdit}
-        onClose={() => setItemToEdit(null)}
-        onSave={handleSaveEdit}
+        visible={!!inv.itemToEdit}
+        item={inv.itemToEdit as any}
+        onClose={() => inv.setItemToEdit(null)}
+        onSave={inv.saveEdit}
       />
     </SafeAreaView>
   );
 }
 
-
 export default function InventoryScreen() {
-  return (
-    <InventoryScreenBase
-      initialCategory="all"
-      title="מלאי"
-      hideTabs={false}
-    />
-  );
+  return <InventoryScreenBase initialCategory="all" title="מלאי" hideTabs={false} />;
 }
 
-/* ---------- STYLES  ---------- */
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F4F4F4", 
-  },
-  gradientBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  main: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  headerIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-  },
+  safeArea: { flex: 1, backgroundColor: "#F4F4F4" },
+  gradientBackground: { ...StyleSheet.absoluteFillObject },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

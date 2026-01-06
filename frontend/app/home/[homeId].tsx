@@ -1,10 +1,9 @@
 // app/home/[homeId].tsx
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import { useInventory } from "@/src/context/inventory-context";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
 import QuickActionButton from "@/src/ui/QuickActionButton";
 import CategoryAreaButton from "@/src/components/homes/CategoryAreaButton";
@@ -13,30 +12,117 @@ import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStat
 import SideTitleCard from "@/src/ui/SideTitleCard";
 import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
+import { getAllStock, type ProductDTO } from "@/src/api/stock";
+import type { Category } from "@/src/context/inventory-context";
+
+import { setSelectedHomeId } from "./selected-home";
+
 const BRAND_BLUE_SOFT = "#F0FAFF";
+
+type HomeItem = {
+  id: string;
+  name: string;
+  category: Category;
+  quantity: number;
+  expiresAt?: string;
+};
+
+function locationToCategory(location?: string | null): Category {
+  switch ((location ?? "").toUpperCase()) {
+    case "FRIDGE":
+      return "fridge";
+    case "FREEZER":
+      return "freezer";
+    case "PANTRY":
+      return "pantry";
+    case "CLEANING_SUPPLIES":
+      return "cleaning supplies";
+    case "OTHER":
+      return "other";
+    default:
+      return "other";
+  }
+}
+
+function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
+  const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
+  const category = locationToCategory(dto.location);
+
+  if (dto.items?.length) {
+    return dto.items.map((it) => ({
+      id: `${dto.id}__${it.expiration_date ?? "none"}`,
+      name: displayName,
+      category,
+      quantity: it.quantity,
+      expiresAt: it.expiration_date ?? undefined,
+    }));
+  }
+
+  return [
+    {
+      id: `${dto.id}__none`,
+      name: displayName,
+      category,
+      quantity: dto.quantity ?? 0,
+      expiresAt: undefined,
+    },
+  ];
+}
 
 export default function HomeDashboardScreen() {
   const { homeId } = useLocalSearchParams<{ homeId: string }>();
   const currentHomeId = String(homeId);
 
-  const { items } = useInventory();
+  useEffect(() => {
+    if (!currentHomeId) return;
+    setSelectedHomeId(currentHomeId).catch(() => {
+    });
+  }, [currentHomeId]);
 
-  // שלב הבא (מומלץ): לסנן לפי בית.
-  // כרגע זה יעבוד רק אם יש לך item.homeId
-  const homeItems = useMemo(() => {
-    return items.filter((i: any) => i.homeId === currentHomeId);
-  }, [items, currentHomeId]);
+  const [homeItems, setHomeItems] = useState<HomeItem[]>([]);
+  const homeAreasScrollRef = useRef<ScrollView>(null);
+  const didAutoScrollAreas = useRef(false);
+
+  const loadHome = useCallback(async () => {
+    if (!currentHomeId) return;
+
+    try {
+      const res = await getAllStock(currentHomeId);
+      const products = res.data ?? [];
+      setHomeItems(products.flatMap(productDtoToHomeItems));
+    } catch (e: any) {
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון נתוני בית");
+      setHomeItems([]);
+    }
+  }, [currentHomeId]);
+
+  useEffect(() => {
+    loadHome();
+  }, [loadHome]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHome();
+    }, [loadHome])
+  );
 
   const stats: Stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let fridge = 0, freezer = 0, pantry = 0, expiringSoon = 0;
+    let fridge = 0,
+      freezer = 0,
+      pantry = 0,
+      cleaningSupplies = 0,
+      other = 0,
+      expiringSoon = 0;
 
-    homeItems.forEach((item: any) => {
+    homeItems.forEach((item) => {
       if (item.category === "fridge") fridge++;
       if (item.category === "freezer") freezer++;
       if (item.category === "pantry") pantry++;
+      if (item.category === "cleaning supplies") cleaningSupplies++;
+      if (item.category === "other") other++;
 
       if (item.expiresAt) {
         const exp = new Date(item.expiresAt);
@@ -46,7 +132,7 @@ export default function HomeDashboardScreen() {
       }
     });
 
-    return { total: homeItems.length, fridge, freezer, pantry, expiringSoon };
+    return { total: homeItems.length, fridge, freezer, pantry, cleaningSupplies, other, expiringSoon };
   }, [homeItems]);
 
   const expiringSoonItems = useMemo(() => {
@@ -54,14 +140,14 @@ export default function HomeDashboardScreen() {
     today.setHours(0, 0, 0, 0);
 
     return homeItems
-      .filter((item: any) => {
+      .filter((item) => {
         if (!item.expiresAt) return false;
         const exp = new Date(item.expiresAt);
         exp.setHours(0, 0, 0, 0);
         const diffDays = (exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
         return diffDays >= 0 && diffDays <= 3;
       })
-      .sort((a: any, b: any) => new Date(a.expiresAt!).getTime() - new Date(b.expiresAt!).getTime())
+      .sort((a, b) => new Date(a.expiresAt!).getTime() - new Date(b.expiresAt!).getTime())
       .slice(0, 3);
   }, [homeItems]);
 
@@ -85,34 +171,78 @@ export default function HomeDashboardScreen() {
           {/* home areas */}
           <View style={styles.horizontalSection}>
             <ScrollView
+              ref={homeAreasScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
-              contentOffset={{ x: 150, y: 0 }}
+              onContentSizeChange={() => {
+                if (didAutoScrollAreas.current) return;
+                didAutoScrollAreas.current = true;
+
+                requestAnimationFrame(() => {
+                  homeAreasScrollRef.current?.scrollToEnd({ animated: false });
+                });
+              }}
             >
               <SideTitleCard label={"אזורי\nהבית"} />
+
               <CategoryAreaButton
                 label="מקרר"
                 value={stats.fridge}
                 icon="snow-outline"
                 onPress={() =>
-                  router.push({ pathname: "/inventory/fridge", params: { homeId: currentHomeId } })
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "fridge", homeId: currentHomeId },
+                  })
                 }
               />
+
               <CategoryAreaButton
                 label="מקפיא"
                 value={stats.freezer}
                 icon="cube-outline"
                 onPress={() =>
-                  router.push({ pathname: "/inventory/freezer", params: { homeId: currentHomeId } })
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "freezer", homeId: currentHomeId },
+                  })
                 }
               />
+
               <CategoryAreaButton
                 label="מזווה"
                 value={stats.pantry}
                 icon="restaurant-outline"
                 onPress={() =>
-                  router.push({ pathname: "/inventory/pantry", params: { homeId: currentHomeId } })
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "pantry", homeId: currentHomeId },
+                  })
+                }
+              />
+
+              <CategoryAreaButton
+                label="ציוד ניקוי"
+                value={stats.cleaningSupplies}
+                icon="water-outline"
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "cleaning-supplies", homeId: currentHomeId },
+                  })
+                }
+              />
+
+              <CategoryAreaButton
+                label="אחר"
+                value={stats.other}
+                icon="ellipsis-horizontal-outline"
+                onPress={() =>
+                  router.push({
+                    pathname: "/inventory/[category]",
+                    params: { category: "other", homeId: currentHomeId },
+                  })
                 }
               />
             </ScrollView>
@@ -140,7 +270,7 @@ export default function HomeDashboardScreen() {
             </ScrollView>
           </View>
 
-          <ExpiringSoonCard items={expiringSoonItems} />
+          <ExpiringSoonCard items={expiringSoonItems as any} />
         </ScrollView>
 
         <BottomNavBar activeTab="home" />

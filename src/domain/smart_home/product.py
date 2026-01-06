@@ -101,6 +101,11 @@ class Product:
 
     def get_expiration_dates(self) -> dict[date, tuple[int, ExpirationType]]:
         return self._expiration_dates_to_quantity 
+    def get_expiration_type(self, expiration_date: date) -> Optional[ExpirationType]:
+        if expiration_date in self._expiration_dates_to_quantity:
+            _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
+            return expiration_type
+        return None
     
     # Setters
     def set_nickname(self, new_nickname: str) -> None:
@@ -138,7 +143,17 @@ class Product:
             raise ValueError("Quantity cannot be negative.")
         self._quantity = new_quantity
 
-    async def remove_product_date(self, expiration_date: date) -> 'Product':
+    async def remove_product_date(self, expiration_date: Optional[date]) -> 'Product':
+        # case: product without expiration date
+        if expiration_date is None:
+            if None in self._expiration_dates_to_quantity:
+                date_quantity, _ = self._expiration_dates_to_quantity.pop(None)
+                self._quantity -= date_quantity
+                return self
+            else:
+                raise ValueError("Product has no item without expiration date.")
+            
+        # case: product with expiration date
         if expiration_date in self._expiration_dates_to_quantity:
             date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
             del self._expiration_dates_to_quantity[expiration_date]

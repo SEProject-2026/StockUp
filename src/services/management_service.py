@@ -272,7 +272,7 @@ class ManagementService:
         
         return Response(isOk = True, data = home_details)
     
-    async def get_all_homes_for_user(self, user_id: UUID) -> Response:
+    async def get_all_homes_for_user(self, user_id: UUID) -> List[Home]:
         """Retrieves a list of all homes the user is a member of."""
         if not user_id:
             return Response(isOk = False, error_message = "User ID is required.") 
@@ -282,8 +282,4 @@ class ManagementService:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving homes.")
         
-        home_dict = {}
-        for home in homes:
-            home_dict[home.get_id()] = home.get_name()
-
-        return Response(isOk = True, data = home_dict)
+        return homes
