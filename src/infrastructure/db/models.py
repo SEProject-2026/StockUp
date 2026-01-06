@@ -66,7 +66,7 @@ class ProductModel(Base):
     barcode = Column(String, nullable=True, index=True)
     location = Column(String) 
     
-    total_quantity = Column(Integer, default=0) 
+    quantity = Column(Integer, default=0) 
 
 
     home = relationship("HomeModel", back_populates="products")
