@@ -1,8 +1,10 @@
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from uuid import UUID
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Path, status, Header, Query
+from sqlalchemy.orm import Session
 
+from src.infrastructure.db.database import get_db
 from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
     ProductDTO, 
@@ -18,15 +20,25 @@ from src.api.security import get_current_user_id
 
 router = APIRouter(prefix="/stock", tags=["Stock Management"])
 
-stock_service = AppContainer.get_stock_service()
+# --- Dependency Injection Setup ---
+
+def get_stock_service(db: Session = Depends(get_db)) -> StockService:
+    return AppContainer.get_stock_service(db)
+
+StockServiceDep = Annotated[StockService, Depends(get_stock_service)]
+
+
+# --- Routes ---
+
 @router.post("/add", response_model=GeneralResponse)
 async def add_product(
     request: AddProductRequest,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        product = await stock_service.add_product(
+        product = await service.add_product(
             name=request.name,
             user_id=user_id,
             home_id=home_id,
@@ -52,11 +64,12 @@ async def add_product(
 async def update_quantity(
     product_id: UUID,
     request: UpdateProductQuantityRequest,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        updated_product = await stock_service.update_date_quantity(
+        updated_product = await service.update_date_quantity(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
@@ -79,12 +92,13 @@ async def update_quantity(
 async def update_expiration(
     product_id: UUID,
     request: UpdateExpirationDateRequest,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 
 ):
     try:
-        updated_product = await stock_service.update_expiration_date(
+        updated_product = await service.update_expiration_date(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
@@ -103,11 +117,12 @@ async def update_expiration(
 async def update_nickname(
     product_id: UUID,
     request: UpdateProductNicknameRequest,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        updated_product = await stock_service.update_nickname(
+        updated_product = await service.update_nickname(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
@@ -124,12 +139,13 @@ async def update_nickname(
 @router.delete("/{product_id}", response_model=GeneralResponse)
 async def remove_product(
     product_id: UUID,
-    expiration_date: Optional[date]= Query(None), # In DELETE, we usually pass params in Query String
+    service: StockServiceDep, # <--- Injected Service (Must come before Query with defaults)
+    expiration_date: Optional[date]= Query(None), 
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        result = await stock_service.remove_product(
+        result = await service.remove_product(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
@@ -150,11 +166,12 @@ async def remove_product(
 @router.get("/search", response_model=GeneralResponse)
 async def search_products(
     query: str,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        results = await stock_service.search_product(user_id, home_id, query)
+        results = await service.search_product(user_id, home_id, query)
         dtos = [ProductDTO.from_domain(p) for p in results]
         
         return GeneralResponse(status="success", data=dtos)
@@ -165,11 +182,12 @@ async def search_products(
 @router.get("/filter/location", response_model=GeneralResponse)
 async def filter_by_location(
     location: LocationType,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        results = await stock_service.filter_by_location(user_id, home_id, location)
+        results = await service.filter_by_location(user_id, home_id, location)
         dtos = [ProductDTO.from_domain(p) for p in results]
         return GeneralResponse(status="success", data=dtos)
     except ValueError as e:
@@ -179,22 +197,22 @@ async def filter_by_location(
 @router.get("/filter/expiration", response_model=GeneralResponse)
 async def filter_by_expiration(
     type: ExpirationType,
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
-        results = await stock_service.filter_by_expiration_type(user_id, home_id, type)
+        results = await service.filter_by_expiration_type(user_id, home_id, type)
         return GeneralResponse(status="success", data=results)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
 
-
 @router.get("/all", response_model=GeneralResponse)
 async def get_all_products(
+    service: StockServiceDep, # <--- Injected Service
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
-    service: StockService = Depends(AppContainer.get_stock_service)
 ):
     try:
         products = await service.get_home_products(user_id=user_id, home_id=home_id)
@@ -211,6 +229,7 @@ async def get_all_products(
 
 @router.get("/catalog/search", response_model=GeneralResponse)
 async def search_global_catalog_by_name(
+    service: StockServiceDep, # <--- Injected Service (Must come before Query with defaults)
     query: str = Query(..., min_length=2, description="Search term (e.g., 'Milk')"),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
@@ -220,7 +239,7 @@ async def search_global_catalog_by_name(
     Useful for autocomplete suggestions when adding a new product.
     """
     try:
-        results = await stock_service.search_product_by_name_external_db(
+        results = await service.search_product_by_name_external_db(
             user_id=user_id, 
             home_id=home_id, 
             query=query
@@ -240,7 +259,8 @@ async def search_global_catalog_by_name(
 
 @router.get("/catalog/barcode/{barcode}", response_model=GeneralResponse)
 async def get_global_product_by_barcode(
-    barcode: str = Path(..., description="The barcode to lookup"),
+    barcode: str,
+    service: StockServiceDep, # <--- Injected Service (Must come before Query/Header/Depends)
     chain: Optional[str] = Query(None, description="Optional chain context (e.g., 'rami_levi')"),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
@@ -250,7 +270,7 @@ async def get_global_product_by_barcode(
     If 'chain' is provided, it tries to find the chain-specific version first.
     """
     try:
-        item = await stock_service.search_product_by_barcode_external_db(
+        item = await service.search_product_by_barcode_external_db(
             user_id=user_id, 
             home_id=home_id, 
             barcode=barcode,

@@ -1,7 +1,11 @@
 from pathlib import Path
+from src.infrastructure.repositories.db_home_repository import DbHomeRepository
+from src.infrastructure.repositories.db_product_repository import DbProductRepository
+from src.infrastructure.repositories.db_user_repository import DbUserRepository
 from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from src.services.user_service import UserService
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
+from sqlalchemy.orm import Session
 
 from src.services.stock_service import StockService
 from src.services.management_service import ManagementService 
@@ -69,6 +73,18 @@ class AppContainer:
         if AppContainer._product_repo_instance is None:
             AppContainer._product_repo_instance = InMemoryProductRepository()
         return AppContainer._product_repo_instance
+    
+    @staticmethod
+    def get_user_repository(db: Session) -> DbUserRepository:
+        return DbUserRepository(db)
+
+    @staticmethod
+    def get_home_repository(db: Session) -> DbHomeRepository:
+        return DbHomeRepository(db)
+
+    @staticmethod
+    def get_product_repository(db: Session) -> DbProductRepository:
+        return DbProductRepository(db)
     
     @staticmethod
     def get_catalog_provider():

@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: stockup_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: 123456  # הסיסמה החדשה
+      POSTGRES_DB: stockup_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_v4:/var/lib/postgresql/data # שיניתי ל-v4 ליתר ביטחון
+
+volumes:
+  postgres_data_v4:
