@@ -1,7 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Path, status, Header, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Path, UploadFile, status, Header, Query
 
 from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
@@ -47,6 +47,34 @@ async def add_product(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+
+@router.post("/scan", response_model=GeneralResponse)
+async def scan_receipt(
+    file: UploadFile = File(...), 
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Scans a receipt image and extracts items using OCR.
+    Returns a ReceiptDTO with identified items.
+    """
+    try:
+        receipt_dto = await stock_service.scan_receipt(
+            user_id=user_id,
+            home_id=home_id,
+            file_path=file.file 
+        )
+        
+        return GeneralResponse(
+            status="success",
+            message="Receipt scanned successfully",
+            data=receipt_dto.model_dump()
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Scanning failed: {str(e)}")
 
 @router.patch("/{product_id}/quantity", response_model=GeneralResponse)
 async def update_quantity(
