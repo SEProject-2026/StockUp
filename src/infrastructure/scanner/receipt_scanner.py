@@ -10,7 +10,7 @@ import os
 import pdfplumber
 import subprocess as sp
 
-class ReceiptParser:
+class ReceiptScanner:
     def __init__(self):
         base_dir = os.getcwd()
         
@@ -181,7 +181,7 @@ class ReceiptParser:
         text = 'פלפל' if text == '7979' else text
         return text
 
-    def parse_receipt(self, file_path):
+    def parse_receipt(self, file_path) -> tuple[str, dict]:
         print(f"Processing: {file_path}...")
         
         # טעינה חכמה: מקבלים גם את הנתונים וגם האם זה דיגיטלי
@@ -200,7 +200,7 @@ class ReceiptParser:
             all_results["chain name"] = page_data["chain name"] or all_results["chain name"]
         
         # --- אם לא מצאנו שם רשת בטקסט, סורקים את הלוגו ---
-        if (not all_results["chain name"] or all_results["chain name"] == "רשת לא מזוהה") and is_digital and file_path.lower().endswith('.pdf'):
+        if (not all_results["chain name"] or all_results["chain name"] == "undentified chain") and is_digital and file_path.lower().endswith('.pdf'):
             print("Chain name not found in text layer. Scanning header image (OCR)...")
             detected_chain = self._extract_chain_from_header_image(file_path)
             if detected_chain:
@@ -214,8 +214,15 @@ class ReceiptParser:
         if os.path.exists("page_temp_out.png"):
             try: os.remove("page_temp_out.png")
             except: pass
+
+        ret_dict = dict()
+        for p in all_results["products"]:
+            barcode = p["barcode"]
+            quantity = p["quantity"]
+            unit = p["unit"]
+            ret_dict[barcode] = (quantity, unit)
             
-        return all_results
+        return all_results["chain name"], ret_dict
     
     def _extract_chain_from_header_image(self, file_path):
         """
@@ -312,7 +319,7 @@ class ReceiptParser:
 
             if not chain_name_found:
                 ch = self._chain_name_in_line(full_line_text)
-                if ch != "רשת לא מזוהה":
+                if ch != "unidentified chain":
                     chain_name_found = True
 
             if self.table_ended_global:
@@ -385,7 +392,7 @@ class ReceiptParser:
             is_kg_found = found_kg(reversed_row_list)
             
             if not is_kg_found:
-                unit_type = "יחידה"
+                unit_type = "unit"
                 # try to find quantity in format X.000 or X.00 or X.0
                 qty_matches = re.findall(r'\b(\d+\.0{1,3})\b', full_line_text)
                 if qty_matches:
@@ -394,7 +401,7 @@ class ReceiptParser:
                         if quantity == 0.0: quantity = 1.0
                     except: quantity = 1.0
             else:
-                unit_type = "ק\"ג"
+                unit_type = "kg"
                 qty_matches = re.findall(r'\b(\d+\.\d{2,3})\b', full_line_text)
                 if qty_matches:
                     try: 
@@ -412,17 +419,48 @@ class ReceiptParser:
         return {"chain name": ch, "header": header_lines, "products": products}
     
     def _chain_name_in_line(self, line: str) -> str:
-        retail_chains = [
-                        "קינג סטור", "מעיין אלפיים", "גוד פארם", "קרפור", "קוויק", 
-                        "ביתן אונליין", "יינות ביתן", "מגה", "דור אלון", "אלונית", 
-                        "וולט", "ויקטורי", "זול ובגדול", "ח. כהן", "טיב טעם", 
-                        "מחסני השוק", "חצי חינם", "יוחננוף", "אושר עד", "נתיב החסד", 
-                        "ברכל", "סאלח דבאח", "סופר ספיר", "סופר פארם", "סיטי מרקט", 
-                        "סטופ מרקט", "עוף והודו ברקת", "פוליצר", "יילו", "סופר יודה", 
-                        "פרשמרקט", "משנת יוסף", "קשת טעמים", "רמי לוי", "סופר קופיקס", 
-                        "שופרסל", "Be", "שוק העיר", "שפע ברכת השם"
-                    ]
-        for chain in retail_chains:
+        retail_chains_map = {
+                "קינג סטור": "King Store",
+                "מעיין אלפיים": "Maayan 2000",
+                "גוד פארם": "Good Pharm",
+                "קרפור": "Carrefour",
+                "קוויק": "Quik",
+                "ביתן אונליין": "Bitan Online",
+                "יינות ביתן": "Yeinot Bitan",
+                "מגה": "Mega",
+                "דור אלון": "Dor Alon",
+                "אלונית": "Alonit",
+                "וולט": "Wolt",
+                "ויקטורי": "Victory",
+                "זול ובגדול": "Zol VeBegadol",
+                "ח. כהן": "H. Cohen",
+                "טיב טעם": "Tiv Taam",
+                "מחסני השוק": "Machsanei HaShouk",
+                "חצי חינם": "Hatzi Hinam",
+                "יוחננוף": "Yochananof",
+                "אושר עד": "Osher Ad",
+                "נתיב החסד": "Nativ HaChessed",
+                "ברכל": "BarKol",
+                "סאלח דבאח": "Saleh Dabach",
+                "סופר ספיר": "Super Sapir",
+                "סופר פארם": "Super-Pharm",
+                "סיטי מרקט": "City Market",
+                "סטופ מרקט": "Stop Market",
+                "עוף והודו ברקת": "Of VeHodu Bareket",
+                "פוליצר": "Polizer",
+                "יילו": "Yellow",
+                "סופר יודה": "Super Yuda",
+                "פרשמרקט": "Freshmarket",
+                "משנת יוסף": "Mishnat Yosef",
+                "קשת טעמים": "Keshet Teamim",
+                "רמי לוי": "Rami Levy",
+                "סופר קופיקס": "Super Cofix",
+                "שופרסל": "Shufersal",
+                "Be": "Be",
+                "שוק העיר": "Shouk HaIr",
+                "שפע ברכת השם": "Shefa Birkat Hashem"
+            }
+        for chain in retail_chains_map.keys():
             if chain in line:
-                return chain
-        return "רשת לא מזוהה"
+                return retail_chains_map[chain]
+        return "unidentified chain"
