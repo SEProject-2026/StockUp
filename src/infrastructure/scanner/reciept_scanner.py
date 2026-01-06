@@ -8,11 +8,20 @@ from bidi.algorithm import get_display
 from pdf2image import convert_from_path
 import os
 import pdfplumber
+import subprocess as sp
 
 class ReceiptParser:
     def __init__(self):
-        pytesseract.pytesseract.tesseract_cmd = r'tools\Tesseract-OCR\tesseract.exe'
-        self.poppler_path = r'tools\poppler-25.12.0\Library\bin' 
+        base_dir = os.getcwd()
+        
+        # בניית נתיבים אבסולוטיים (מלאים)
+        tesseract_rel = r'tools\Tesseract-OCR\tesseract.exe'
+        poppler_rel = r'tools\poppler-25.12.0\Library\bin'
+        
+        pytesseract.pytesseract.tesseract_cmd = os.path.join(base_dir, tesseract_rel)
+        self.poppler_path = os.path.join(base_dir, poppler_rel)
+        self.table_started_global = False
+        self.table_ended_global = False
 
     def load_file(self, file_path):
         """
@@ -21,11 +30,11 @@ class ReceiptParser:
         """
         if not os.path.exists(file_path): raise Exception(f"File not found: {file_path}")
         
-        # --- ניסיון 1: קריאה דיגיטלית (מהירה ומדויקת) ---
+        # --- ניסיון 1: קריאה דיגיטלית ---
         if file_path.lower().endswith('.pdf'):
             try:
                 with pdfplumber.open(file_path) as pdf:
-                    # בדיקה מקדימה: האם יש טקסט בעמוד הראשון?
+                    # בדיקה האם יש טקסט בעמוד הראשון
                     if len(pdf.pages) > 0 and len(pdf.pages[0].extract_words()) > 5:
                         print("Detected Digital PDF. Extracting text directly...")
                         all_pages_dfs = []
@@ -53,13 +62,17 @@ class ReceiptParser:
             except Exception as e:
                 print(f"Digital parsing failed (falling back to OCR): {e}")
 
-        # --- ניסיון 2: המרה לתמונות ו-OCR (לסריקות) ---
+        # --- ניסיון 2: המרה לתמונות ו-OCR ---
         if file_path.lower().endswith('.pdf'):
             print("Converting PDF to High-Res Images (300 DPI)...")
             try:
                 abs_path = os.path.abspath(file_path)
-                pil_images = convert_from_path(abs_path, dpi=300, poppler_path=self.poppler_path)
-                images = [cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR) for img in pil_images]
+                images = convert_from_path(
+                            abs_path,
+                            dpi=300,
+                            poppler_path=self.poppler_path
+                        )
+                images = [cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR) for img in images]
                 return images, False # False מסמן שצריך OCR
             except Exception as e: raise Exception(f"PDF Error: {e}")
         else:
@@ -69,18 +82,103 @@ class ReceiptParser:
                 return [img], False
             except Exception as e: raise Exception(f"Image Error: {e}")
 
+
     def enhance_image(self, img):
         if img is None: return None
-        height, width = img.shape[:2]
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        scale = 2.5 if width < 1000 else 1.0 
-        img_resized = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-        blurred = cv2.GaussianBlur(img_resized, (3, 3), 0)
-        return cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)
+
+        # נתיבים לקבצים זמניים
+        temp_in = os.path.abspath("page_temp_in.png")
+        temp_out = os.path.abspath("page_temp_out.png")
+        cv2.imwrite(temp_in, img)
+
+        # 1. איתור נתיב הסקריפט (PowerShell)
+        # מניח שהוא בתיקיית ה-src הנוכחית או בתיקיית tools
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ps_script = os.path.join(script_dir, "textcleaner.ps1")
+        if not os.path.exists(ps_script):
+             # ניסיון שני: אולי זה בתיקיית השורש?
+             ps_script = os.path.abspath("textcleaner.ps1")
+
+        # 2. איתור נתיב ImageMagick (התיקייה בה נמצא magick.exe)
+        # נשתמש במיקום היחסי לתיקיית הפרויקט
+        project_root = os.getcwd()
+        if 'src' in project_root: # אם הרצנו מתוך תיקייה פנימית
+             project_root = os.path.abspath(os.path.join(project_root, '..', '..', '..'))
+        
+        im_dir = os.path.join(project_root, 'tools', 'ImageMagick-7.1.2-Q16')
+        
+        # אם התיקייה לא קיימת בדיוק בשם הזה, ננסה למצוא אותה דינמית
+        if not os.path.exists(im_dir):
+            tools_dir = os.path.join(project_root, 'tools')
+            if os.path.exists(tools_dir):
+                for d in os.listdir(tools_dir):
+                    if "ImageMagick" in d:
+                        im_dir = os.path.join(tools_dir, d)
+                        break
+
+        # 3. יצירת סביבת ריצה מותאמת (Environment Variables)
+        # זה התיקון הקריטי! אנחנו אומרים ל-ImageMagick איפה הוא גר
+        my_env = os.environ.copy()
+        
+        # הוספה ל-PATH כדי ש-PowerShell יזהה את הפקודה 'magick'
+        my_env["PATH"] = im_dir + os.pathsep + my_env["PATH"]
+        
+        # משתנים קריטיים לגרסה ניידת כדי שתמצא את ה-Modules (כמו PNG decoder)
+        my_env["MAGICK_HOME"] = im_dir
+        my_env["MAGICK_CODER_MODULE_PATH"] = os.path.join(im_dir, "modules", "coders")
+        my_env["MAGICK_CONFIGURE_PATH"] = im_dir
+
+        # בדיקה שהסקריפט קיים
+        if not os.path.exists(ps_script):
+            print(f"[WARNING] textcleaner.ps1 not found via path: {ps_script}")
+            return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # הפקודה המלאה
+        cmd = [
+            "powershell.exe",
+            "-NoProfile", 
+            "-ExecutionPolicy", "Bypass", 
+            "-File", ps_script,
+            "-InputFile", temp_in,
+            "-OutputFile", temp_out,
+            "-Grayscale",
+            "-Enhance", "stretch",
+            "-FilterSize", "25",
+            "-Offset", "10",
+            "-Sharpen", "1"
+        ]
+
+        try:
+            # מריצים עם הפרמטר env=my_env
+            sp.run(cmd, check=True, env=my_env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+
+            if os.path.exists(temp_out):
+                cleaned_img = cv2.imread(temp_out)
+                # ניקוי קבצים זמניים
+                try:
+                    os.remove(temp_in)
+                    os.remove(temp_out)
+                except: pass
+                
+                if cleaned_img is None:
+                    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    
+                return cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY)
+            else:
+                print("Error: Output file not created by script.")
+                return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        except Exception as e:
+            # הדפסת שגיאה מפורטת רק אם זה נכשל
+            print(f"PowerShell TextCleaner failed: {e}")
+            return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
 
     def clean_ocr_text(self, text):
-        text = text.replace('|', '1').replace('l', '1').replace('I', '1').replace(']', '1').replace('[', '1').replace('n', 'ח')
-        text = text.replace('o', '0').replace('O', '0').replace('S', '5').replace(',', '.').replace('״', '"').replace('״', '"')
+        text = text.replace('|', '1').replace('l', '1').replace('I', '1').replace(']', '1').replace('[', '1').replace('n', 'ח').replace('\u200f', "").replace('\\', "")
+        text = text.replace('o', '0').replace('O', '0').replace('S', '5').replace(',', '.').replace('״', '"').replace('״', '"').replace('/', '7').replace('D', 'ק').replace('_', '')
+        text = text.replace('T', 'ק').replace('Z', '2').replace('z', '2').replace('B', '8').replace('G', '6').replace('a', 'ג').replace('y', 'ק').replace('p', 'ק')
+        text = 'פלפל' if text == '7979' else text
         return text
 
     def parse_receipt(self, file_path):
@@ -96,18 +194,26 @@ class ReceiptParser:
             print(f"Analyzing Page {i+1}...")
             # מעבירים את הפריט (תמונה או DataFrame) ואת הדגל
             page_data = self._process_single_page(item, is_digital)
-            
+            self.table_started_global = False  # איפוס לדף הבא
             all_results["header"].extend(page_data["header"])
             all_results["products"].extend(page_data["products"])
             all_results["chain name"] = page_data["chain name"] or all_results["chain name"]
         
-        # --- לוגיקה חדשה: אם לא מצאנו שם רשת בטקסט, סורקים את הלוגו ---
+        # --- אם לא מצאנו שם רשת בטקסט, סורקים את הלוגו ---
         if (not all_results["chain name"] or all_results["chain name"] == "רשת לא מזוהה") and is_digital and file_path.lower().endswith('.pdf'):
             print("Chain name not found in text layer. Scanning header image (OCR)...")
             detected_chain = self._extract_chain_from_header_image(file_path)
             if detected_chain:
                 print(f"Success! Found chain in header image: {detected_chain}")
                 all_results["chain name"] = detected_chain
+        
+        if os.path.exists("page_temp_in.png"):
+            try: os.remove("page_temp_in.png")
+            except: pass
+
+        if os.path.exists("page_temp_out.png"):
+            try: os.remove("page_temp_out.png")
+            except: pass
             
         return all_results
     
@@ -131,7 +237,7 @@ class ReceiptParser:
             processed_header = self.enhance_image(header_crop)
             
             # ביצוע OCR
-            text = pytesseract.image_to_string(processed_header, lang='heb+eng', config='--psm 6')
+            text = pytesseract.image_to_string(processed_header, lang='heb', config='--psm 6')
             
             # חיפוש ברשימת הרשתות
             # מנקים שורות חדשות כדי לאחד הכל לשורה אחת ארוכה לחיפוש
@@ -178,27 +284,39 @@ class ReceiptParser:
             'סה"כ', 'מע"מ', 'מזומן', 'אשראי', 'חתימה', 'לקוח', 'עמוד', 'דף', 
             'סוכן', 'אספקה', 'חוסרים', 'ממחסן', 'ויזה', 'כאל', 'שיק', 'בנק', 'בבית'
         ]
+        stop_keywords = ['סה"כ לתשלום', 'סה"כ כולל מע"מ', 'כרטיס', 'ויזה', 'שיק', 'מאסטרקארד', 'אשראי', 'חוסרים', 'וויזה', 'כאל']
 
         chain_name_found = False
         ch = ""
 
 
-        for line_id, group in df.groupby('line_group'):
+        for _, group in df.groupby('line_group'):
             row_words = group.sort_values('left')
-            conf = row_words['conf'].astype(float).mean() if 'conf' in row_words.columns else 100.0
-            reversed_row_list = row_words['text'].to_list()[::-1] if not is_digital else [str(w)[::-1] if not (re.match(r'\b(\d+\.\d{2,3})\b', str(w)) or str(w).isdigit()) else str(w) for w in row_words['text'].to_list()[::-1]]
-            full_line_text = " ".join(reversed_row_list) 
-            clean_line = self.clean_ocr_text(full_line_text)
+            reversed_row_list = []
+            if not is_digital:
+                for w in row_words['text'].to_list()[::-1]:
+                    cleaned_word = self.clean_ocr_text(w)
+                    if cleaned_word and cleaned_word != '':
+                        reversed_row_list.append(cleaned_word)
+            else:
+                for w in row_words['text'].to_list()[::-1]:
+                    cleaned_word = self.clean_ocr_text(str(w)[::-1]) if not (re.match(r'\b(\d+\.\d{2,3})\b', str(w)) or str(w).isdigit()) else str(w)
+                    if cleaned_word and cleaned_word != '':
+                        reversed_row_list.append(cleaned_word)
 
-            to_print = [f"[{i}] {w}" for i, w in enumerate(clean_line.split(" "))]
+            full_line_text = " ".join(reversed_row_list)
+
+            to_print = [f"[{i}] {w}" for i, w in enumerate(reversed_row_list)]
             # הדפסה לדיבוג - כדי לראות מה הוא קורא
-            print(f"DEBUG Line: confident?:{conf} Words: {to_print}")
+            print(f"DEBUG Line: {to_print}")
 
             if not chain_name_found:
-                ch = self._chain_name_in_line(clean_line)
+                ch = self._chain_name_in_line(full_line_text)
                 if ch != "רשת לא מזוהה":
                     chain_name_found = True
 
+            if self.table_ended_global:
+                continue
             # --- תיקון: בדיקת תחילת טבלה *לפני* הסינון הגלובלי ---
             # זה מונע את המצב שבו המילה "מע"מ" בכותרת גורמת לדילוג על פתיחת הטבלה
             if not self.table_started_global:
@@ -210,14 +328,19 @@ class ReceiptParser:
                     continue 
 
                 # 2. האם זה ברקוד 729? (גיבוי למקרה שהכותרת לא זוהתה)
-                if re.search(r'\b729\d{9,10}\b', clean_line):
+                if re.search(r'\b729\d{9,10}\b', full_line_text):
                     self.table_started_global = True
-                    print("Table started by 729 Barcode") # לדיבוג
                     # לא עושים continue כי השורה הזו היא כבר מוצר!
                 else:
                     # אם הטבלה עוד לא התחילה וזו לא כותרת ולא מוצר 729 - זה זבל
                     header_lines.append(full_line_text)
                     continue
+
+            if any(s in full_line_text for s in stop_keywords):
+                print(f"Table ended by Stop Keywords: {full_line_text}") 
+                self.table_ended_global = True # חשוב: מסמן שהטבלה נגמרה
+                # אופציונלי: אם אתה רוצה להפסיק לעבד את העמוד הזה לגמרי:
+                break
             
             # --- לוגיקת HEADER SKIP (עכשיו היא רצה רק בתוך הטבלה או בדפים הבאים) ---
             if any(k in full_line_text for k in global_skip_keywords):
@@ -228,18 +351,32 @@ class ReceiptParser:
             if len(reversed_row_list) < 5:
                 continue
                     
-            barcode = reversed_row_list[1] 
-            
-            # הגנה: אם הברקוד לא ספרתי, דלג
-            if not str(barcode).isdigit() or len(barcode) < 2: # המרה ל-str ליתר ביטחון
-                print(f"Skipping line due to invalid barcode: {barcode}")
+            barcode = None
+            possible_barcodes = []
+
+            for w in reversed_row_list:
+                if w.isdigit():
+                    possible_barcodes.append(w)
+                else:
+                    break
+
+            if not possible_barcodes:
+                continue
+
+            if len(possible_barcodes) > 1:
+                barcode = possible_barcodes[1]
+            else:
+                barcode = possible_barcodes[0]
+
+            if not barcode or len(str(barcode)) < 2:
+                # print(f"Skipping line due to invalid barcode: {barcode}")
                 continue
 
             quantity = 1.0
             unit_type = ""
 
             def found_kg(line):
-                kgs = ["קג", 'ק"ג', "קילוגרם", "קילוגרמים", 'קילו', "גק", 'ג"ק', 'םרגוליק', 'םימרגוליק', "וליק"]
+                kgs = ["קג", 'ק"ג', "קילוגרם", "קילוגרמים", 'קילו', "גק", 'ג"ק', 'םרגוליק', 'םימרגוליק', "וליק", 'ה"ג', 'הג', 'גה', 'ג"ה']
                 for w in line:
                     for k in kgs:
                         if k in w: return True
@@ -289,19 +426,3 @@ class ReceiptParser:
             if chain in line:
                 return chain
         return "רשת לא מזוהה"
-
-if __name__ == "__main__":
-    parser = ReceiptParser()
-    file_path = r'C:\Users\User\final_project\StockUp\src\infrastructure\scanner\reciept_rami_levi_full_2.pdf'
-    
-    try:
-        data = parser.parse_receipt(file_path)
-        print(f"\nFound {len(data['products'])} products in chain: {data['chain name'][::-1] if data['chain name'] else 'Unknown'}\n")
-        print("="*80)
-        print(f"| {'Barcode':<15} | {'Qty':<5} | {'Unit':<6} | {'Original Line'}")
-        print("="*80)
-        for p in data['products']:
-            orig = get_display(p['line'])
-            print(f"| {p['barcode']:<15} | {p['quantity']:<5} | {p['unit']:<6} | {orig}")
-    except Exception as e:
-        print(f"\n[FATAL ERROR] {e}")
