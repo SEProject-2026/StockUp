@@ -143,7 +143,7 @@ class ReceiptScanner:
             "-OutputFile", temp_out,
             "-Grayscale",
             "-Enhance", "stretch",
-            "-FilterSize", "25",
+            "-FilterSize", "15",
             "-Offset", "10",
             "-Sharpen", "1"
         ]
@@ -378,6 +378,8 @@ class ReceiptScanner:
             if not barcode or len(str(barcode)) < 2:
                 # print(f"Skipping line due to invalid barcode: {barcode}")
                 continue
+            
+            barcode = self.smart_fix_barcode(barcode)
 
             quantity = 1.0
             unit_type = ""
@@ -418,12 +420,54 @@ class ReceiptScanner:
 
         return {"chain name": ch, "header": header_lines, "products": products}
     
+    def validate_ean13(self, barcode):
+        """בודק אם ספרת הביקורת של הברקוד תקינה"""
+        if len(barcode) != 13 or not barcode.isdigit(): return False
+        digits = [int(d) for d in barcode]
+        checksum = digits[-1]
+        total = sum(d * (1 if i % 2 == 0 else 3) for i, d in enumerate(digits[:-1]))
+        calculated = (10 - (total % 10)) % 10
+        return checksum == calculated
+
+    def smart_fix_barcode(self, broken_barcode):
+        """מנסה לתקן ברקוד שגוי על ידי החלפת ספרות דומות"""
+        # אם הברקוד כבר תקין, תחזיר אותו
+        if self.validate_ean13(broken_barcode):
+            return broken_barcode
+
+        # מילון החלפות נפוצות
+        confusions = {
+            '8': '6', '6': '8',
+            '1': '4', '4': '1',
+            '7': '1', # לפעמים קורה
+            '0': '8'  # לפעמים קורה
+        }
+
+        # מנסים להחליף כל ספרה חשודה אחת-אחת
+        chars = list(broken_barcode)
+        for i, char in enumerate(chars):
+            if char in confusions:
+                original = char
+                # החלפה
+                chars[i] = confusions[char]
+                candidate = "".join(chars)
+                
+                # בדיקה אם התיקון עבד
+                if self.validate_ean13(candidate):
+                    print(f"[SMART FIX] Changed {broken_barcode} -> {candidate}")
+                    return candidate
+                
+                # החזרה למצב קודם (Backtrack) כדי לנסות את הספרה הבאה
+                chars[i] = original
+
+        return broken_barcode # אם לא הצלחנו לתקן
+    
     def _chain_name_in_line(self, line: str) -> str:
         retail_chains_map = {
                 "קינג סטור": "King Store",
                 "מעיין אלפיים": "Maayan 2000",
                 "גוד פארם": "Good Pharm",
-                "קרפור": "Carrefour",
+                "קרפור": "carrefour",
                 "קוויק": "Quik",
                 "ביתן אונליין": "Bitan Online",
                 "יינות ביתן": "Yeinot Bitan",
@@ -431,20 +475,20 @@ class ReceiptScanner:
                 "דור אלון": "Dor Alon",
                 "אלונית": "Alonit",
                 "וולט": "Wolt",
-                "ויקטורי": "Victory",
+                "ויקטורי": "victory",
                 "זול ובגדול": "Zol VeBegadol",
                 "ח. כהן": "H. Cohen",
-                "טיב טעם": "Tiv Taam",
-                "מחסני השוק": "Machsanei HaShouk",
+                "טיב טעם": "tivtaam",
+                "מחסני השוק": "mck",
                 "חצי חינם": "Hatzi Hinam",
-                "יוחננוף": "Yochananof",
-                "אושר עד": "Osher Ad",
+                "יוחננוף": "yohananof",
+                "אושר עד": "osherad",
                 "נתיב החסד": "Nativ HaChessed",
                 "ברכל": "BarKol",
-                "סאלח דבאח": "Saleh Dabach",
+                "סאלח דבאח": "salachd",
                 "סופר ספיר": "Super Sapir",
                 "סופר פארם": "Super-Pharm",
-                "סיטי מרקט": "City Market",
+                "סיטי מרקט": "citymarket",
                 "סטופ מרקט": "Stop Market",
                 "עוף והודו ברקת": "Of VeHodu Bareket",
                 "פוליצר": "Polizer",
@@ -452,10 +496,10 @@ class ReceiptScanner:
                 "סופר יודה": "Super Yuda",
                 "פרשמרקט": "Freshmarket",
                 "משנת יוסף": "Mishnat Yosef",
-                "קשת טעמים": "Keshet Teamim",
-                "רמי לוי": "Rami Levy",
+                "קשת טעמים": "keshet",
+                "רמי לוי": "ramilevi",
                 "סופר קופיקס": "Super Cofix",
-                "שופרסל": "Shufersal",
+                "שופרסל": "shufersal",
                 "Be": "Be",
                 "שוק העיר": "Shouk HaIr",
                 "שפע ברכת השם": "Shefa Birkat Hashem"
