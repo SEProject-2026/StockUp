@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 
-from src.api.routes import auth_routes 
+from src.api.routes import auth_routes, management_routes, stock_routes
 
 
 app = FastAPI(title="StockUp API", version="1.0.0")
 
 
 app.include_router(auth_routes.router)
+app.include_router(management_routes.router)
+app.include_router(stock_routes.router)
 
 @app.get("/")
 def read_root():

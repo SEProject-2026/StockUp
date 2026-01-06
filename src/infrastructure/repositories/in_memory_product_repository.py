@@ -16,6 +16,12 @@ class InMemoryProductRepository(IProductRepository):
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[Product]: 
         return self._products_db.get(product_id)
     
+    async def get_by_name(self, home_id: uuid.UUID, name: str) -> Optional[Product]:
+        for p in self._products_db.values():
+            if p.get_home_id() == home_id and p.get_original_name() == name:
+                return p
+        return None
+    
     async def update(self, product: Product) -> None:
         if product.get_id() in self._products_db:
             self._products_db[product.get_id()] = product
@@ -41,23 +47,20 @@ class InMemoryProductRepository(IProductRepository):
 
             if p.get_home_id() != home_id:
                 continue
-            name_match = query in p.get_name().lower()
+            name_match = query in p.get_original_name().lower()
             nickname_match = p.get_nickname() and query in p.get_nickname().lower()
             
             if name_match or nickname_match:
                 results.append(p)
         return results
 
-    async def get_by_expiration_filter(self, home_id: uuid.UUID, filter_type: ExpirationType) -> List[Product]:
+    # might need to implement or delete if not needed later, for now same as list_all_by_home    
+    async def get_by_expiration_filter(self, home_id: uuid.UUID, home_expiration_range: int, filter_type: ExpirationType) -> List[Product]:
         results = []
-
         for p in self._products_db.values():
             if p.get_home_id() != home_id:
                 continue
-            
-            exp_type = p.get_expiration_type()
-            if exp_type == filter_type:
-                results.append(p)
+            results.append(p)
         return results
     
     async def get_by_location(self, home_id: uuid.UUID, location: LocationType) -> List[Product]:

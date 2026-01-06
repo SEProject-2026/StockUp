@@ -1,195 +1,388 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useInventory, Category } from "../../src/context/inventory-context";
 import { LinearGradient } from "expo-linear-gradient";
 
-import ItemForm from "@/src/components/add-item/ItemForm";
-import PrimaryButton from "@/src/ui/PrimaryButton";
 import ScreenHeader from "@/src/layout/ScreenHeader";
+import PrimaryButton from "@/src/ui/PrimaryButton";
+import { addProduct } from "@/src/api/stock";
 
-const BRAND_PRIMARY = "#0284C7";
-const BRAND_TEXT = "#111827";
+import { CATEGORY_OPTIONS, routeToCategory, locationMap } from "@/src/components/add-item/types";
+import type { Category, DraftItem } from "@/src/components/add-item/types";
 
-export default function AddItemScreen() {
-  const { addItem } = useInventory();
-  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+import ProductDraftCard from "@/src/components/add-item/ProductDraftCard";
+import PendingList from "@/src/components/add-item/PendingList";
+import CategoryPickerModal from "@/src/components/add-item/CategoryPickerModal";
+import BarcodeScannerModal from "@/src/components/add-item/BarcodeScannerModal";
+import DatePickerModal from "@/src/components/add-item/DatePickerModal";
+
+import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
+import { searchCatalog, getCatalogByBarcode, type CatalogItem } from "@/src/api/catalog";
+
+const BRAND_BG = "#F4F4F4";
+
+function uid() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+function normalizeCatalogList(raw: any): CatalogItem[] {
+  const arr =
+    Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.results)
+      ? raw.results
+      : [];
+
+  return arr
+    .map((x: any) => ({
+      name: x.name ?? x.product_name ?? x.original_name ?? "",
+      barcode: x.barcode ?? x.code ?? null,
+      brand: x.brand ?? null,
+      chain: x.chain ?? null,
+    }))
+    .filter((x: CatalogItem) => x.name);
+}
+
+function normalizeCatalogOne(raw: any): CatalogItem | null {
+  if (!raw) return null;
+  const name = raw.name ?? raw.product_name ?? raw.original_name ?? "";
+  if (!name) return null;
+  return {
+    name,
+    barcode: raw.barcode ?? raw.code ?? null,
+    brand: raw.brand ?? null,
+    chain: raw.chain ?? null,
+  };
+}
+
+export default function BatchAddItemsScreen() {
+  const { homeId, category: categoryParam } = useLocalSearchParams<{ homeId?: string; category?: string }>();
   const currentHomeId = homeId ? String(homeId) : "";
+
+  const initialCategory = useMemo<Category>(() => routeToCategory(categoryParam), [categoryParam]);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [barcode, setBarcode] = useState("");
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
+
   const [quantity, setQuantity] = useState("");
-  const [category, setCategory] = useState<Category>("fridge");
+  const [category, setCategory] = useState<Category>(initialCategory);
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const onChangeDate = (event: any, selectedDate?: Date) => {
-    // On Android: close only when the user presses "OK"
-    if (Platform.OS === "android") {
-      if (event.type === "set" && selectedDate) {
-        setExpiresAt(selectedDate);
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
+
+  const [suggestions, setSuggestions] = useState<CatalogItem[]>([]);
+  const [nameLoading, setNameLoading] = useState(false);
+
+  const [pending, setPending] = useState<DraftItem[]>([]);
+
+  const [catOpen, setCatOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+
+  const selectedName = selectedCatalogItem?.name ?? name.trim();
+  const canAddToList = selectedName.length > 0 && Number(quantity) > 0;
+
+  const debouncedName = useDebouncedValue(name.trim(), 250);
+  const debouncedBarcode = useDebouncedValue(barcode.trim(), 300);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (editingId) return;
+      if (debouncedBarcode.length < 8) return;
+
+      try {
+        const resp = await getCatalogByBarcode(debouncedBarcode);
+        if (cancelled) return;
+
+        const item = normalizeCatalogOne(resp.data);
+        if (item?.name) {
+          setSelectedCatalogItem(item);
+          if (item.barcode) setBarcode(item.barcode);
+          setSuggestions([]);
+          setName("");
+        }
+      } catch {}
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedBarcode, editingId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (editingId) {
+        setSuggestions([]);
+        return;
       }
-      setShowDatePicker(false);
-    } else {
-      if (selectedDate) {
-        setExpiresAt(selectedDate);
+
+      if (selectedCatalogItem) {
+        setSuggestions([]);
+        return;
       }
-    }
-  };
 
-   const onAdd = () => {
-    if (!currentHomeId) {
-      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
-      return;
-    }
+      if (debouncedName.length < 2) {
+        setSuggestions([]);
+        return;
+      }
 
-    if (!name.trim()) {
-      Alert.alert("שגיאה", "חייב להיות שם מוצר");
-      return;
-    }
+      setNameLoading(true);
+      try {
+        const resp = await searchCatalog(debouncedName);
+        if (cancelled) return;
+
+        const items = normalizeCatalogList(resp.data);
+        setSuggestions(items.slice(0, 10));
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setNameLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedName, editingId, selectedCatalogItem]);
+
+  function resetDraft(keepCategory = true) {
+    setEditingId(null);
+    setBarcode("");
+    setName("");
+    setNickname("");
+    setQuantity("");
+    if (!keepCategory) setCategory(initialCategory);
+    setExpiresAt(undefined);
+
+    setSelectedCatalogItem(null);
+    setSuggestions([]);
+    setNameLoading(false);
+  }
+
+  function loadItemToDraft(item: DraftItem) {
+    setEditingId(item.id);
+    setBarcode(item.barcode ?? "");
+    setSelectedCatalogItem(null);
+    setName(item.name);
+    setNickname(item.nickname ?? "");
+    setQuantity(String(item.quantity));
+    setCategory(item.category);
+    setExpiresAt(item.expiresAt);
+
+    setSuggestions([]);
+    setNameLoading(false);
+  }
+
+  function upsertDraftToList() {
+    if (!canAddToList) return;
+
     const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0) {
+    if (Number.isNaN(qty) || qty <= 0) {
       Alert.alert("שגיאה", "כמות חייבת להיות מספר חיובי");
       return;
     }
 
-    const formattedExpires = expiresAt
-      ? expiresAt.toISOString().slice(0, 10)
-      : undefined;
+    const finalName = (selectedCatalogItem?.name ?? name.trim()).trim();
 
-    addItem({
-      name: name.trim(),
-      category,
+    const newItem: DraftItem = {
+      id: editingId ?? uid(),
+      barcode: barcode.trim() ? barcode.trim() : null,
+      name: finalName,
+      nickname: nickname.trim() ? nickname.trim() : null,
       quantity: qty,
-      expiresAt: formattedExpires,
-      homeId: currentHomeId,
+      category,
+      expiresAt,
+    };
+
+    setPending((prev) => {
+      const exists = prev.some((x) => x.id === newItem.id);
+      if (!exists) return [newItem, ...prev];
+      return prev.map((x) => (x.id === newItem.id ? newItem : x));
     });
 
-    router.back();
-  };
+    resetDraft(true);
+  }
+
+  function removeFromList(id: string) {
+    setPending((prev) => prev.filter((x) => x.id !== id));
+    if (editingId === id) resetDraft(true);
+  }
+
+  async function onBulkAdd() {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
+      return;
+    }
+    if (pending.length === 0) {
+      Alert.alert("אין מוצרים", "הוסיפי לפחות מוצר אחד לרשימה לפני שמירה.");
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      pending.map(async (item) => {
+        const formattedExpires = item.expiresAt ? item.expiresAt.toISOString().slice(0, 10) : undefined;
+
+        const res = await addProduct(currentHomeId, {
+          name: item.name,
+          quantity: item.quantity,
+          barcode: item.barcode ? item.barcode : null,
+          expiration_date: formattedExpires,
+          location: locationMap[item.category],
+          nickname: item.nickname ?? null,
+        });
+
+        if (res.status !== "success") throw new Error(res.message ?? "הוספה נכשלה");
+        return true;
+      })
+    );
+
+    const successCount = results.filter((r) => r.status === "fulfilled").length;
+    const failCount = results.length - successCount;
+
+    if (failCount === 0) {
+      Alert.alert("הצלחה!", `נוספו ${successCount} מוצרים למלאי.`);
+      router.back();
+      return;
+    }
+
+    const failedIds: string[] = [];
+    results.forEach((r, idx) => {
+      if (r.status === "rejected") failedIds.push(pending[idx].id);
+    });
+    setPending((prev) => prev.filter((x) => failedIds.includes(x.id)));
+
+    Alert.alert("בוצע חלקית", `נוספו ${successCount} מוצרים.\nנכשלו ${failCount} — השארתי אותם ברשימה לנסות שוב.`);
+  }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient
-          colors={["#E5F3FF", "#F4F4F4"]}
+          colors={["#E5F3FF", BRAND_BG]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
-          style={styles.gradientBackground}
+          style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
 
-        {/* Header */}
-        <ScreenHeader
-          title="הוספת מוצר"
-          onBack={() => router.back()}
-        />
+        <ScreenHeader title="הוספה מרובה" onBack={() => router.back()} />
 
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ItemForm
-            category={category}
-            onChangeCategory={setCategory}
-            expiresAt={expiresAt}
-            showDatePicker={showDatePicker}
-            onOpenDatePicker={() => setShowDatePicker(true)}
-            onChangeDate={onChangeDate}
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ProductDraftCard
+            editing={!!editingId}
             barcode={barcode}
             name={name}
+            nickname={nickname}
             quantity={quantity}
+            category={category}
+            expiresAt={expiresAt}
+            categoryOptions={CATEGORY_OPTIONS}
             onChangeBarcode={setBarcode}
-            onChangeName={setName}
+            onChangeName={(v) => {
+              setName(v);
+              if (selectedCatalogItem) setSelectedCatalogItem(null);
+              if (v.trim().length < 2) setSuggestions([]);
+            }}
+            onChangeNickname={setNickname}
             onChangeQuantity={setQuantity}
+            onPressCategory={() => setCatOpen(true)}
+            onPressScan={() => setScanOpen(true)}
+            onPressDate={() => setDateOpen(true)}
+            onClearDate={() => setExpiresAt(undefined)}
+            onAddToList={upsertDraftToList}
+            onCancelEdit={() => resetDraft(true)}
+            addDisabled={!canAddToList}
+            suggestions={suggestions}
+            nameLoading={nameLoading}
+            selectedCatalogItem={selectedCatalogItem}
+            onClearSelectedCatalogItem={() => setSelectedCatalogItem(null)}
+            onPickSuggestion={(item) => {
+              setSelectedCatalogItem(item);
+              if (item.barcode) setBarcode(item.barcode);
+              setSuggestions([]);
+              setName("");
+            }}
           />
+
+          <PendingList
+            items={pending}
+            categoryOptions={CATEGORY_OPTIONS}
+            onEdit={loadItemToDraft}
+            onRemove={removeFromList}
+          />
+
+          <View style={{ height: 90 }} />
         </ScrollView>
 
-        {/* save button */}
-      <PrimaryButton title="שמירה למלאי" onPress={onAdd} style={styles.addButton} />
+        <View style={styles.bottomBar}>
+          <PrimaryButton
+            title={`הוספה למלאי (${pending.length})`}
+            onPress={onBulkAdd}
+            disabled={pending.length === 0}
+            style={[styles.saveButton, pending.length === 0 && { opacity: 0.55 }]}
+          />
+        </View>
 
+        <CategoryPickerModal
+          open={catOpen}
+          selected={category}
+          options={CATEGORY_OPTIONS}
+          onClose={() => setCatOpen(false)}
+          onSelect={(c) => {
+            setCategory(c);
+            setCatOpen(false);
+          }}
+        />
+
+        <BarcodeScannerModal
+          open={scanOpen}
+          onClose={() => setScanOpen(false)}
+          onScanned={(value) => setBarcode(value)}
+        />
+
+        <DatePickerModal
+          open={dateOpen}
+          value={expiresAt}
+          onClose={() => setDateOpen(false)}
+          onChange={(d) => setExpiresAt(d)}
+          onClear={() => setExpiresAt(undefined)}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
 
-/* ---------- STYLES  ---------- */
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F4F4F4",
-  },
-  gradientBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  safeArea: { flex: 1, backgroundColor: BRAND_BG },
+  content: { padding: 16, paddingBottom: 140, gap: 12 },
+
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-    justifyContent: "space-between",
+    paddingTop: 10,
+    paddingBottom: 16,
+    backgroundColor: "rgba(244,244,244,0.92)",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
-  headerIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: BRAND_TEXT,
-  },
-  container: {
-    padding: 16,
-    paddingBottom: 90,
-    gap: 12,
-  },
-  addButton: {
-    //position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
-    backgroundColor: BRAND_PRIMARY,
+  saveButton: {
+    backgroundColor: "#0284C7",
     paddingVertical: 14,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  addButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
   },
 });

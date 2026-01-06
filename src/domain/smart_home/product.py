@@ -1,8 +1,7 @@
 from datetime import date
 from typing import Optional
 from uuid import uuid4, UUID
-from src.domain.smart_home.enums import ExpirationType, LocationType, ChainType
-from src.domain.domain_exception import DomainException
+from src.domain.smart_home.enums import ExpirationType, LocationType
 
 
 class ProductBuilder:
@@ -75,8 +74,8 @@ class Product:
         self.set_nickname(nickname)
         self.set_quantity(quantity)
         self._location = location
-        self._expiration_dates_to_quantity = {}
-        self.set_expiration_date(expiration_date, quantity, expiration_range)
+        self._expiration_dates_to_quantity = {} # expiration_date: (quantity, ExpirationType)
+        self.set_expiration_date_and_type(expiration_date, quantity, expiration_range)
 
     # Getters
     def get_id(self) -> UUID:
@@ -100,8 +99,13 @@ class Product:
     def get_location(self) -> Optional[LocationType]:
         return self._location
 
-    def get_expiration_dates(self) -> Optional[date]:
+    def get_expiration_dates(self) -> dict[date, tuple[int, ExpirationType]]:
         return self._expiration_dates_to_quantity 
+    def get_expiration_type(self, expiration_date: date) -> Optional[ExpirationType]:
+        if expiration_date in self._expiration_dates_to_quantity:
+            _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
+            return expiration_type
+        return None
     
     # Setters
     def set_nickname(self, new_nickname: str) -> None:
@@ -111,7 +115,7 @@ class Product:
         if self._is_valid_name(new_nickname):
             self._nickname = new_nickname    
 
-    def set_expiration_date(self, expiration_date: Optional[date], quantity: int, expiration_range: int) -> None:
+    def set_expiration_date_and_type(self, expiration_date: Optional[date], quantity: int, expiration_range: int) -> None:
         if expiration_date is None:
             self._expiration_dates_to_quantity[expiration_date] = (quantity, ExpirationType.FRESH)
         else:
@@ -127,15 +131,61 @@ class Product:
     def update_expiration_date(self, old_date: date, new_date: date, expiration_range: Optional[int]) -> None:
         if old_date in self._expiration_dates_to_quantity:
             quantity, _ = self._expiration_dates_to_quantity.pop(old_date)
-            self.set_expiration_date(new_date, quantity, expiration_range)
+            if new_date in self._expiration_dates_to_quantity:
+                existing_quantity, _ = self._expiration_dates_to_quantity[new_date]
+                quantity += existing_quantity
+            self.set_expiration_date_and_type(new_date, quantity, expiration_range)
         else:
-            raise DomainException("Old expiration date not found.")
+            raise ValueError("Old expiration date not found.")
     
     def set_quantity(self, new_quantity: int) -> None:
         if new_quantity < 0:
             raise ValueError("Quantity cannot be negative.")
         self._quantity = new_quantity
 
+    async def remove_product_date(self, expiration_date: Optional[date]) -> 'Product':
+        # case: product without expiration date
+        if expiration_date is None:
+            if None in self._expiration_dates_to_quantity:
+                date_quantity, _ = self._expiration_dates_to_quantity.pop(None)
+                self._quantity -= date_quantity
+                return self
+            else:
+                raise ValueError("Product has no item without expiration date.")
+            
+        # case: product with expiration date
+        if expiration_date in self._expiration_dates_to_quantity:
+            date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
+            del self._expiration_dates_to_quantity[expiration_date]
+            self._quantity = self._quantity - date_quantity 
+            return self
+        else:
+            raise ValueError(f"item of date {expiration_date} not found for this product.")
+        
+    async def update_date_quantity(self, expiration_date: date, new_quantity: int) -> 'Product':
+        if not isinstance(new_quantity, int):
+            raise ValueError("Quantity must be a number.")
+        if new_quantity < 0:
+            raise ValueError("Quantity cannot be negative.")
+        elif new_quantity == 0:
+            return await self.remove_product_date(expiration_date)
+        else:
+            if expiration_date in self._expiration_dates_to_quantity:
+                _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
+                self._expiration_dates_to_quantity[expiration_date] = (new_quantity, expiration_type)
+                self._quantity = sum(q for q, _ in self._expiration_dates_to_quantity.values())
+                return self
+            else:
+                raise ValueError(f"item of date {expiration_date} not found for this product.")
+            
+    async def add_to_existing_product(self, expiration_date: date, new_quantity: int, expiration_range: int) -> None:
+        if expiration_date in self._expiration_dates_to_quantity:
+            old_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
+            await self.update_date_quantity(expiration_date, new_quantity + old_quantity)
+        else:
+            self.set_expiration_date_and_type(expiration_date, new_quantity, expiration_range)
+            self._quantity += new_quantity
+            
     def set_location(self, new_location: LocationType) -> None:
         self._location = new_location
 
@@ -150,7 +200,6 @@ class Product:
         if not clean_name.isalnum():
             raise ValueError("Nickname must contain only letters or numbers.")
         return True
-
   
     def to_dict(self) -> dict:
         return {

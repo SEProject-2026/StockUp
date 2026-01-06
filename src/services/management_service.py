@@ -18,29 +18,15 @@ class ManagementService:
     # 1. Home Management (House & Members)
     # ==========================================
 
-    async def create_home(self, user_id: UUID, home_name: str) -> Response:
-        """Creates a new home and sets the creator as ADMIN."""
-        if not user_id or not home_name or home_name.strip() == "":
-            return Response(isOk = False, error_message = "User ID and Home Name are required.")        
-        # Create Home instance
-        try:
-            new_home: Home = Home(user_id=user_id, name=home_name)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while creating the home.")
+    async def create_home(self, user_id: UUID, home_name: str) -> Home:
+        """
+        Creates a new home.
+        """
+        new_home = Home(user_id=user_id, name=home_name)
 
-        # Save to repository
-        try:
-            await self._home_repository.save(new_home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while saving the home.")
-        data = new_home.get_home_details(user_id)
-        data["message"] = "Home created successfully."
-        return Response(
-            isOk = True,
-            data = data
-        )
+        await self._home_repository.save(new_home)
+        
+        return new_home
 
     async def view_home_code(self, user_id: UUID, home_id: UUID) -> Response:
         """Retrieves the home join code (Admin only)."""
@@ -286,7 +272,7 @@ class ManagementService:
         
         return Response(isOk = True, data = home_details)
     
-    async def get_all_homes_for_user(self, user_id: UUID) -> Response:
+    async def get_all_homes_for_user(self, user_id: UUID) -> List[Home]:
         """Retrieves a list of all homes the user is a member of."""
         if not user_id:
             return Response(isOk = False, error_message = "User ID is required.") 
@@ -296,8 +282,4 @@ class ManagementService:
             print(e)
             return Response(isOk = False, error_message = "An internal error occurred while retrieving homes.")
         
-        home_dict = {}
-        for home in homes:
-            home_dict[home.get_id()] = home.get_name()
-
-        return Response(isOk = True, data = home_dict)
+        return homes

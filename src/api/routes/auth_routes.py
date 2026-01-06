@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from src.api.schemas import (
+from src.api.schemas.user_schemas import (
+    UserDTO,
     RegisterRequest, 
     LoginRequest, 
     LoginResponse, 
-    GeneralResponse, 
-    UserDTO,
-    UpdateNameRequest,
+    UpdateNameRequest, 
     ChangePasswordRequest
 )
+from src.api.schemas.common import GeneralResponse
+
 from src.infrastructure.app_container import AppContainer
-from src.api.security import get_current_user_id
+from src.api.security import get_current_user_id 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -25,6 +26,7 @@ async def register(request: RegisterRequest):
         user = await user_service.register(
             email=request.email, 
             password=request.password, 
+            confirm_password=request.password_confirm,
             name=request.name
         )
         

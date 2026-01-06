@@ -1,276 +1,220 @@
-// components/inventory/EditItemModal.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   View,
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
+  Pressable,
+  KeyboardAvoidingView,
   Platform,
-  Alert,
+  TouchableOpacity,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { InventoryItem } from "@/src/context/inventory-context";
-
-const BRAND_BLUE_SOFT = "#F0FAFF";
-const BRAND_TEXT = "#111827";
-const BRAND_MUTED = "#6B7280";
 
 type Props = {
   visible: boolean;
-  item: InventoryItem | null;
+  item: any | null;
   onClose: () => void;
-  onSave: (
-    id: string,
-    values: { name: string; quantity: number; expiresAt?: string }
-  ) => void;
+  onSave: (rowId: string, values: { name: string; quantity: number; expiresAt?: string }) => Promise<void> | void;
 };
 
-export const EditItemModal: React.FC<Props> = ({
-  visible,
-  item,
-  onClose,
-  onSave,
-}) => {
+function pickString(...vals: any[]) {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim().length) return v;
+  }
+  return "";
+}
+
+export function EditItemModal({ visible, item, onClose, onSave }: Props) {
+  const rowId = useMemo(() => {
+    const v =
+      item?.id ??
+      item?.rowId ??
+      item?.key ??
+      item?.itemId ??
+      item?.productItemId ??
+      item?.product_item_id ??
+      "";
+    return String(v ?? "");
+  }, [item]);
+
+  const initialName = useMemo(
+    () =>
+      pickString(
+        item?.nickname,
+        item?.name,
+        item?.displayName,
+        item?.display_name,
+        item?.original_name,
+        item?.originalName
+      ),
+    [item]
+  );
+
+  const initialQty = useMemo(() => {
+    const v = item?.quantity;
+    return typeof v === "number" && v > 0 ? String(v) : "1";
+  }, [item]);
+
+  const initialExp = useMemo(() => {
+    const v = item?.expirationDate ?? item?.expiration_date ?? item?.expiresAt ?? "";
+    return typeof v === "string" ? v : "";
+  }, [item]);
+
   const [name, setName] = useState("");
-  const [qty, setQty] = useState("");
-  const [expiresAt, setExpiresAt] = useState<Date | undefined>();
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [qty, setQty] = useState("1");
+  const [exp, setExp] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (item) {
-      setName(item.name);
-      setQty(String(item.quantity));
-      setExpiresAt(item.expiresAt ? new Date(item.expiresAt) : undefined);
-    } else {
-      setName("");
-      setQty("");
-      setExpiresAt(undefined);
-      setShowDatePicker(false);
-    }
-  }, [item, visible]);
+    if (!visible) return;
+    setName(initialName);
+    setQty(initialQty);
+    setExp(initialExp);
+    setSaving(false);
+  }, [visible, initialName, initialQty, initialExp]);
 
-  const handleChangeDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS === "android") {
-      if (selectedDate) setExpiresAt(selectedDate);
-      setShowDatePicker(false);
-    } else {
-      if (selectedDate) setExpiresAt(selectedDate);
-    }
-  };
+  if (!visible) return null;
 
-  const handleSave = () => {
-    if (!item) return;
-
-    if (!name.trim()) {
-      Alert.alert("שגיאה", "חייב להיות שם מוצר");
-      return;
-    }
-    const parsedQty = parseInt(qty, 10);
-    if (!Number.isInteger(parsedQty) || parsedQty <= 0) {
-      Alert.alert("שגיאה", "כמות חייבת להיות מספר שלם וחיובי");
-      return;
-    }
-
-    const formattedExpires = expiresAt
-      ? expiresAt.toISOString().slice(0, 10)
-      : undefined;
-
-    onSave(item.id, {
-      name: name.trim(),
-      quantity: parsedQty,
-      expiresAt: formattedExpires,
-    });
-  };
+  const qtyNum = Number(qty);
+  const canSave = rowId.length > 0 && Number.isFinite(qtyNum) && qtyNum > 0 && !saving;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>עריכת מוצר</Text>
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
+          <View style={styles.card}>
+            <View style={styles.header}>
+              <Text style={styles.title}>עדכון מוצר</Text>
+              <TouchableOpacity onPress={onClose} style={styles.iconBtn} activeOpacity={0.85}>
+                <Ionicons name="close" size={18} color="#111827" />
+              </TouchableOpacity>
+            </View>
 
-          <Text style={styles.modalLabel}>שם המוצר</Text>
-          <TextInput
-            style={styles.modalInput}
-            value={name}
-            onChangeText={setName}
-            placeholder="שם המוצר"
-            placeholderTextColor="#9CA3AF"
-            textAlign="right"
-          />
-
-          <Text style={styles.modalLabel}>כמות</Text>
-          <TextInput
-            style={styles.modalInput}
-            value={qty}
-            onChangeText={setQty}
-            keyboardType="numeric"
-            placeholder="כמות"
-            placeholderTextColor="#9CA3AF"
-            textAlign="right"
-          />
-
-          <Text style={styles.modalLabel}>תאריך תוקף</Text>
-          <TouchableOpacity
-            style={styles.modalDateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Ionicons name="time-outline" size={18} color={BRAND_MUTED} />
-            <Text style={styles.modalDateButtonText}>
-              {expiresAt
-                ? expiresAt.toLocaleDateString("he-IL")
-                : "בחר תאריך (לא חובה)"}
-            </Text>
-          </TouchableOpacity>
-
-          {showDatePicker && (
-            <View style={styles.datePickerWrapper}>
-              <DateTimePicker
-                value={expiresAt || new Date()}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={handleChangeDate}
-                locale="he-IL"
-                minimumDate={new Date()}
-                {...(Platform.OS === "ios" ? { themeVariant: "dark" } : {})}
+            <View style={styles.field}>
+              <Text style={styles.label}>שם תצוגה</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="למשל: חלב טרה"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input}
+                textAlign="right"
               />
             </View>
-          )}
 
-          <View style={styles.modalButtonsRow}>
-            <TouchableOpacity style={styles.modalButton} onPress={onClose}>
-              <Text style={styles.modalButtonText}>ביטול</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonPrimary]}
-              onPress={handleSave}
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>כמות</Text>
+                <TextInput
+                  value={qty}
+                  onChangeText={setQty}
+                  keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+                  placeholder="1"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  textAlign="right"
+                />
+              </View>
+
+              <View style={{ width: 10 }} />
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>תוקף (YYYY-MM-DD)</Text>
+                <TextInput
+                  value={exp}
+                  onChangeText={setExp}
+                  placeholder="2026-01-05"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  textAlign="right"
+                />
+              </View>
+            </View>
+
+            <Pressable
+              disabled={!canSave}
+              style={[styles.saveBtn, !canSave && { opacity: 0.55 }]}
+              onPress={async () => {
+                try {
+                  setSaving(true);
+                  const finalName = name.trim().length ? name.trim() : initialName;
+                  const finalExp = exp.trim().length ? exp.trim() : undefined;
+
+                  await onSave(rowId, {
+                    name: finalName,
+                    quantity: qtyNum,
+                    expiresAt: finalExp,
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              }}
             >
-              <Text
-                style={[
-                  styles.modalButtonText,
-                  styles.modalButtonTextPrimary,
-                ]}
-              >
-                שמירה
-              </Text>
-            </TouchableOpacity>
+              <Text style={styles.saveText}>{saving ? "שומר..." : "שמור"}</Text>
+            </Pressable>
+
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  modalBackdrop: {
+  backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    alignItems: "center",
-    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    padding: 16,
   },
-  modalCard: {
+  kav: { width: "100%", alignItems: "center", justifyContent: "center" },
+  card: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingBottom: 32,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: -2 },
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  modalHandle: {
-    alignSelf: "center",
-    width: 48,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: "#E5E7EB",
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "right",
-    marginBottom: 16,
-    color: BRAND_TEXT,
-  },
-  modalLabel: {
-    textAlign: "right",
-    marginTop: 8,
-    marginBottom: 4,
-    fontSize: 13,
-    color: BRAND_MUTED,
-    fontWeight: "500",
-  },
-  modalInput: {
-    borderRadius: 10,
-    backgroundColor: BRAND_BLUE_SOFT,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    maxWidth: 520,
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    padding: 12,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    fontSize: 14,
-    color: BRAND_TEXT,
   },
-  modalDateButton: {
+  header: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: BRAND_BLUE_SOFT,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  modalDateButtonText: {
-    fontSize: 14,
-    color: BRAND_TEXT,
-  },
-  datePickerWrapper: {
-    marginTop: 8,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: BRAND_BLUE_SOFT,
-    paddingVertical: 8,
-    height: 220,
-  },
-  modalButtonsRow: {
-    flexDirection: "row-reverse",
-    gap: 8,
-    marginTop: 16,
-  },
-  modalButton: {
-    flex: 1,
-    borderRadius: 999,
-    paddingVertical: 10,
+  title: { fontSize: 16, fontWeight: "800", color: "#111827", textAlign: "right" },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: BRAND_BLUE_SOFT,
+  },
+  field: { marginTop: 10 },
+  row: { flexDirection: "row-reverse", marginTop: 10 },
+  label: { fontSize: 12, color: "#6B7280", textAlign: "right", marginBottom: 6 },
+  input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
-  },
-  modalButtonPrimary: {
-    backgroundColor: "#0284C7",
-    borderColor: "#0284C7",
-  },
-  modalButtonText: {
+    backgroundColor: "#FAFAFA",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 14,
-    fontWeight: "600",
-    color: BRAND_TEXT,
+    color: "#111827",
   },
-  modalButtonTextPrimary: {
-    color: "#FFFFFF",
+  saveBtn: {
+    marginTop: 12,
+    backgroundColor: "#0284C7",
+    paddingVertical: 14,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  saveText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  debugText: { marginTop: 10, fontSize: 11, color: "#6B7280", textAlign: "right" },
 });

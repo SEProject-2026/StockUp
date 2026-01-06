@@ -3,31 +3,25 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { InventoryItem } from "../../context/inventory-context";
 
-const BRAND_YELLOW = "#3A6EA5";
-const BRAND_PINK = "#c43131ff";
-
 type Props = {
   item: InventoryItem;
   variant: "warning" | "neutral";
 };
 
-export default function HomeItemRow({ item, variant }: Props) {
-  const categoryLabel =
-    item.category === "fridge"
-      ? "מקרר"
-      : item.category === "freezer"
-      ? "מקפיא"
-      : "מזווה";
+const CATEGORY_LABELS: Record<InventoryItem["category"], string> = {
+  fridge: "מקרר",
+  freezer: "מקפיא",
+  pantry: "מזווה",
+  "cleaning supplies": "חומרי ניקוי",
+  other: "אחר",
+};
 
+export default function HomeItemRow({ item, variant }: Props) {
+  const categoryLabel = CATEGORY_LABELS[item.category] ?? "אחר";
   const isWarning = variant === "warning";
 
   return (
-    <View
-      style={[
-        styles.row,
-        isWarning && styles.rowWarning,
-      ]}
-    >
+    <View style={[styles.row, isWarning && styles.rowWarning]}>
       <View style={styles.main}>
         <View style={styles.headerRow}>
           <Text style={styles.name}>{item.name}</Text>
@@ -35,6 +29,7 @@ export default function HomeItemRow({ item, variant }: Props) {
             <Text style={styles.qtyText}>x{item.quantity}</Text>
           </View>
         </View>
+
         <View style={styles.metaRow}>
           <Text
             style={[
@@ -66,7 +61,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   rowWarning: {
-    borderColor: BRAND_YELLOW,
+    borderColor: "#3A6EA5",
   },
   main: {
     paddingHorizontal: 12,
@@ -87,7 +82,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    backgroundColor: BRAND_PINK,
+    backgroundColor: "#c43131ff",
   },
   qtyText: {
     fontSize: 11,
@@ -103,6 +98,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   metaTextWarning: {
-    color: BRAND_PINK,
+    color: "#c43131ff",
   },
 });

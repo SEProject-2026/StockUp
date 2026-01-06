@@ -1,17 +1,17 @@
 from enum import Enum
 
-class ExpirationType(Enum):
-    FRESH = "תקין"
-    GOING_TO_EXPIRE = "בקרוב יפוג"
-    EXPIRED = "פג תוקף"
+class ExpirationType(str, Enum):
+    FRESH = "FRESH"
+    GOING_TO_EXPIRE = "GOING_TO_EXPIRE"
+    EXPIRED = "EXPIRED"
 
 
-class LocationType(Enum):
-    FRIDGE = "מקרר"
-    FREEZER = "מקפיא"
-    DRY = "יבשים"
-    CLEANING_SUPPLIES = "חומרי ניקוי"
-    OTHER = "אחר"
+class LocationType(str, Enum):
+    FRIDGE = "FRIDGE"         
+    FREEZER = "FREEZER"
+    PANTRY = "PANTRY"
+    CLEANING_SUPPLIES = "CLEANING_SUPPLIES"
+    OTHER = "OTHER"
 
 class ChainType(Enum):
     SHEFA_BIRKAT_HASHEM = 0
