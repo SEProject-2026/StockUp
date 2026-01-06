@@ -104,7 +104,20 @@ class CsvCatalogProvider(ICatalogProvider):
             # 2. Fallback to global
             if not item:
                 item = self._global_map.get(barcode)
-                
+
+            # 3. Fallback to padded barcode (for weight-based items)
+            if not item and chain_name:
+                key = f"{chain_name}_{"729" + '0' * (10 - len(barcode)) + barcode}"
+                item = self._chain_map.get(key)
+                if item:
+                    item.barcode = barcode  # Adjust barcode to original
+
+            # 4. Fallback to global padded barcode
+            if not item:
+                item = self._global_map.get("729" + '0' * (10 - len(barcode)) + barcode)
+                if item:
+                    item.barcode = barcode  # Adjust barcode to original
+            
             if item:
                 results.append(item)
                 

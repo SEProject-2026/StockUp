@@ -53,29 +53,12 @@ class StockService:
     async def scan_receipt(self, user_id: UUID, home_id: UUID, file_path: Any) -> ReceiptDTO:
         """Processes a receipt image (OCR) and returns detected items for verification."""
         await self._check_access(user_id, home_id)
-
         scanner = ReceiptScanner()
-        chain_name, scanned_items = scanner.parse_receipt(file_path)  
-
-        items = await self._catalog_provider.get_items_by_barcodes( 
-            scanned_items.keys(),
-            chain_name
-        )
-
-        receipt_items_dto = [
-            ReceiptItemDTO(
-                barcode=i.barcode,
-                name=i.name,
-                quantity=scanned_items[i.barcode][0],
-                unit=scanned_items[i.barcode][1],
-            )
-            for i in items
-            if i.barcode in scanned_items  
-        ]
-
+        chain_name, scanned_items = scanner.parse_receipt(file_path)
+        items = await self._catalog_provider.get_items_by_barcodes(scanned_items.keys(), chain_name)
+        receipt_items_dto = [ReceiptItemDTO(i.barcode, i.name, scanned_items[i.barcode][0], scanned_items[i.barcode][1]) for i in items]
         receipt_dto = ReceiptDTO(uuid4(), home_id, user_id, chain_name, receipt_items_dto)
         return receipt_dto
-
         
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
         
