@@ -1,5 +1,5 @@
 // frontend/app/processing.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,11 +10,85 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+
 import InfoBox from "@/src/ui/InfoBox";
 import ScreenHeader from "@/src/layout/ScreenHeader";
+import PrimaryButton from "@/src/ui/PrimaryButton";
+
+import { getSelectedHomeId } from "../home/selected-home";
+import { scanReceipt } from "@/src/api/stock"; // ✅ תתאימי לנתיב של הקובץ שבו יש scanReceipt
 
 export default function ReceiptProcessingScreen() {
-  const { imageUri } = useLocalSearchParams<{ imageUri?: string }>();
+  const { imageUri, fileName, mimeType } = useLocalSearchParams<{
+    imageUri?: string;
+    fileName?: string;
+    mimeType?: string;
+  }>();
+
+  const [homeId, setHomeId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const id = await getSelectedHomeId();
+        if (!id) throw new Error("לא נבחר בית פעיל. חזרי למסך הבית ובחרי בית.");
+        if (mounted) setHomeId(id);
+      } catch (e: any) {
+        if (mounted) setError(e?.message ?? "שגיאה בטעינת בית נבחר");
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!homeId || !imageUri || started || error) return;
+
+    let cancelled = false;
+    setStarted(true);
+
+    (async () => {
+      try {
+        const res = await scanReceipt(homeId, {
+          fileUri: imageUri,
+          fileName: fileName ?? null,
+          mimeType: mimeType ?? null,
+        });
+
+        if (cancelled) return;
+
+        if (!res?.data) {
+          throw new Error("לא התקבלו תוצאות סריקה מהשרת");
+        }
+
+        // Navigate to review screen with the receipt payload
+        router.replace({
+          pathname: "/receipts/review",
+          params: {
+            receipt: encodeURIComponent(JSON.stringify(res.data)),
+          },
+        });
+      } catch (e: any) {
+        if (cancelled) return;
+        setError(e?.message ?? "Scanning failed");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [homeId, imageUri, fileName, mimeType, started, error]);
+
+  const onRetry = () => {
+    setError(null);
+    setStarted(false);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -29,31 +103,41 @@ export default function ReceiptProcessingScreen() {
       <ScreenHeader title="מעבד את הקבלה" onBack={() => router.back()} />
 
       <View style={styles.content}>
-        <View style={styles.loadingRow}>
-          <ActivityIndicator size="small" color="#0284C7" />
-          <Text style={styles.loadingText}>
-            קורא את הקבלה ומזהה את הפריטים...
-          </Text>
-        </View>
+        {!error ? (
+          <>
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#0284C7" />
+              <Text style={styles.loadingText}>
+                קורא את הקבלה ומזהה את הפריטים...
+              </Text>
+            </View>
 
-        {imageUri && (
-          <View style={styles.previewBox}>
-            <Text style={styles.previewTitle}>תמונה שעובדה:</Text>
-            <Image 
-              source={{ uri: imageUri }} 
-              style={styles.previewImage} />
-          </View>
+            {imageUri && (
+              <View style={styles.previewBox}>
+                <Text style={styles.previewTitle}>תמונה שעובדה:</Text>
+                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+              </View>
+            )}
+
+            <InfoBox
+              icon="bulb-outline"
+              text="בשלב הבא תוכל לראות אילו פריטים זוהו מהקבלה, לאשר או לערוך לפני עדכון המלאי."
+            />
+          </>
+        ) : (
+          <>
+            <InfoBox icon="warning-outline" text={`שגיאה בסריקה: ${error}`} />
+            <View style={{ marginTop: 16 }}>
+              <PrimaryButton title="נסה שוב" onPress={onRetry} />
+            </View>
+          </>
         )}
-
-        <InfoBox
-          icon="bulb-outline"
-          text="בשלב הבא תוכל לראות אילו פריטים זוהו מהקבלה, לאשר או לערוך לפני עדכון המלאי."
-        />
       </View>
     </SafeAreaView>
   );
 }
-// ---------- Styles ---------- 
+
+// ---------- Styles ----------
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -100,18 +184,5 @@ const styles = StyleSheet.create({
     height: 500,
     borderRadius: 12,
     backgroundColor: "#E5E7EB",
-  },
-  primaryButton: {
-    marginTop: 24,
-    alignSelf: "center",
-    backgroundColor: "#0284C7",
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
   },
 });

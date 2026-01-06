@@ -132,3 +132,52 @@ export async function filterStockByExpiration(homeId: string, type: ExpirationTy
   });
 }
 
+
+// --- Receipt Scan (OCR) ---
+
+export type DetectedReceiptItemDTO = {
+  name: string;
+  quantity: number;
+  unit_price?: number | null;
+  total_price?: number | null;
+  barcode?: string | null;
+};
+
+export type ReceiptDTO = {
+  items: DetectedReceiptItemDTO[];
+  raw_text?: string | null;
+  total?: number | null;
+};
+
+function isProbablyImage(mimeType?: string | null) {
+  return !!mimeType && mimeType.startsWith("image/");
+}
+
+export async function scanReceipt(
+  homeId: string,
+  params: {
+    fileUri: string;
+    fileName?: string | null;
+    mimeType?: string | null; 
+  }
+) {
+  const fileName =
+    params.fileName ??
+    (isProbablyImage(params.mimeType) ? "receipt.jpg" : "receipt.pdf");
+
+  const mimeType = params.mimeType ?? "application/octet-stream";
+
+  const form = new FormData();
+  form.append("file", {
+    uri: params.fileUri,
+    name: fileName,
+    type: mimeType,
+  } as any);
+
+  return stockFetch<GeneralResponse<ReceiptDTO>>(homeId, "/stock/scan", {
+    method: "POST",
+    body: form,
+  });
+}
+
+

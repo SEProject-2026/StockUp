@@ -16,9 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
 import PrimaryButton from "@/src/ui/PrimaryButton";
-// או למשל:
-// import PrimaryButton from "@/components/PrimaryButton";
-// import { PrimaryButton } from "@/components/ui/buttons";
+import { getSelectedHomeId } from "../home/selected-home";
+import { addProduct } from "@/src/api/stock"; // ✅ מהקובץ שהדבקת עם addProduct
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 const BRAND_BG = "#F4F4F4";
@@ -39,20 +38,9 @@ function uuid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-/** TODO: החליפי ל-action אמיתי אצלכם (API/Store) */
-async function addManyToHomeInventoryMock(
-  homeId: string,
-  items: Array<{ name: string; quantity: number; unit?: string }>
-) {
-  await new Promise((r) => setTimeout(r, 250));
-  return true;
-}
-
 /**
  * 👇 טריק תאימות:
- * אנחנו מעבירים גם `title` וגם `children`.
- * - אם ה-PrimaryButton שלכם בנוי עם title → הוא ישתמש ב-title ויתעלם מ-children.
- * - אם הוא בנוי עם children → הוא יציג את children ויתעלם מה-title.
+ * מעבירים גם `title` וגם `children` ל-PrimaryButton
  */
 function PrimaryButtonCompat(props: {
   title: string;
@@ -67,7 +55,6 @@ function PrimaryButtonCompat(props: {
 
   return (
     <Btn title={title} onPress={onPress} disabled={disabled}>
-      {/* אם PrimaryButton תומך children – זה ייראה טוב; אם לא – לרוב יתעלם */}
       <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8 }}>
         {leftIcon}
         <Text style={{ fontWeight: "800", color: TEXT_DARK }}>{title}</Text>
@@ -76,18 +63,65 @@ function PrimaryButtonCompat(props: {
   );
 }
 
-export default function ReceiptReviewDetectedProductsScreen() {
-  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
-  const currentHomeId = String(homeId ?? "");
+function parseReceiptParam(receiptParam?: string): any | null {
+  if (!receiptParam) return null;
+  try {
+    return JSON.parse(decodeURIComponent(receiptParam));
+  } catch {
+    return null;
+  }
+}
 
-  const [items, setItems] = useState<DetectedItem[]>([
-    { id: uuid(), name: "חלב 3%", quantity: 2, unit: "יח׳" },
-    { id: uuid(), name: "לחם מלא", quantity: 1, unit: "יח׳" },
-    { id: uuid(), name: "עגבניות", quantity: 1.2, unit: "ק״ג" },
-  ]);
+/**
+ * מנסה לחלץ מערך של פריטים מה-receipt שמגיע מהשרת.
+ * תומך בכמה מבנים נפוצים:
+ * - receipt.items
+ * - receipt.detected_items
+ * - receipt.data.items (אם עטפתם)
+ */
+function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
+  if (!receipt) return [];
+
+  const rawItems =
+    receipt.items ??
+    receipt.detected_items ??
+    receipt?.data?.items ??
+    [];
+
+  if (!Array.isArray(rawItems)) return [];
+
+  return rawItems
+    .map((it: any) => {
+      const name = String(it.name ?? it.product_name ?? it.title ?? "").trim();
+      const qRaw = it.quantity ?? it.qty ?? 1;
+      const quantity = Number(String(qRaw).replace(",", "."));
+      const unit = it.unit ? String(it.unit) : undefined;
+
+      if (!name) return null;
+      return {
+        id: uuid(),
+        name,
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        unit,
+      } as DetectedItem;
+    })
+    .filter(Boolean) as DetectedItem[];
+}
+
+export default function ReceiptReviewDetectedProductsScreen() {
+  // ✅ עכשיו אנחנו מקבלים receipt (ולא homeId)
+  const { receipt } = useLocalSearchParams<{ receipt?: string }>();
+
+  const receiptObj = useMemo(() => parseReceiptParam(receipt), [receipt]);
+
+  // ✅ init items from receipt
+  const [items, setItems] = useState<DetectedItem[]>(
+    () => mapReceiptToDetectedItems(receiptObj)
+  );
 
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const totalCount = useMemo(() => items.length, [items.length]);
 
@@ -100,19 +134,17 @@ export default function ReceiptReviewDetectedProductsScreen() {
   }
 
   async function onConfirmAddAll() {
-    if (!currentHomeId) {
-      Alert.alert("שגיאה", "חסר homeId כדי להוסיף למלאי.");
-      return;
-    }
+    if (saving) return;
+
     if (items.length === 0) {
       Alert.alert("אין מוצרים", "אין מה להוסיף למלאי.");
       return;
     }
 
+    // ולידציה
     const payload = items.map((x) => ({
       name: x.name.trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
-      unit: x.unit?.trim() || undefined,
     }));
 
     const bad = payload.find((p) => !p.name || p.quantity <= 0);
@@ -121,19 +153,43 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
+    setSaving(true);
     try {
-      await addManyToHomeInventoryMock(currentHomeId, payload);
-      Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.");
-      router.back();
-    } catch {
-      Alert.alert("נכשל", "לא הצלחנו להוסיף למלאי. נסי שוב.");
+      const homeId = await getSelectedHomeId();
+      if (!homeId) {
+        Alert.alert("שגיאה", "לא נבחר בית פעיל. חזרי ובחרי בית.");
+        return;
+      }
+
+      // מוסיפים כל פריט בנפרד (בשלב הזה זה הכי קל)
+      const results = await Promise.allSettled(
+        payload.map((p) => addProduct(homeId, p))
+      );
+
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - ok;
+
+      if (failed === 0) {
+        Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.");
+        router.back();
+        return;
+      }
+
+      Alert.alert(
+        "נוספו חלקית",
+        `נוספו ${ok} מוצרים, נכשלו ${failed}. אפשר לנסות שוב או לבדוק פריטים בעייתיים.`
+      );
+    } catch (e: any) {
+      Alert.alert("נכשל", e?.message ?? "לא הצלחנו להוסיף למלאי. נסי שוב.");
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* HEADER (כמו אצלך) */}
+        {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.appTitle}>StockUp</Text>
@@ -157,6 +213,19 @@ export default function ReceiptReviewDetectedProductsScreen() {
             <Text style={styles.smallActionText}>הוסף</Text>
           </Pressable>
         </View>
+
+        {/* אם אין receipt / אין פריטים */}
+        {!receiptObj && (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="alert-circle-outline" size={22} color={TEXT_MUTED} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.emptyTitle}>אין נתוני סריקה</Text>
+              <Text style={styles.emptyText}>חזרי למסך ההעלאה ונסי שוב.</Text>
+            </View>
+          </View>
+        )}
 
         {/* LIST */}
         <View style={{ gap: 10 }}>
@@ -191,12 +260,12 @@ export default function ReceiptReviewDetectedProductsScreen() {
           )}
         </View>
 
-        {/* ✅ CTA עם PrimaryButton של האפליקציה */}
+        {/* CTA */}
         <PrimaryButtonCompat
-          title="אישור והוספה למלאי"
+          title={saving ? "מוסיף למלאי..." : "אישור והוספה למלאי"}
           onPress={onConfirmAddAll}
           leftIcon={<Ionicons name="checkmark-circle-outline" size={20} color={TEXT_DARK} />}
-          disabled={items.length === 0}
+          disabled={items.length === 0 || saving}
         />
 
         {/* Modals */}
@@ -279,7 +348,6 @@ function EditItemModal({
             </Pressable>
           </View>
 
-          {/* ✅ כפתור שמירה עם PrimaryButton */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButtonCompat
               title="שמור"
@@ -350,7 +418,6 @@ function AddItemModal({
             </Pressable>
           </View>
 
-          {/* ✅ הוספה עם PrimaryButton */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButtonCompat
               title="הוסף"
@@ -399,8 +466,6 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BRAND_BG },
-
-  // “גובה”/צפיפות כמו המסך שלך: לא מוגזם, הרבה אוויר אבל לא גבוה מדי
   container: {
     paddingHorizontal: 16,
     paddingTop: 12,
