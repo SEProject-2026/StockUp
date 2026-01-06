@@ -34,6 +34,20 @@ class ICatalogProvider(ABC):
                         If not found (or not provided), it falls back to the global definition.
         """
         pass
+    @abstractmethod
+    async def get_items_by_barcodes(self, barcodes: List[str], chain_name: Optional[str] = None) -> List[CatalogItem]:
+        """
+        Retrieves multiple products by a list of barcodes.
+        Optimized for batch operations to avoid N+1 queries.
+
+        Args:
+            barcodes: A list of barcode strings to search for.
+            chain_name: (Optional) The specific retail chain context.
+
+        Returns:
+            List[CatalogItem]: A list of found products. Barcodes that are not found are typically skipped.
+        """
+        pass
 
     @abstractmethod
     async def search_items_by_name(self, query: str) -> List[CatalogItem]:

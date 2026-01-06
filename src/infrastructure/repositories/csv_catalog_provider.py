@@ -87,6 +87,28 @@ class CsvCatalogProvider(ICatalogProvider):
                 return chain_item
         
         return self._global_map.get(barcode)
+    
+    async def get_items_by_barcodes(self, barcodes: List[str], chain_name: Optional[str] = None) -> List[CatalogItem]:
+        """
+        Retrieves multiple products by a list of barcodes.
+        """
+        results = []
+        for barcode in barcodes:
+            item = None
+            
+            # 1. Try chain specific first
+            if chain_name:
+                key = f"{chain_name}_{barcode}"
+                item = self._chain_map.get(key)
+            
+            # 2. Fallback to global
+            if not item:
+                item = self._global_map.get(barcode)
+                
+            if item:
+                results.append(item)
+                
+        return results
 
     async def search_items_by_name(self, query: str) -> List[CatalogItem]:
         """
