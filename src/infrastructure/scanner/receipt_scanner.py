@@ -310,7 +310,6 @@ class ReceiptScanner:
                 print(f"Success! Found chain in header image: {detected_chain}")
                 all_results["chain name"] = detected_chain
 
-        # ניקוי temp files
         for fn in ["page_temp_in.png", "page_temp_out.png"]:
             if os.path.exists(fn):
                 try:
@@ -348,7 +347,6 @@ class ReceiptScanner:
 
             processed_header = self.enhance_image(header_crop)
 
-            # אם אין tesseract מותקן ב-Mac זה יפול — אז נעטוף
             try:
                 text = pytesseract.image_to_string(processed_header, lang="heb", config="--psm 6")
             except Exception as e:
@@ -520,7 +518,7 @@ class ReceiptScanner:
             "קינג סטור": "King Store",
             "מעיין אלפיים": "Maayan 2000",
             "גוד פארם": "Good Pharm",
-            "קרפור": "Carrefour",
+            "קרפור": "carrefour",
             "קוויק": "Quik",
             "ביתן אונליין": "Bitan Online",
             "יינות ביתן": "Yeinot Bitan",
@@ -528,20 +526,20 @@ class ReceiptScanner:
             "דור אלון": "Dor Alon",
             "אלונית": "Alonit",
             "וולט": "Wolt",
-            "ויקטורי": "Victory",
+            "ויקטורי": "victory",
             "זול ובגדול": "Zol VeBegadol",
             "ח. כהן": "H. Cohen",
-            "טיב טעם": "Tiv Taam",
-            "מחסני השוק": "Machsanei HaShouk",
-            "חצי חינם": "Hatzi Hinam",
-            "יוחננוף": "Yochananof",
-            "אושר עד": "Osher Ad",
+            "טיב טעם": "tivtaam",
+            "מחסני השוק": "mck",
+            "חצי חינם": "hazi-hinam",
+            "יוחננוף": "yohananof",
+            "אושר עד": "osherad",
             "נתיב החסד": "Nativ HaChessed",
             "ברכל": "BarKol",
-            "סאלח דבאח": "Saleh Dabach",
+            "סאלח דבאח": "salachd",
             "סופר ספיר": "Super Sapir",
             "סופר פארם": "Super-Pharm",
-            "סיטי מרקט": "City Market",
+            "סיטי מרקט": "citymarket",
             "סטופ מרקט": "Stop Market",
             "עוף והודו ברקת": "Of VeHodu Bareket",
             "פוליצר": "Polizer",
@@ -549,10 +547,10 @@ class ReceiptScanner:
             "סופר יודה": "Super Yuda",
             "פרשמרקט": "Freshmarket",
             "משנת יוסף": "Mishnat Yosef",
-            "קשת טעמים": "Keshet Teamim",
-            "רמי לוי": "Rami Levy",
+            "קשת טעמים": "keshet",
+            "רמי לוי": "ramilevi",
             "סופר קופיקס": "Super Cofix",
-            "שופרסל": "Shufersal",
+            "שופרסל": "shufersal",
             "Be": "Be",
             "שוק העיר": "Shouk HaIr",
             "שפע ברכת השם": "Shefa Birkat Hashem",
