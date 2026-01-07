@@ -42,7 +42,7 @@ class CsvCatalogProvider(ICatalogProvider):
                     barcode = row.get("Barcode", "").strip()
                     name = row.get("ItemName", "").strip()
                     chain = row.get("Chain", "GLOBAL").strip()
-                    
+                    storage_category = row.get("SuggestedStorageCategory", "").strip()
                     if not barcode or not name:
                         continue
                         
@@ -50,7 +50,8 @@ class CsvCatalogProvider(ICatalogProvider):
                         barcode=barcode,
                         name=name,
                         manufacturer=row.get("ManufacturerName", ""),
-                        chain_source=chain
+                        chain_source=chain,
+                        storage_category=storage_category
                     )
                     
                     self._all_items.append(item)
@@ -107,14 +108,14 @@ class CsvCatalogProvider(ICatalogProvider):
 
             # 3. Fallback to padded barcode (for weight-based items)
             if not item and chain_name:
-                key = f"{chain_name}_{"729" + '0' * (10 - len(barcode)) + barcode}"
+                key = f"{chain_name}_{"729" + "0" * (10 - len(barcode)) + barcode}"
                 item = self._chain_map.get(key)
                 if item:
                     item.barcode = barcode  # Adjust barcode to original
 
             # 4. Fallback to global padded barcode
             if not item:
-                item = self._global_map.get("729" + '0' * (10 - len(barcode)) + barcode)
+                item = self._global_map.get("729" + "0" * (10 - len(barcode)) + barcode)
                 if item:
                     item.barcode = barcode  # Adjust barcode to original
             
