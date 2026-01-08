@@ -13,6 +13,10 @@ class LocationType(str, Enum):
     CLEANING_SUPPLIES = "CLEANING_SUPPLIES"
     OTHER = "OTHER"
 
+class UnitType(str, Enum):
+    UNIT = "UNIT"
+    KG = "KG"
+
 class ChainType(Enum):
     SHEFA_BIRKAT_HASHEM = 0
     SHUK_HAIR = 1
