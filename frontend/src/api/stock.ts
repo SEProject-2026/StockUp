@@ -174,12 +174,20 @@ export async function filterStockByExpiration(homeId: string, type: ExpirationTy
 }
 
 // --- Receipt Scan (OCR) ---
-// ✅ טיפוסים לפי השרת שלך
+
+export type StorageCategory =
+  | "fridge"
+  | "freezer"
+  | "pantry"
+  | "cleaning"
+  | "other";
+
 export type DetectedReceiptItemDTO = {
   barcode: string;
   name: string;
   quantity: number;
-  unit: string; // UnitType אצל השרת (UNIT / KG וכו')
+  unit: string; 
+  storage_category?: StorageCategory | null;
 };
 
 export type ReceiptDTO = {
@@ -202,16 +210,6 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string) {
   return Promise.race([p.finally(() => clearTimeout(t)), timeout]);
 }
 
-/**
- * ✅ scanReceipt חדש:
- * - לא משתמש ב-authFetch כדי לא להסתבך עם FormData/JSON parsing.
- * - עושה fetch עם FormData + timeout + לוגים.
- *
- * ⚠️ אם השרת שלך דורש Authorization:
- * כרגע אין לנו גישה לטוקן מתוך authFetch.
- * אם את אומרת לי איך authFetch מוסיף Authorization (מאיפה הוא קורא את הטוקן),
- * אני אתן לך שורה אחת להוסיף פה.
- */
 export async function scanReceipt(
   homeId: string,
   params: {

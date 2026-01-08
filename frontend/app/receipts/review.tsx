@@ -18,7 +18,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import PrimaryButton from "@/src/ui/PrimaryButton";
 import { getSelectedHomeId } from "../home/selected-home";
 import { addProduct } from "@/src/api/stock";
-
 import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
@@ -29,11 +28,48 @@ const TEXT_MUTED = "#6B7280";
 const BRAND_PINK = "#FF4FA3";
 const BRAND_PINK_SOFT = "#FFE0EF";
 
+// --------------------
+// Locations (UI-level)
+// --------------------
+type LocationKey = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
+type StorageCategory = LocationKey;
+
+const LOCATION_LABEL: Record<LocationKey, string> = {
+  fridge: "מקרר",
+  freezer: "מקפיא",
+  pantry: "מזווה",
+  cleaning: "ניקיון",
+  other: "אחר",
+};
+
+const LOCATION_ICON: Record<LocationKey, keyof typeof Ionicons.glyphMap> = {
+  fridge: "snow-outline",
+  freezer: "ice-cream-outline",
+  pantry: "cube-outline",
+  cleaning: "sparkles-outline",
+  other: "help-circle-outline",
+};
+
+function normalizeCategory(v: any): StorageCategory {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (s === "fridge" || s === "freezer" || s === "pantry" || s === "cleaning" || s === "other") return s;
+  return "other";
+}
+
+function categoryToDefaultLocation(cat?: any): LocationKey {
+  // כרגע מיפוי 1:1. אם בעתיד תרצי closet לניקיון, תשני כאן.
+  return normalizeCategory(cat);
+}
+
 type DetectedItem = {
   id: string;
+  barcode?: string; // שימושי להמשך
   name: string;
   quantity: number;
   unit?: string;
+
+  storage_category?: StorageCategory; // מגיע מהשרת
+  location: LocationKey; // מיקום נבחר/מוצע (editable)
 };
 
 function uuid() {
@@ -77,9 +113,8 @@ function parseReceiptParam(receiptParam?: string): any | null {
 function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
   if (!receipt) return [];
 
-  // השרת שלך מחזיר GeneralResponse: {status,message,data: ReceiptDTO}
-  // אז פה נתמוך גם בקבלה עטופה
-  const inner = receipt?.data ?? receipt;
+  // תומך גם ב-GeneralResponse עטוף
+  const inner = receipt?.data?.receipt ?? receipt?.data ?? receipt;
 
   const rawItems = inner.items ?? inner.detected_items ?? inner?.data?.items ?? [];
   if (!Array.isArray(rawItems)) return [];
@@ -93,26 +128,68 @@ function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
 
       if (!name) return null;
 
+      const storage_category = it.storage_category ?? it.storageCategory ?? it.category;
+      const normalizedCat = normalizeCategory(storage_category);
+      const location = categoryToDefaultLocation(normalizedCat);
+
       return {
         id: uuid(),
+        barcode: it.barcode ? String(it.barcode) : undefined,
         name,
         quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
         unit,
+        storage_category: normalizedCat,
+        location,
       } as DetectedItem;
     })
     .filter(Boolean) as DetectedItem[];
 }
 
+function LocationPill({ loc }: { loc: LocationKey }) {
+  return (
+    <View style={styles.locPill}>
+      <Ionicons name={LOCATION_ICON[loc]} size={14} color={TEXT_DARK} />
+      <Text style={styles.locPillText}>{LOCATION_LABEL[loc]}</Text>
+    </View>
+  );
+}
+
+function LocationSelector({
+  value,
+  onChange,
+}: {
+  value: LocationKey;
+  onChange: (v: LocationKey) => void;
+}) {
+  const options: LocationKey[] = ["fridge", "freezer", "pantry", "cleaning", "other"];
+
+  return (
+    <View style={{ marginTop: 10 }}>
+      <Text style={styles.fieldLabel}>מיקום בבית</Text>
+      <View style={styles.locRow}>
+        {options.map((opt) => {
+          const active = value === opt;
+          return (
+            <Pressable
+              key={opt}
+              onPress={() => onChange(opt)}
+              style={[styles.locChip, active && styles.locChipActive]}
+            >
+              <Ionicons name={LOCATION_ICON[opt]} size={16} color={TEXT_DARK} />
+              <Text style={styles.locChipText}>{LOCATION_LABEL[opt]}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function ReceiptReviewDetectedProductsScreen() {
   const { receipt } = useLocalSearchParams<{ receipt?: string }>();
 
-  // 1) אם הגיע param (בכל זאת) ננסה לפרסר
   const receiptFromParam = useMemo(() => parseReceiptParam(receipt), [receipt]);
-
-  // 2) אם לא הגיע param – ניקח מה-store (זה ה-flow הראשי החדש)
-  const receiptObj = useMemo(() => {
-    return receiptFromParam ?? consumeLastScannedReceipt();
-  }, [receiptFromParam]);
+  const receiptObj = useMemo(() => receiptFromParam ?? consumeLastScannedReceipt(), [receiptFromParam]);
 
   const [items, setItems] = useState<DetectedItem[]>([]);
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
@@ -141,9 +218,12 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
+    // ⚠️ כרגע addProduct אצלך כנראה מקבל רק name+quantity.
+    // אם ה-API תומך גם במיקום, הוסיפי כאן location.
     const payload = items.map((x) => ({
       name: x.name.trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
+      // location: x.location, // ← להפעיל אחרי שתתמכי בזה בשרת
     }));
 
     const bad = payload.find((p) => !p.name || p.quantity <= 0);
@@ -235,10 +315,15 @@ export default function ReceiptReviewDetectedProductsScreen() {
                   <Text style={styles.itemName} numberOfLines={1}>
                     {item.name}
                   </Text>
-                  <Text style={styles.itemMeta}>
-                    כמות: {item.quantity}
-                    {item.unit ? ` ${item.unit}` : ""}
-                  </Text>
+
+                  <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8, marginTop: 6 }}>
+                    <Text style={styles.itemMeta}>
+                      כמות: {item.quantity}
+                      {item.unit ? ` ${item.unit}` : ""}
+                    </Text>
+
+                    <LocationPill loc={item.location} />
+                  </View>
                 </View>
 
                 <View style={styles.editBubble}>
@@ -296,12 +381,14 @@ function EditItemModal({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
+  const [location, setLocation] = useState<LocationKey>("other");
 
   React.useEffect(() => {
     if (!item) return;
     setName(item.name ?? "");
     setQuantity(String(item.quantity ?? 1));
     setUnit(item.unit ?? "");
+    setLocation(item.location ?? "other");
   }, [item]);
 
   if (!item) return null;
@@ -321,6 +408,8 @@ function EditItemModal({
             placeholder="למשל: 2"
           />
           <Field label="יחידה (אופציונלי)" value={unit} onChangeText={setUnit} placeholder="יח׳ / ק״ג / ל׳" />
+
+          <LocationSelector value={location} onChange={setLocation} />
 
           <View style={styles.modalActions}>
             <Pressable style={styles.dangerBtn} onPress={() => onDelete(item.id)}>
@@ -349,6 +438,7 @@ function EditItemModal({
                   name: name.trim(),
                   quantity: q,
                   unit: unit.trim() || undefined,
+                  location,
                 });
               }}
               leftIcon={<Ionicons name="save-outline" size={18} color={TEXT_DARK} />}
@@ -372,12 +462,14 @@ function AddItemModal({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
+  const [location, setLocation] = useState<LocationKey>("other");
 
   React.useEffect(() => {
     if (!open) return;
     setName("");
     setQuantity("1");
     setUnit("");
+    setLocation("other");
   }, [open]);
 
   if (!open) return null;
@@ -397,6 +489,8 @@ function AddItemModal({
             placeholder="למשל: 1"
           />
           <Field label="יחידה (אופציונלי)" value={unit} onChangeText={setUnit} placeholder="יח׳ / ק״ג / ל׳" />
+
+          <LocationSelector value={location} onChange={setLocation} />
 
           <View style={styles.modalActions}>
             <View style={{ flex: 1 }} />
@@ -418,6 +512,8 @@ function AddItemModal({
                   name: name.trim(),
                   quantity: q,
                   unit: unit.trim() || undefined,
+                  storage_category: "other",
+                  location,
                 });
               }}
               leftIcon={<Ionicons name="add-circle-outline" size={18} color={TEXT_DARK} />}
@@ -496,7 +592,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   itemName: { fontSize: 14, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
-  itemMeta: { fontSize: 12, color: TEXT_MUTED, textAlign: "right", marginTop: 4 },
+  itemMeta: { fontSize: 12, color: TEXT_MUTED, textAlign: "right" },
 
   editBubble: {
     width: 34,
@@ -506,6 +602,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  locPill: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: BRAND_BLUE_SOFT,
+    borderWidth: 1,
+    borderColor: "#DCEBFA",
+  },
+  locPillText: { fontSize: 12, fontWeight: "800", color: TEXT_DARK, textAlign: "right" },
+
+  locRow: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  locChip: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  locChipActive: {
+    backgroundColor: BRAND_BLUE_SOFT,
+    borderColor: "#BFDDF6",
+  },
+  locChipText: { fontSize: 12, fontWeight: "800", color: TEXT_DARK, textAlign: "right" },
 
   emptyCard: {
     flexDirection: "row-reverse",
