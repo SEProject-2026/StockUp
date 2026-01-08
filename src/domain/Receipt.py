@@ -13,6 +13,7 @@ class ReceiptItemDTO(BaseModel):
     name: str = Field(..., description="The product name as extracted or matched")
     quantity: float = Field(..., gt=0, description="Quantity amount (must be positive)")
     unit: UnitType = Field(default=UnitType.UNIT, description="Unit of measurement")
+    storage_category: Optional[str] = Field(default=None, description="Suggested storage category from catalog (fridge/freezer/pantry/cleaning/other)")
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -12,7 +12,7 @@ const CATEGORY_LABELS: Record<InventoryItem["category"], string> = {
   fridge: "מקרר",
   freezer: "מקפיא",
   pantry: "מזווה",
-  "cleaning supplies": "חומרי ניקוי",
+  "cleaning": "חומרי ניקוי",
   other: "אחר",
 };
 

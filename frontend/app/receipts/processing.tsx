@@ -31,14 +31,11 @@ export default function ReceiptProcessingScreen() {
 
     (async () => {
       try {
-        console.log("[processing] mount: fetching selected home id...");
         const id = await getSelectedHomeId();
-        console.log("[processing] selected home id:", id);
 
         if (!id) throw new Error("לא נבחר בית פעיל. חזרי למסך הבית ובחרי בית.");
         if (mounted) setHomeId(id);
       } catch (e: any) {
-        console.log("[processing] failed to load home id:", e);
         if (mounted) setError(e?.message ?? "שגיאה בטעינת בית נבחר");
       }
     })();
@@ -55,15 +52,11 @@ export default function ReceiptProcessingScreen() {
 
     (async () => {
       try {
-        console.log("[processing] starting scanReceipt...");
-
         const res = await scanReceipt(homeId, {
           fileUri: imageUri,
           fileName: fileName ?? null,
           mimeType: mimeType ?? null,
         });
-
-        console.log("[processing] scanReceipt raw response:", res);
 
         if (!isMounted) return;
 
@@ -71,28 +64,22 @@ export default function ReceiptProcessingScreen() {
         if (!payload) {
           throw new Error("scanReceipt returned empty payload");
         }
-
-        console.log("[processing] saving receipt to store");
         setLastScannedReceipt(payload);
 
-        console.log("[processing] navigating to /receipts/review");
         router.replace("/receipts/review");
 
       } catch (e: any) {
         if (!isMounted) return;
-        console.log("[processing] scanReceipt ERROR:", e);
         setError(e?.message ?? "Scanning failed");
       }
     })();
 
     return () => {
       isMounted = false;
-      console.log("[processing] component unmounted");
     };
   }, [homeId, imageUri]);
 
   const onRetry = () => {
-    console.log("[processing] retry clicked");
     setError(null);
     setStarted(false);
   };

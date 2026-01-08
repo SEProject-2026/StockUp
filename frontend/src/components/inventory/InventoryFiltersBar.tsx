@@ -29,7 +29,7 @@ const CATEGORIES: Array<{
   { key: "fridge", label: "מקרר", icon: "snow-outline" },
   { key: "freezer", label: "מקפיא", icon: "cube-outline" },
   { key: "pantry", label: "מזווה", icon: "restaurant-outline" },
-  { key: "cleaning supplies", label: "חומרי ניקוי", icon: "water-outline" },
+  { key: "cleaning", label: "חומרי ניקוי", icon: "water-outline" },
   { key: "other", label: "אחר", icon: "ellipsis-horizontal-outline" },
 ];
 

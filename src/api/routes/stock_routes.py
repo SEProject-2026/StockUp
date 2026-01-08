@@ -53,7 +53,6 @@ async def scan_receipt(
     file: UploadFile = File(...),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
-    debug: bool = Query(False),
 ):
     try:
         import tempfile, shutil, os
@@ -68,15 +67,7 @@ async def scan_receipt(
                 user_id=user_id,
                 home_id=home_id,
                 file_path=tmp_path,    
-                return_debug=debug,
             )
-
-            if debug:
-                receipt, dbg = result
-                return GeneralResponse(
-                    status="success",
-                    data={"receipt": receipt.model_dump(), "debug": dbg},
-                )
 
             return GeneralResponse(
                 status="success",
