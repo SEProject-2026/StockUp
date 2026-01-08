@@ -38,7 +38,7 @@ const LOCATION_LABEL: Record<LocationKey, string> = {
   fridge: "מקרר",
   freezer: "מקפיא",
   pantry: "מזווה",
-  cleaning: "ניקיון",
+  cleaning: "ניקיון וטואלטיקה",
   other: "אחר",
 };
 
@@ -49,7 +49,22 @@ const LOCATION_ICON: Record<LocationKey, keyof typeof Ionicons.glyphMap> = {
   cleaning: "sparkles-outline",
   other: "help-circle-outline",
 };
+function storageCategoryToLocationType(cat?: string | null): string {
+  const s = String(cat ?? "").toLowerCase().trim();
 
+  switch (s) {
+    case "fridge":
+      return "FRIDGE";
+    case "freezer":
+      return "FREEZER";
+    case "pantry":
+      return "PANTRY";
+    case "cleaning":
+      return "CLEANING_SUPPLIES"; 
+    default:
+      return "OTHER";
+  }
+}
 function normalizeCategory(v: any): StorageCategory {
   const s = String(v ?? "").trim().toLowerCase();
   if (s === "fridge" || s === "freezer" || s === "pantry" || s === "cleaning" || s === "other") return s;
@@ -57,19 +72,18 @@ function normalizeCategory(v: any): StorageCategory {
 }
 
 function categoryToDefaultLocation(cat?: any): LocationKey {
-  // כרגע מיפוי 1:1. אם בעתיד תרצי closet לניקיון, תשני כאן.
   return normalizeCategory(cat);
 }
 
 type DetectedItem = {
   id: string;
-  barcode?: string; // שימושי להמשך
+  barcode?: string;
   name: string;
   quantity: number;
   unit?: string;
 
-  storage_category?: StorageCategory; // מגיע מהשרת
-  location: LocationKey; // מיקום נבחר/מוצע (editable)
+  storage_category?: StorageCategory; 
+  location: LocationKey; 
 };
 
 function uuid() {
@@ -218,12 +232,11 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
-    // ⚠️ כרגע addProduct אצלך כנראה מקבל רק name+quantity.
-    // אם ה-API תומך גם במיקום, הוסיפי כאן location.
     const payload = items.map((x) => ({
       name: x.name.trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
-      // location: x.location, // ← להפעיל אחרי שתתמכי בזה בשרת
+      location: storageCategoryToLocationType(x.location ?? x.storage_category ?? "other"),
+
     }));
 
     const bad = payload.find((p) => !p.name || p.quantity <= 0);

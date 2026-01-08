@@ -124,7 +124,7 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
       ? "מקפיא"
       : group.category === "pantry"
       ? "מזווה"
-      : group.category === "cleaning supplies"
+      : group.category === "cleaning"
       ? "חומרי ניקוי"
       : "אחר";
 
@@ -135,7 +135,7 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
       ? "#6366F1"
       : group.category === "pantry"
       ? "#F97316"
-      : group.category === "cleaning supplies"
+      : group.category === "cleaning"
       ? "#10B981"
       : "#6B7280";
 

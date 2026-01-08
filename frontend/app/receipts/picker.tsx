@@ -34,7 +34,6 @@ export default function ReceiptPickerScreen() {
         setFileName(name);
         setMimeType(type);
 
-        // ✅ חשוב: להעביר ל-processing גם fileName ו-mimeType
         router.push({
           pathname: "./processing",
           params: {

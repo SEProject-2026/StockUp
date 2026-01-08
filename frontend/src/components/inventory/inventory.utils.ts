@@ -21,7 +21,7 @@ export function mapLocationToCategory(location?: string | null): Category {
     case "PANTRY":
       return "pantry";
     case "CLEANING_SUPPLIES":
-      return "cleaning supplies";
+      return "cleaning";
     case "OTHER":
       return "other";
     default:
@@ -37,7 +37,7 @@ export function categoryToLocationType(cat: Category): LocationType {
       return "FREEZER";
     case "pantry":
       return "PANTRY";
-    case "cleaning supplies":
+    case "cleaning":
       return "CLEANING_SUPPLIES";
     case "other":
       return "OTHER";
