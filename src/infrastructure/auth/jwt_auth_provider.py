@@ -1,14 +1,18 @@
 from datetime import datetime, timedelta, timezone
+import os
 from typing import Optional
 from uuid import UUID
 from jose import jwt, JWTError
 from src.authentication.auth_provider import IAuthProvider
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 #settings will be moved to config file later
-SECRET_KEY = "MY_SUPER_SECRET_KEY"
-ALGORITHM = "HS256"
-EXPIRE_MINUTES = 60 * 24 
-
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("JWT_ALGORITHM")
+EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_IN")) 
 class JwtAuthProvider(IAuthProvider):
     def create_token(self, user_id: UUID) -> str:
         #creation of the token payload
