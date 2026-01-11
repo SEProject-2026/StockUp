@@ -8,8 +8,9 @@ class InMemoryUserRepository(IUserRepository):
     def __init__(self):
         self.users = {}
 
-    async def save(self, user: User) -> None:
+    async def save(self, user: User) -> User:
         self.users[user.id] = user
+        return user
 
     async def get_by_email(self, email: str) -> Optional[User]:
         for user in self.users.values():

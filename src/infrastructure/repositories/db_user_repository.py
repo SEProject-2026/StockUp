@@ -9,7 +9,7 @@ class DbUserRepository(IUserRepository):
     def __init__(self, db: Session):
         self.db = db
 
-    async def save(self, user: User) -> None:
+    async def save(self, user: User) -> User:
         db_user = self.db.query(UserModel).filter(UserModel.id == str(user.id)).first()
         
         if not db_user:
@@ -21,6 +21,7 @@ class DbUserRepository(IUserRepository):
         db_user.hashed_password = user.hashed_password
         
         self.db.commit()
+        return self._to_domain(db_user)
 
     async def get_by_email(self, email: str) -> Optional[User]:
         db_user = self.db.query(UserModel).filter(UserModel.email == email).first()
