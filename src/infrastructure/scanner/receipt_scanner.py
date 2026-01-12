@@ -14,7 +14,7 @@ import pdfplumber
 import pytesseract
 from pytesseract import Output
 from pdf2image import convert_from_path
-
+from src.domain.smart_home.enums import OCRMode
 
 class ReceiptScanner:
     def __init__(self):
@@ -121,7 +121,7 @@ class ReceiptScanner:
 
                                 all_pages_dfs.append(df[["left", "top", "width", "height", "text"]])
 
-                            return all_pages_dfs, True
+                            return all_pages_dfs, OCRMode.DIGITAL_PDF
 
             except Exception as e:
                 print(f"Digital parsing failed (falling back to OCR): {e}")
@@ -142,7 +142,7 @@ class ReceiptScanner:
                 images = convert_from_path(abs_path, **kwargs)
 
                 images = [cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR) for img in images]
-                return images, False
+                return images, OCRMode.SCANNED_PDF
 
             except Exception as e:
                 raise Exception(f"PDF Error: {e}")
@@ -154,7 +154,7 @@ class ReceiptScanner:
             img = cv2.imdecode(np.fromfile(file_path, np.uint8), cv2.IMREAD_COLOR)
             if img is None:
                 raise Exception("Empty image")
-            return [img], False
+            return [img], OCRMode.IMAGE
 
         except Exception as e:
             raise Exception(f"Image Error: {e}")
@@ -280,51 +280,79 @@ class ReceiptScanner:
         text = "פלפל" if text == "7979" else text
         return text
 
-    def parse_receipt(self, file_path) -> Tuple[str, Dict]:
-        print(f"Processing: {file_path}...")
+    def parse_receipt(self, file_path: str, *other_paths) -> Tuple[str, Dict]:
+        # 1. איחוד כל הנתיבים לרשימה אחת
+        all_paths = [file_path] + list(other_paths)
+        
+        # משתנים גלובליים לכל הקבצים יחד
+        final_chain_name = ""
+        # המילון שיחזיק את התוצאה הסופית המאוחדת
+        # Key: Barcode, Value: (Quantity, Unit)
+        aggregated_data = {} 
 
-        loaded_data, is_digital = self.load_file(file_path)
+        # 2. לולאה על כל הקבצים
+        for current_path in all_paths:
+            if not os.path.exists(current_path):
+                print(f"[WARNING] File not found: {current_path}, skipping.")
+                continue
 
-        all_results = {"chain name": "", "header": [], "products": []}
-        self.table_started_global = False
-        self.table_ended_global = False
+            print(f"\n--- Processing File: {current_path} ---")
 
-        for i, item in enumerate(loaded_data):
-            print(f"Analyzing Page {i+1}...")
-            page_data = self._process_single_page(item, is_digital)
-            self.table_started_global = False  # איפוס לדף הבא
+            try:
+                loaded_data, is_digital = self.load_file(current_path)
+            except Exception as e:
+                print(f"[ERROR] Failed to load {current_path}: {e}")
+                continue
+
+            # איפוס דגלים פר-קובץ (כדי שלא יושפעו מקובץ קודם)
+            self.table_started_global = False
             self.table_ended_global = False
-            all_results["header"].extend(page_data["header"])
-            all_results["products"].extend(page_data["products"])
-            all_results["chain name"] = page_data["chain name"] or all_results["chain name"]
+            
+            current_file_chain = ""
 
-        # --- fallback למציאת רשת מתוך header image ---
-        if (
-            (not all_results["chain name"] or all_results["chain name"] == "unidentified chain")
-            and is_digital
-            and file_path.lower().endswith(".pdf")
-        ):
-            print("Chain name not found in text layer. Scanning header image (OCR)...")
-            detected_chain = self._extract_chain_from_header_image(file_path)
-            if detected_chain:
-                print(f"Success! Found chain in header image: {detected_chain}")
-                all_results["chain name"] = detected_chain
+            # לולאה על העמודים בקובץ הנוכחי
+            for i, item in enumerate(loaded_data):
+                print(f"  Analyzing Page {i+1}...")
+                
+                # איפוס דגלים פר-עמוד (לפי הלוגיקה המקורית שלך)
+                self.table_started_global = False  
+                self.table_ended_global = False
+                
+                page_data = self._process_single_page(item, is_digital)
+                
+                # זיהוי שם הרשת (לוקחים את הראשון שמוצאים בקובץ)
+                if not current_file_chain and page_data["chain name"]:
+                    current_file_chain = page_data["chain name"]
 
-        for fn in ["page_temp_in.png", "page_temp_out.png"]:
-            if os.path.exists(fn):
-                try:
-                    os.remove(fn)
-                except:
-                    pass
+                # --- לוגיקת האיחוד (Aggregation) ---
+                for p in page_data["products"]:
+                    barcode = p["barcode"]
+                    quantity = float(p["quantity"])
+                    unit = p["unit"]
 
-        ret_dict = {}
-        for p in all_results["products"]:
-            barcode = p["barcode"]
-            quantity = p["quantity"]
-            unit = p["unit"]
-            ret_dict[barcode] = (quantity, unit)
+                    aggregated_data[barcode] = (quantity, unit)
 
-        return all_results["chain name"], ret_dict
+            # --- Fallback: חיפוש שם רשת בתמונה (אם לא נמצא בטקסט) ---
+            if (not current_file_chain or current_file_chain == "unidentified chain") \
+               and is_digital == OCRMode.DIGITAL_PDF and current_path.lower().endswith(".pdf"):
+                print("  Chain name not found in text. Scanning header image...")
+                detected = self._extract_chain_from_header_image(current_path)
+                if detected:
+                    print(f"  Success! Found chain in header: {detected}")
+                    current_file_chain = detected
+            
+            # עדכון שם הרשת הכללי (אם עדיין אין לנו, או אם הקודם היה לא מזוהה)
+            if not final_chain_name or final_chain_name == "unidentified chain":
+                final_chain_name = current_file_chain
+
+            # ניקוי קבצים זמניים (אחרי כל קובץ)
+            for fn in ["page_temp_in.png", "page_temp_out.png"]:
+                if os.path.exists(fn):
+                    try: os.remove(fn)
+                    except: pass
+
+        print("\n--- Aggregation Complete ---")
+        return final_chain_name, aggregated_data
 
     def _extract_chain_from_header_image(self, file_path):
         """
@@ -362,7 +390,7 @@ class ReceiptScanner:
 
     def _process_single_page(self, input_data, is_digital):
         # --- שלב 1: הכנת ה-DataFrame ---
-        if is_digital:
+        if is_digital == OCRMode.DIGITAL_PDF:
             df = input_data
         else:
             processed_img = self.enhance_image(input_data)
@@ -384,7 +412,13 @@ class ReceiptScanner:
             df["text"] = df["text"].astype(str)
             df = df[df["text"].str.strip() != ""]
 
-        group_divider = 10 if is_digital else 30
+        if is_digital == OCRMode.DIGITAL_PDF:
+            group_divider = 10
+        elif is_digital == OCRMode.SCANNED_PDF:
+            group_divider = 30
+        else:  # OCRMode.IMAGE
+            group_divider = 20
+
         df["line_group"] = (df["top"] / group_divider).astype(int)
 
         products = []
@@ -401,117 +435,282 @@ class ReceiptScanner:
 
         chain_name_found = False
         ch = ""
+        if is_digital != OCRMode.IMAGE:
+            for _, group in df.groupby("line_group"):
+                row_words = group.sort_values("left")
 
-        for _, group in df.groupby("line_group"):
-            row_words = group.sort_values("left")
+                reversed_row_list = []
+                if is_digital == OCRMode.SCANNED_PDF:
+                    for w in row_words["text"].to_list()[::-1]:
+                        cleaned_word = self.clean_ocr_text(w)
+                        if cleaned_word:
+                            reversed_row_list.append(cleaned_word)
+                else:
+                    for w in row_words["text"].to_list()[::-1]:
+                        w_str = str(w)
+                        cleaned_word = (
+                            self.clean_ocr_text(w_str[::-1])
+                            if not (re.match(r"\b(\d+\.\d{2,3})\b", w_str) or w_str.isdigit())
+                            else w_str
+                        )
+                        if cleaned_word:
+                            reversed_row_list.append(cleaned_word)
 
-            reversed_row_list = []
-            if not is_digital:
+                full_line_text = " ".join(reversed_row_list)
+
+                if not chain_name_found:
+                    ch = self._chain_name_in_line(full_line_text)
+                    if ch != "unidentified chain":
+                        chain_name_found = True
+
+                if self.table_ended_global:
+                    continue
+
+                # --- פתיחת טבלה ---
+                if not self.table_started_global:
+                    if any(k in full_line_text for k in header_keywords):
+                        self.table_started_global = True
+                        header_lines.append(full_line_text)
+                        continue
+
+                    if re.search(r"\b729\d{9,10}\b", full_line_text):
+                        self.table_started_global = True
+                    else:
+                        header_lines.append(full_line_text)
+                        continue
+
+                if any(s in full_line_text for s in stop_keywords):
+                    self.table_ended_global = True
+                    break
+
+                if any(k in full_line_text for k in global_skip_keywords):
+                    header_lines.append(full_line_text)
+                    continue
+
+                if len(reversed_row_list) < 5:
+                    continue
+
+                # --- barcodes ---
+                possible_barcodes = []
+                for w in reversed_row_list:
+                    if w.isdigit():
+                        possible_barcodes.append(w)
+                    else:
+                        break
+
+                if not possible_barcodes:
+                    continue
+
+                barcode = possible_barcodes[1] if len(possible_barcodes) > 1 else possible_barcodes[0]
+
+                if not barcode or len(str(barcode)) < 2:
+                    continue
+
+                quantity = 1.0
+                unit_type = ""
+
+                def found_kg(line):
+                    kgs = ["קג", 'ק"ג', "קילוגרם", "קילוגרמים", "קילו", "גק", 'ג"ק', "םרגוליק", "םימרגוליק", "וליק",
+                        'ה"ג', "הג", "גה", 'ג"ה']
+                    for w in line:
+                        for k in kgs:
+                            if k in w:
+                                return True
+                    return False
+
+                is_kg_found = found_kg(reversed_row_list)
+
+                if not is_kg_found:
+                    unit_type = "UNIT"
+                    qty_matches = re.findall(r"\b(\d+\.0{1,3})\b", full_line_text)
+                    if qty_matches:
+                        try:
+                            quantity = float(qty_matches[0])
+                            if quantity == 0.0:
+                                quantity = 1.0
+                        except:
+                            quantity = 1.0
+                else:
+                    unit_type = "KG"
+                    qty_matches = re.findall(r"\b(\d+\.\d{2,3})\b", full_line_text)
+                    if qty_matches:
+                        try:
+                            quantity = float(qty_matches[0])
+                            if quantity == 0.0:
+                                quantity = 1.0
+                        except:
+                            quantity = 1.0
+
+                products.append(
+                    {"barcode": barcode, "quantity": quantity, "unit": unit_type, "line": full_line_text}
+                )
+
+            return {"chain name": ch, "header": header_lines, "products": products}
+        else: # is_digital == OCRMode.IMAGE
+            # --- משתנים לניהול מצב בין שורות ---
+            last_product = None
+            name_buffer = []
+
+            # מילות מפתח לדילוג (רעש)
+            # שים לב: המילים כאן צריכות להיות כפי שהן מופיעות ב-OCR (לפעמים הפוך, אבל clean_ocr_text מסדר את זה לרוב)
+            line_skip_keywords = [
+                "מוגבל", "מבצע", "הנחה", "זיכוי", "לתשלום", "כרטיס", "אשראי", 
+                "מסוף", "עסקה", "שיק", "מזומן", "עודף", "חשבונית", "עוסק", 
+                "טלפון", "פקס", "שעה", "תאריך", "קופאי", "סניף", "פיקדון"
+            ]
+
+            for _, group in df.groupby("line_group"):
+                row_words = group.sort_values("left")
+
+                # ניקוי והכנת השורה
+                reversed_row_list = []
                 for w in row_words["text"].to_list()[::-1]:
                     cleaned_word = self.clean_ocr_text(w)
                     if cleaned_word:
                         reversed_row_list.append(cleaned_word)
-            else:
-                for w in row_words["text"].to_list()[::-1]:
-                    w_str = str(w)
-                    cleaned_word = (
-                        self.clean_ocr_text(w_str[::-1])
-                        if not (re.match(r"\b(\d+\.\d{2,3})\b", w_str) or w_str.isdigit())
-                        else w_str
-                    )
-                    if cleaned_word:
-                        reversed_row_list.append(cleaned_word)
-
-            full_line_text = " ".join(reversed_row_list)
-
-            if not chain_name_found:
-                ch = self._chain_name_in_line(full_line_text)
-                if ch != "unidentified chain":
-                    chain_name_found = True
-
-            if self.table_ended_global:
-                continue
-
-            # --- פתיחת טבלה ---
-            if not self.table_started_global:
-                if any(k in full_line_text for k in header_keywords):
-                    self.table_started_global = True
-                    header_lines.append(full_line_text)
+                
+                if not reversed_row_list:
                     continue
 
-                if re.search(r"\b729\d{9,10}\b", full_line_text):
-                    self.table_started_global = True
-                else:
-                    header_lines.append(full_line_text)
+                full_line_text = " ".join(reversed_row_list)
+
+                to_print = [f'[{i}] "{t[::-1]}"' if not (re.match(r"\b(\d+\.\d{2,3})\b", t) or t.isdigit()) else f'[{i}] "{t}"' for i, t in enumerate(reversed_row_list)]
+                print(f"DEBUG LINE:{'|'.join(to_print)}")
+
+                # --- 1. סינון שורות רעש (Skip Logic) ---
+                
+                # א. בדיקת מספרים שליליים (הנחות/זיכויים) - התיקון שביקשת
+                # מחפש מינוס שנמצא מיד לפני מספר (למשל -5.90) או מיד אחריו (5.90-)
+                if re.search(r"-\s*\d", full_line_text) or re.search(r"\d\s*-", full_line_text):
+                    # print(f"DEBUG: Skipping discount/negative line: {full_line_text}")
                     continue
 
-            if any(s in full_line_text for s in stop_keywords):
-                self.table_ended_global = True
-                break
+                # ב. בדיקת מילות מפתח אסורות
+                # הוספתי לרשימה: ח.פ, ע.מ, טלפון, וכו' כדי לסנן את הכותרות העליונות
+                line_skip_keywords = [
+                    "מוגבל", "מבצע", "הנחה", "זיכוי", "לתשלום", "כרטיס", "אשראי", 
+                    "מסוף", "עסקה", "שיק", "מזומן", "עודף", "חשבונית", "עוסק", "מורשה",
+                    "טלפון", "פקס", "שעה", "תאריך", "קופאי", "סניף", "ח.פ", "ע.מ", "חפ", "עמ",
+                    "העתק", "מקור"
+                ]
+                
+                if any(skip_word in full_line_text for skip_word in line_skip_keywords):
+                    continue
+                
+                # ג. סינון מספרי טלפון שמזוהים בטעות כברקודים (מתחילים ב-02, 03, 05, 07)
+                # אם השורה מכילה רק מספר שנראה כמו טלפון - דלג
+                if re.match(r"^\d{9,10}$", full_line_text.replace("-", "").strip()):
+                    clean_num = full_line_text.replace("-", "").strip()
+                    if clean_num.startswith(("05", "07", "02", "03", "04", "08", "09")):
+                        continue
 
-            if any(k in full_line_text for k in global_skip_keywords):
-                header_lines.append(full_line_text)
-                continue
-
-            if len(reversed_row_list) < 5:
-                continue
-
-            # --- barcodes ---
-            possible_barcodes = []
-            for w in reversed_row_list:
-                if w.isdigit():
-                    possible_barcodes.append(w)
-                else:
+                # --- 2. זיהוי סיום קבלה ---
+                if any(s in full_line_text for s in stop_keywords):
+                    self.table_ended_global = True
                     break
 
-            if not possible_barcodes:
-                continue
+                # --- 3. זיהוי תחילת טבלה ---
+                if not self.table_started_global:
+                    # ברקוד חוקי ראשון מתחיל את הטבלה
+                    if re.search(r"\b(729\d{9,10}|\d{7,14})\b", full_line_text):
+                        self.table_started_global = True
+                    # או כותרות
+                    elif any(k in full_line_text for k in header_keywords):
+                        self.table_started_global = True
+                        continue
+                    else:
+                        continue # עדיין בהדר - מדלגים
 
-            barcode = possible_barcodes[1] if len(possible_barcodes) > 1 else possible_barcodes[0]
+                # --- 4. ניתוח השורה (Parsing) ---
 
-            if not barcode or len(str(barcode)) < 2:
-                continue
+                # א. האם זו שורת כמות "יתומה"? (Continuation Line)
+                # תנאים: מכילה מספר עשרוני (כמו משקל), או יחידת מידה, ואין בה כמעט טקסט אחר
+                is_pure_weight_line = False
+                
+                # בדיקה אם יש מספר בפורמט משקל (0.XXX או X.XXX)
+                weight_decimal_match = re.search(r"\b(\d+\.\d{3})\b", full_line_text)
+                
+                # בדיקה אם יש טקסט עברי משמעותי (יותר מ-2 אותיות רצופות)
+                has_hebrew_text = re.search(r"[א-ת]{3,}", full_line_text)
 
-            quantity = 1.0
-            unit_type = ""
+                # בדיקה אם יש יחידת מידה
+                has_unit_keyword = any(u in full_line_text for u in ["קג", 'ק"ג', "קילו", 'ג"ק', "ליטר"])
 
-            def found_kg(line):
-                kgs = ["קג", 'ק"ג', "קילוגרם", "קילוגרמים", "קילו", "גק", 'ג"ק', "םרגוליק", "םימרגוליק", "וליק",
-                       'ה"ג', "הג", "גה", 'ג"ה']
-                for w in line:
-                    for k in kgs:
-                        if k in w:
-                            return True
-                return False
+                # אם יש משקל/יחידה ואין טקסט עברי משמעותי -> זו שורת המשך!
+                if (weight_decimal_match or has_unit_keyword) and not has_hebrew_text:
+                    if last_product:
+                        # חילוץ הכמות
+                        qty = 1.0
+                        if weight_decimal_match:
+                            qty = float(weight_decimal_match.group(1))
+                        elif "x" in full_line_text.lower(): # מקרה של כפל: 2 x
+                             mult_match = re.search(r"(\d+)\s*[xX]", full_line_text)
+                             if mult_match: qty = float(mult_match.group(1))
+                        
+                        # עדכון המוצר הקודם
+                        last_product["quantity"] = qty
+                        last_product["unit"] = "KG" if (weight_decimal_match or has_unit_keyword) else "UNIT"
+                        # print(f"DEBUG: Updated last product quantity: {qty}")
+                    continue # סיימנו עם השורה הזו
 
-            is_kg_found = found_kg(reversed_row_list)
 
-            if not is_kg_found:
-                unit_type = "UNIT"
-                qty_matches = re.findall(r"\b(\d+\.0{1,3})\b", full_line_text)
-                if qty_matches:
-                    try:
-                        quantity = float(qty_matches[0])
-                        if quantity == 0.0:
-                            quantity = 1.0
-                    except:
-                        quantity = 1.0
-            else:
-                unit_type = "KG"
-                qty_matches = re.findall(r"\b(\d+\.\d{2,3})\b", full_line_text)
-                if qty_matches:
-                    try:
-                        quantity = float(qty_matches[0])
-                        if quantity == 0.0:
-                            quantity = 1.0
-                    except:
-                        quantity = 1.0
+                # ב. חיפוש ברקוד (Product Anchor)
+                found_barcode = None
+                
+                # ברקוד ארוך (תמיד תופס)
+                long_barcode_match = re.search(r"\b(729\d{9,10}|\d{6,13})\b", full_line_text)
+                if long_barcode_match:
+                    found_barcode = long_barcode_match.group(1)
+                
+                # ברקוד קצר (3-6 ספרות) - כאן היתה הבעיה!
+                # נקבל אותו רק אם הוא לא חלק ממספר עשרוני (כמו 0.716)
+                else:
+                    # מחפשים מספר שלם
+                    short_matches = re.finditer(r"\b(\d{3,6})\b", full_line_text)
+                    for m in short_matches:
+                        candidate = m.group(1)
+                        # מוודאים שהמספר הזה הוא לא חלק ממשקל (למשל שהשורה לא מכילה 0.candidate)
+                        # ושהוא לא נראה כמו שנה (2020) או שעה
+                        if not re.search(rf"[0-9]\.{candidate}", full_line_text) and \
+                           not re.search(rf"{candidate}\.[0-9]", full_line_text):
+                            found_barcode = candidate
+                            break 
 
-            products.append(
-                {"barcode": barcode, "quantity": quantity, "unit": unit_type, "line": full_line_text}
-            )
+                # ג. חילוץ שם מוצר (טקסט עברי)
+                text_only = re.sub(r"[^א-ת\s]", "", full_line_text).strip()
+                
+                # --- 5. לוגיקת יצירת/עדכון מוצר ---
 
-        return {"chain name": ch, "header": header_lines, "products": products}
+                if found_barcode:
+                    # מצאנו מוצר חדש!
+                    
+                    # הרכבת שם המוצר מהבפר שנצבר
+                    full_name = " ".join(name_buffer)
+                    if len(text_only) > 1: # אם יש טקסט גם בשורה הזו
+                        full_name += " " + text_only
+                    
+                    full_name = full_name.strip()
+                    if not full_name: full_name = "פריט כללי"
+
+                    new_item = {
+                        "barcode": found_barcode,
+                        "quantity": 1.0, # ברירת מחדל, תעודכן אם תבוא שורת משקל אח"כ
+                        "unit": "UNIT",
+                        "name": full_name, # לשמירה (אופציונלי)
+                        "line": full_line_text
+                    }
+                    
+                    products.append(new_item)
+                    last_product = new_item # מעדכנים מצביע
+                    name_buffer = [] # מנקים בפר
+
+                elif len(text_only) > 2:
+                    # אין ברקוד, אבל יש טקסט עברי.
+                    # זה כנראה שם של מוצר (לפני הברקוד)
+                    name_buffer.append(text_only)
+
+            return {"chain name": ch, "header": [], "products": products}
+        
 
     def _chain_name_in_line(self, line: str) -> str:
         retail_chains_map = {
