@@ -329,8 +329,11 @@ class ReceiptScanner:
                     barcode = p["barcode"]
                     quantity = float(p["quantity"])
                     unit = p["unit"]
-
-                    aggregated_data[barcode] = (quantity, unit)
+                    if barcode in aggregated_data:
+                        existing_qty, _ = aggregated_data[barcode]
+                        aggregated_data[barcode] = (existing_qty + quantity, unit)
+                    else:
+                        aggregated_data[barcode] = (quantity, unit)
 
             # --- Fallback: חיפוש שם רשת בתמונה (אם לא נמצא בטקסט) ---
             if (not current_file_chain or current_file_chain == "unidentified chain") \
