@@ -7,9 +7,9 @@ scanner = ReceiptScanner()
 
 # file_path1 = r'tests\unit\8306975.pdf'
 file_path1 = r'tests\unit\receipt1.jpeg'
-# file_path2 = r'tests\unit\receipt2.jpeg'
+file_path2 = r'tests\unit\receipt2.jpeg'
 
-chain_name, products = scanner.parse_receipt(file_path1)
+chain_name, products = scanner.parse_receipt(file_path1, file_path2)
 
 print(f"--- RECEIPT: {chain_name} ---")
 print(f"{'Barcode':<20} | {'Qty':<5} | {'Unit':<5}")
