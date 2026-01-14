@@ -1,83 +1,55 @@
 from pathlib import Path
-from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from typing import Optional
+from sqlalchemy.orm import Session
+
+# --- Services ---
 from src.services.user_service import UserService
+from src.services.stock_service import StockService
+from src.services.management_service import ManagementService
+
+# --- Auth ---
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 
-from src.services.stock_service import StockService
-from src.services.management_service import ManagementService 
+# --- Repositories (DB Implementation) ---
+from src.infrastructure.repositories.db_user_repository import DbUserRepository
+from src.infrastructure.repositories.db_home_repository import DbHomeRepository
+from src.infrastructure.repositories.db_product_repository import DbProductRepository
 
+# --- Repositories (In-Memory for Tests) ---
+from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
+
+# --- Catalog ---
 from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
 
 class AppContainer:
     """
     Dependency Injection Container.
-    The main factory that creates and wires the application components.
+    Supports both Database injection (Production) and In-Memory fallback (Testing).
     """
 
-    # Singleton instances
-    _user_repo_instance = None
-    _auth_provider_instance = None
+    # Singleton instances (for Tests or Stateless components)
     _user_service_instance = None
-    _home_repo_instance = None
-    _product_repo_instance = None
-    _catalog_provider_instance = None
     _stock_service_instance = None
-    
-    _management_service_instance = None 
-
-    @staticmethod
-    def get_user_repository():
-        """Creates (if needed) and returns the User Repository"""
-        if AppContainer._user_repo_instance is None:
-            AppContainer._user_repo_instance = InMemoryUserRepository()
-        return AppContainer._user_repo_instance
+    _management_service_instance = None
+    _auth_provider_instance = None
+    _catalog_provider_instance = None
 
     @staticmethod
     def get_auth_provider():
-        """Creates (if needed) and returns the Auth Provider"""
         if AppContainer._auth_provider_instance is None:
-            # In production, get secret from env variables
             AppContainer._auth_provider_instance = JwtAuthProvider()
         return AppContainer._auth_provider_instance
 
     @staticmethod
-    def get_user_service():
-        """
-        Creates the UserService and injects dependencies.
-        """
-        if AppContainer._user_service_instance is None:
-            repo = AppContainer.get_user_repository()
-            auth = AppContainer.get_auth_provider()
-            
-            # Injection happens here
-            AppContainer._user_service_instance = UserService(user_repo=repo, auth_provider=auth)
-            
-        return AppContainer._user_service_instance
-    
-    @staticmethod
-    def get_home_repository():
-        """Creates (if needed) and returns the Home Repository"""
-        if AppContainer._home_repo_instance is None:
-            AppContainer._home_repo_instance = InMemoryHomeRepository()
-        return AppContainer._home_repo_instance
-    
-    @staticmethod
-    def get_product_repository():
-        """Creates (if needed) and returns the Product Repository"""
-        if AppContainer._product_repo_instance is None:
-            AppContainer._product_repo_instance = InMemoryProductRepository()
-        return AppContainer._product_repo_instance
-    
-    @staticmethod
     def get_catalog_provider():
-        """Creates (if needed) and returns the Catalog Repository"""
         if AppContainer._catalog_provider_instance is None:
-            project_root = Path(__file__).resolve().parents[2] 
+            project_root = Path(__file__).resolve().parents[2]
             csv_path = project_root / "src" / "data" / "master_db.csv"
 
             if not csv_path.exists():
+                # Fallback if running from a different directory
                 alt = project_root / "data" / "master_db.csv"
                 if alt.exists():
                     csv_path = alt
@@ -85,34 +57,60 @@ class AppContainer:
             AppContainer._catalog_provider_instance = CsvCatalogProvider(str(csv_path))
 
         return AppContainer._catalog_provider_instance
-    
+
     @staticmethod
-    def get_stock_service():
+    def get_user_service(db: Optional[Session] = None) -> UserService:
         """
-        Creates the StockService and injects dependencies.
+        Returns a UserService.
+        - If 'db' is provided: Returns a new instance connected to the DB (Production).
+        - If 'db' is None: Returns a singleton instance with InMemory repository (Testing).
         """
-        if AppContainer._stock_service_instance is None:
-            home_repo = AppContainer.get_home_repository()
-            product_repo = AppContainer.get_product_repository()
-            catalog_repo = AppContainer.get_catalog_provider()
-            
-            # Injection happens here
-            AppContainer._stock_service_instance = StockService(
-                home_repository=home_repo,
-                product_repository=product_repo,
-                catalog_provider=catalog_repo
+        auth = AppContainer.get_auth_provider()
+
+        # Production (DB)
+        if db:
+            repo = DbUserRepository(db)
+            return UserService(user_repo=repo, auth_provider=auth)
+
+        # Testing (In-Memory)
+        if AppContainer._user_service_instance is None:
+            repo = InMemoryUserRepository()
+            AppContainer._user_service_instance = UserService(user_repo=repo, auth_provider=auth)
+        
+        return AppContainer._user_service_instance
+
+    @staticmethod
+    def get_stock_service(db: Optional[Session] = None) -> StockService:
+        catalog = AppContainer.get_catalog_provider()
+
+        # Production (DB)
+        if db:
+            return StockService(
+                home_repository=DbHomeRepository(db),
+                product_repository=DbProductRepository(db),
+                catalog_provider=catalog
             )
-            
+
+        # Testing (In-Memory)
+        if AppContainer._stock_service_instance is None:
+            AppContainer._stock_service_instance = StockService(
+                home_repository=InMemoryHomeRepository(),
+                product_repository=InMemoryProductRepository(),
+                catalog_provider=catalog
+            )
+        
         return AppContainer._stock_service_instance
 
     @staticmethod
-    def get_management_service():
-        """
-        Creates the ManagementService and injects dependencies.
-        """
+    def get_management_service(db: Optional[Session] = None) -> ManagementService:
+        # Production (DB)
+        if db:
+            return ManagementService(home_repository=DbHomeRepository(db))
+        
+        # Testing (In-Memory)
         if AppContainer._management_service_instance is None:
-            home_repo = AppContainer.get_home_repository()
-            
-            AppContainer._management_service_instance = ManagementService(home_repository=home_repo)
+            AppContainer._management_service_instance = ManagementService(
+                home_repository=InMemoryHomeRepository()
+            )
             
         return AppContainer._management_service_instance
