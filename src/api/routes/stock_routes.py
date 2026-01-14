@@ -1,7 +1,7 @@
 from typing import List, Optional, Annotated
 from uuid import UUID
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Path, status, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query,File
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.database import get_db
@@ -62,6 +62,7 @@ async def add_product(
 
 @router.post("/scan", response_model=GeneralResponse)
 async def scan_receipt(
+    service: StockServiceDep, # <--- Injected Service
     file: UploadFile = File(...),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
@@ -75,7 +76,7 @@ async def scan_receipt(
             shutil.copyfileobj(file.file, tmp)
 
         try:
-            result = await stock_service.scan_receipt(
+            result = await service.scan_receipt(
                 user_id=user_id,
                 home_id=home_id,
                 file_path=tmp_path,    
