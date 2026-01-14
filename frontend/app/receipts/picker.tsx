@@ -1,17 +1,11 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as DocumentPicker from "expo-document-picker";
+
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import PrimaryButton from "@/src/ui/PrimaryButton";
 
@@ -22,32 +16,40 @@ export default function ReceiptPickerScreen() {
   const [loading, setLoading] = useState(false);
 
   const handlePickFile = async () => {
-  setLoading(true);
-  try {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["image/*", "application/pdf"], 
-      copyToCacheDirectory: true,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-
-      const uri = asset.uri;
-      setFileUri(uri);
-      setFileName(asset.name ?? "קובץ");
-      setMimeType(asset.mimeType ?? null);
-
-      router.push({
-        pathname: "./processing", 
-        params: { imageUri: uri },
+    setLoading(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/*", "application/pdf"],
+        copyToCacheDirectory: true,
       });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+
+        const uri = asset.uri;
+        const name = asset.name ?? "receipt";
+        const type = asset.mimeType ?? "application/octet-stream";
+
+        setFileUri(uri);
+        setFileName(name);
+        setMimeType(type);
+
+        // ✅ חשוב: להעביר ל-processing גם fileName ו-mimeType
+        router.push({
+          pathname: "./processing",
+          params: {
+            imageUri: uri,
+            fileName: name,
+            mimeType: type,
+          },
+        });
+      }
+    } catch (e) {
+      console.warn("File pick failed:", e);
+    } finally {
+      setLoading(false);
     }
-  } catch (e) {
-    console.warn("File pick failed:", e);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const isImage = mimeType?.startsWith("image/");
 
@@ -60,7 +62,6 @@ export default function ReceiptPickerScreen() {
         style={styles.gradient}
       />
 
-      {/* HEADER */}
       <ScreenHeader title="בחירת קובץ מהמכשיר" onBack={() => router.back()} />
 
       <View style={styles.content}>
@@ -69,7 +70,11 @@ export default function ReceiptPickerScreen() {
           המלאי.
         </Text>
 
-        <PrimaryButton title="בחר קובץ" onPress={handlePickFile} disabled={loading} />
+        <PrimaryButton
+          title={loading ? "טוען..." : "בחר קובץ"}
+          onPress={handlePickFile}
+          disabled={loading}
+        />
 
         {fileUri && (
           <View style={styles.previewBox}>
@@ -82,13 +87,12 @@ export default function ReceiptPickerScreen() {
                 <View style={styles.fileIconCircle}>
                   <Ionicons name="document-outline" size={20} color="#0F172A" />
                 </View>
+
                 <View style={{ flex: 1 }}>
                   <Text style={styles.fileName} numberOfLines={1}>
                     {fileName}
                   </Text>
-                  {mimeType && (
-                    <Text style={styles.fileMeta}>{mimeType}</Text>
-                  )}
+                  {mimeType && <Text style={styles.fileMeta}>{mimeType}</Text>}
                 </View>
               </View>
             )}
@@ -117,21 +121,6 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     textAlign: "right",
     marginBottom: 20,
-  },
-  pickButton: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#0284C7",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  pickButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 14,
   },
   previewBox: {
     marginTop: 24,

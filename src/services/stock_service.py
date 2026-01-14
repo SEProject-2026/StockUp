@@ -1,3 +1,4 @@
+import os
 from sys import exception
 from uuid import UUID, uuid4
 from typing import Any, List, Optional, Dict
@@ -50,15 +51,81 @@ class StockService:
         return product
         
     
-    async def scan_receipt(self, user_id: UUID, home_id: UUID, file_path: Any) -> ReceiptDTO:
-        """Processes a receipt image (OCR) and returns detected items for verification."""
+    async def scan_receipt(
+        self,
+        user_id: UUID,
+        home_id: UUID,
+        file_path: str,                 # ✅ חשוב: str
+        return_debug: bool = False,      # ✅ debug אופציונלי
+    ):
+        """Processes a receipt and returns detected items for verification.
+        If return_debug=True returns (ReceiptDTO, debug_dict)
+        """
         await self._check_access(user_id, home_id)
+
+        # ✅ הגנה: אם מישהו בטעות העביר אובייקט קובץ
+        if not isinstance(file_path, (str, os.PathLike)):
+            raise TypeError(f"file_path must be a path string, got: {type(file_path)}")
+
         scanner = ReceiptScanner()
-        chain_name, scanned_items = scanner.parse_receipt(file_path)
-        items = await self._catalog_provider.get_items_by_barcodes(scanned_items.keys(), chain_name)
-        receipt_items_dto = [ReceiptItemDTO(barcode=i.barcode, name=i.name, quantity=scanned_items[i.barcode][0], unit=scanned_items[i.barcode][1]) for i in items]
-        receipt_dto = ReceiptDTO(id=uuid4(), home_id=home_id, user_id=user_id, chain=chain_name, items=receipt_items_dto)
+        chain_name, scanned_items = scanner.parse_receipt(str(file_path))  # dict[barcode] -> (qty, unit)
+
+        scanned_barcodes = list(scanned_items.keys())
+
+        # מביאים מהקטלוג מה שמזהים לפי ברקודים
+        catalog_items = await self._catalog_provider.get_items_by_barcodes(
+            scanned_barcodes,
+            chain_name
+        )
+        catalog_items = catalog_items or []
+
+        catalog_by_barcode = {
+            ci.barcode: ci for ci in catalog_items if getattr(ci, "barcode", None)
+        }
+
+        # מה נסרק אבל לא נמצא בקטלוג (זאת סיבה נפוצה ל"חסרים" בפרונט)
+        missing_in_catalog = [b for b in scanned_barcodes if b not in catalog_by_barcode]
+
+        receipt_items_dto: list[ReceiptItemDTO] = []
+        for barcode in scanned_barcodes:
+            qty, unit = scanned_items[barcode]
+            ci = catalog_by_barcode.get(barcode)
+
+            # אם לא נמצא בקטלוג עדיין נחזיר אותו כדי שתראי אותו במסך
+            name = ci.name if ci else f"(לא נמצא בקטלוג) {barcode}"
+            safe_unit = unit if unit else "UNIT"  # או UnitType.UNIT אם זה enum
+
+            receipt_items_dto.append(
+                ReceiptItemDTO(
+                    barcode=barcode,
+                    name=name,
+                    quantity=float(qty),
+                    unit=safe_unit,
+                )
+            )
+
+        receipt_dto = ReceiptDTO(
+            id=uuid4(),
+            home_id=home_id,
+            user_id=user_id,
+            chain=chain_name,
+            items=receipt_items_dto,
+        )
+
+        debug = {
+            "chain": chain_name,
+            "scanned_count": len(scanned_barcodes),
+            "returned_count": len(receipt_items_dto),
+            "catalog_count": len(catalog_items),
+            "missing_in_catalog_count": len(missing_in_catalog),
+            "missing_in_catalog_sample": missing_in_catalog[:30],
+        }
+
+        if return_debug:
+            return receipt_dto, debug
+
         return receipt_dto
+
         
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
         

@@ -2,7 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
-from domain.smart_home.enums import UnitType
+from src.domain.smart_home.enums import UnitType
 
 
 class ReceiptItemDTO(BaseModel):
