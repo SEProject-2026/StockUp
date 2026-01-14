@@ -1,13 +1,13 @@
-// src/features/inventory/components/InventoryCategoryTabs.tsx
+// src/features/inventory/components/InventorylocationTabs.tsx
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
+import type { locationKey } from "@/src/components/inventory/inventory.utils";
 import { CATEGORIES, QUICK_KEYS, COLORS } from "./filters.constants";
 
-export default function InventoryCategoryTabs(props: {
-  selectedTab: CategoryKey;
-  onChangeTab: (tab: CategoryKey) => void;
+export default function InventorylocationTabs(props: {
+  selectedTab: locationKey;
+  onChangeTab: (tab: locationKey) => void;
   onOpenMore: () => void;
 }) {
   const selected = useMemo(
@@ -20,10 +20,10 @@ export default function InventoryCategoryTabs(props: {
   const selectedExtra = selectedIsExtra ? selected : null;
 
   return (
-    <View style={styles.categoryContainer}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryChipsRow}>
+    <View style={styles.locationContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locationChipsRow}>
         {quickCats.map((c) => (
-          <CategoryChip
+          <LocationChip
             key={c.key}
             label={c.label}
             icon={c.icon}
@@ -33,7 +33,7 @@ export default function InventoryCategoryTabs(props: {
         ))}
 
         {selectedExtra && (
-          <CategoryChip
+          <LocationChip
             key={`selected-extra-${selectedExtra.key}`}
             label={selectedExtra.label}
             icon={selectedExtra.icon}
@@ -43,7 +43,7 @@ export default function InventoryCategoryTabs(props: {
           />
         )}
 
-        <CategoryChip
+        <LocationChip
           label="עוד"
           icon="chevron-down"
           active={false}
@@ -59,7 +59,7 @@ export default function InventoryCategoryTabs(props: {
   );
 }
 
-function CategoryChip({
+function LocationChip({
   label,
   icon,
   active,
@@ -81,8 +81,8 @@ function CategoryChip({
 }
 
 const styles = StyleSheet.create({
-  categoryContainer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  categoryChipsRow: {
+  locationContainer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  locationChipsRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 8,

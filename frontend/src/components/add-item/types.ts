@@ -1,4 +1,4 @@
-export type Category = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
+export type location = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
 
 export type DraftItem = {
   id: string;
@@ -6,11 +6,11 @@ export type DraftItem = {
   nickname?: string | null;
   barcode?: string | null;
   quantity: number;
-  category: Category;
+  location: location;
   expiresAt?: Date;
 };
 
-export const locationMap: Record<Category, string> = {
+export const locationMap: Record<location, string> = {
   fridge: "FRIDGE",
   freezer: "FREEZER",
   pantry: "PANTRY",
@@ -18,7 +18,7 @@ export const locationMap: Record<Category, string> = {
   other: "OTHER",
 };
 
-export const CATEGORY_OPTIONS: Array<{ key: Category; label: string; icon: any }> = [
+export const location_OPTIONS: Array<{ key: location; label: string; icon: any }> = [
   { key: "fridge", label: "מקרר", icon: "snow-outline" },
   { key: "freezer", label: "מקפיא", icon: "ice-cream-outline" },
   { key: "pantry", label: "מזווה", icon: "cube-outline" },
@@ -26,8 +26,8 @@ export const CATEGORY_OPTIONS: Array<{ key: Category; label: string; icon: any }
   { key: "other", label: "אחר", icon: "ellipsis-horizontal-outline" },
 ];
 
-export function routeToCategory(categoryParam?: string): Category {
-  const c = String(categoryParam ?? "").toLowerCase();
+export function routeTolocation(locationParam?: string): location {
+  const c = String(locationParam ?? "").toLowerCase();
   if (c === "fridge") return "fridge";
   if (c === "freezer") return "freezer";
   if (c === "pantry") return "pantry";

@@ -9,7 +9,7 @@ type Props = {
   onPress: () => void;
 };
 
-export default function CategoryAreaButton({
+export default function locationAreaButton({
   label,
   value,
   icon,

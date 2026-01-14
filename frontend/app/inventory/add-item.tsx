@@ -8,12 +8,12 @@ import ScreenHeader from "@/src/layout/ScreenHeader";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 import { addProduct } from "@/src/api/stock";
 
-import { CATEGORY_OPTIONS, routeToCategory, locationMap } from "@/src/components/add-item/types";
-import type { Category, DraftItem } from "@/src/components/add-item/types";
+import { location_OPTIONS, routeTolocation, locationMap } from "@/src/components/add-item/types";
+import type { location, DraftItem } from "@/src/components/add-item/types";
 
 import ProductDraftCard from "@/src/components/add-item/ProductDraftCard";
 import PendingList from "@/src/components/add-item/PendingList";
-import CategoryPickerModal from "@/src/components/add-item/CategoryPickerModal";
+import locationPickerModal from "@/src/components/add-item/locationPickerModal";
 import BarcodeScannerModal from "@/src/components/add-item/BarcodeScannerModal";
 import DatePickerModal from "@/src/components/add-item/DatePickerModal";
 
@@ -59,10 +59,10 @@ function normalizeCatalogOne(raw: any): CatalogItem | null {
 }
 
 export default function BatchAddItemsScreen() {
-  const { homeId, category: categoryParam } = useLocalSearchParams<{ homeId?: string; category?: string }>();
+  const { homeId, location: locationParam } = useLocalSearchParams<{ homeId?: string; location?: string }>();
   const currentHomeId = homeId ? String(homeId) : "";
 
-  const initialCategory = useMemo<Category>(() => routeToCategory(categoryParam), [categoryParam]);
+  const initiallocation = useMemo<location>(() => routeTolocation(locationParam), [locationParam]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -71,7 +71,7 @@ export default function BatchAddItemsScreen() {
   const [nickname, setNickname] = useState("");
 
   const [quantity, setQuantity] = useState("");
-  const [category, setCategory] = useState<Category>(initialCategory);
+  const [location, setlocation] = useState<location>(initiallocation);
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
 
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
@@ -155,13 +155,13 @@ export default function BatchAddItemsScreen() {
     };
   }, [debouncedName, editingId, selectedCatalogItem]);
 
-  function resetDraft(keepCategory = true) {
+  function resetDraft(keeplocation = true) {
     setEditingId(null);
     setBarcode("");
     setName("");
     setNickname("");
     setQuantity("");
-    if (!keepCategory) setCategory(initialCategory);
+    if (!keeplocation) setlocation(initiallocation);
     setExpiresAt(undefined);
 
     setSelectedCatalogItem(null);
@@ -176,7 +176,7 @@ export default function BatchAddItemsScreen() {
     setName(item.name);
     setNickname(item.nickname ?? "");
     setQuantity(String(item.quantity));
-    setCategory(item.category);
+    setlocation(item.location);
     setExpiresAt(item.expiresAt);
 
     setSuggestions([]);
@@ -200,7 +200,7 @@ export default function BatchAddItemsScreen() {
       name: finalName,
       nickname: nickname.trim() ? nickname.trim() : null,
       quantity: qty,
-      category,
+      location,
       expiresAt,
     };
 
@@ -237,7 +237,7 @@ export default function BatchAddItemsScreen() {
           quantity: item.quantity,
           barcode: item.barcode ? item.barcode : null,
           expiration_date: formattedExpires,
-          location: locationMap[item.category],
+          location: locationMap[item.location],
           nickname: item.nickname ?? null,
         });
 
@@ -284,9 +284,9 @@ export default function BatchAddItemsScreen() {
             name={name}
             nickname={nickname}
             quantity={quantity}
-            category={category}
+            location={location}
             expiresAt={expiresAt}
-            categoryOptions={CATEGORY_OPTIONS}
+            locationOptions={location_OPTIONS}
             onChangeBarcode={setBarcode}
             onChangeName={(v) => {
               setName(v);
@@ -295,7 +295,7 @@ export default function BatchAddItemsScreen() {
             }}
             onChangeNickname={setNickname}
             onChangeQuantity={setQuantity}
-            onPressCategory={() => setCatOpen(true)}
+            onPresslocation={() => setCatOpen(true)}
             onPressScan={() => setScanOpen(true)}
             onPressDate={() => setDateOpen(true)}
             onClearDate={() => setExpiresAt(undefined)}
@@ -316,7 +316,7 @@ export default function BatchAddItemsScreen() {
 
           <PendingList
             items={pending}
-            categoryOptions={CATEGORY_OPTIONS}
+            locationOptions={location_OPTIONS}
             onEdit={loadItemToDraft}
             onRemove={removeFromList}
           />
@@ -333,13 +333,13 @@ export default function BatchAddItemsScreen() {
           />
         </View>
 
-        <CategoryPickerModal
+        <locationPickerModal
           open={catOpen}
-          selected={category}
-          options={CATEGORY_OPTIONS}
+          selected={location}
+          options={location_OPTIONS}
           onClose={() => setCatOpen(false)}
           onSelect={(c) => {
-            setCategory(c);
+            setlocation(c);
             setCatOpen(false);
           }}
         />

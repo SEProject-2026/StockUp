@@ -16,10 +16,10 @@ import {
 import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
 
 import {
-  CategoryKey,
+  locationKey,
   StatusFilter,
   InventoryRow,
-  categoryToLocationType,
+  locationToLocationType,
   dtoToRows,
   rowsSignature,
   statusFilterToExpirationType,
@@ -30,22 +30,22 @@ type LoadMode = "initial" | "soft";
 
 export function useInventoryData(params: {
   homeId?: string;
-  initialCategory: CategoryKey;
+  initiallocation: locationKey;
   hideTabs: boolean;
 }) {
-  const { homeId, initialCategory, hideTabs } = params;
+  const { homeId, initiallocation, hideTabs } = params;
 
   const [rows, setRows] = useState<InventoryRow[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
 
-  const [selectedTab, setSelectedTab] = useState<CategoryKey>(initialCategory);
+  const [selectedTab, setSelectedTab] = useState<locationKey>(initiallocation);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const [itemToEdit, setItemToEdit] = useState<InventoryRow | null>(null);
 
-  const effectiveCategory: CategoryKey = hideTabs ? initialCategory : selectedTab;
+  const effectivelocation: locationKey = hideTabs ? initiallocation : selectedTab;
 
   const debouncedSearch = useDebouncedValue(search, 400);
 
@@ -56,7 +56,7 @@ export function useInventoryData(params: {
   const didInitialLoadRef = useRef<string | null>(null);
 
   const fetchProducts = useCallback(
-    async (q: string, effCat: CategoryKey, sf: StatusFilter): Promise<ProductDTO[]> => {
+    async (q: string, effCat: locationKey, sf: StatusFilter): Promise<ProductDTO[]> => {
       if (!homeId) return [];
 
       if (q.length >= 2) {
@@ -71,7 +71,7 @@ export function useInventoryData(params: {
       }
 
       if (effCat !== "all") {
-        const loc = categoryToLocationType(effCat);
+        const loc = locationToLocationType(effCat);
         const res = await filterStockByLocation(homeId, loc);
         return res.data ?? [];
       }
@@ -83,10 +83,10 @@ export function useInventoryData(params: {
   );
 
   const applyClientFilters = useCallback(
-    (input: InventoryRow[], q: string, effCat: CategoryKey, sf: StatusFilter) => {
+    (input: InventoryRow[], q: string, effCat: locationKey, sf: StatusFilter) => {
       let out = input;
 
-      if (effCat !== "all") out = out.filter((r) => r.category === effCat);
+      if (effCat !== "all") out = out.filter((r) => r.location === effCat);
 
       if (q.length >= 2) {
         const qq = q.toLowerCase();
@@ -118,11 +118,11 @@ export function useInventoryData(params: {
         if (mode === "initial") setInitialLoading(true);
         else setIsSearching(true);
 
-        const products = await fetchProducts(q, effectiveCategory, statusFilter);
+        const products = await fetchProducts(q, effectivelocation, statusFilter);
         if (mySeq !== requestSeqRef.current) return;
 
         const flat = products.flatMap(dtoToRows);
-        const filtered = applyClientFilters(flat, q, effectiveCategory, statusFilter);
+        const filtered = applyClientFilters(flat, q, effectivelocation, statusFilter);
 
         const nextSig = rowsSignature(filtered);
         if (nextSig !== prevSigRef.current) {
@@ -142,7 +142,7 @@ export function useInventoryData(params: {
     [
       homeId,
       debouncedSearch,
-      effectiveCategory,
+      effectivelocation,
       statusFilter,
       fetchProducts,
       applyClientFilters,
@@ -173,7 +173,7 @@ export function useInventoryData(params: {
     if (didInitialLoadRef.current !== homeId) return;
 
     loadInventory("soft");
-  }, [homeId, debouncedSearch, effectiveCategory, statusFilter, loadInventory]);
+  }, [homeId, debouncedSearch, effectivelocation, statusFilter, loadInventory]);
 
   const groupedItems = useMemo(() => {
     const map = new Map<
@@ -181,20 +181,20 @@ export function useInventoryData(params: {
       {
         key: string;
         name: string;
-        category: InventoryRow["category"];
+        location: InventoryRow["location"];
         totalQuantity: number;
         items: InventoryRow[];
       }
     >();
 
     for (const r of rows) {
-      const key = `${r.category}__${r.name}`;
+      const key = `${r.location}__${r.name}`;
 
       const g =
         map.get(key) ?? {
           key,
           name: r.name,
-          category: r.category,
+          location: r.location,
           totalQuantity: 0,
           items: [] as InventoryRow[],
         };

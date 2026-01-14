@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TextInput, Platform, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
-import type { Category } from "./types";
+import type { location } from "./types";
 import SuggestionsList from "@/src/components/add-item/SuggestionsList";
 import type { CatalogItem } from "@/src/api/catalog";
 
@@ -23,16 +23,16 @@ export default function ProductDraftCard(props: {
   name: string;
   nickname: string;
   quantity: string;
-  category: Category;
+  location: location;
   expiresAt?: Date;
-  categoryOptions: Array<{ key: Category; label: string; icon: keyof typeof Ionicons.glyphMap }>;
+  locationOptions: Array<{ key: location; label: string; icon: keyof typeof Ionicons.glyphMap }>;
 
   onChangeBarcode: (v: string) => void;
   onChangeName: (v: string) => void;
   onChangeNickname: (v: string) => void;
   onChangeQuantity: (v: string) => void;
 
-  onPressCategory: () => void;
+  onPresslocation: () => void;
   onPressScan: () => void;
   onPressDate: () => void;
   onClearDate: () => void;
@@ -49,8 +49,8 @@ export default function ProductDraftCard(props: {
   onPickSuggestion: (item: CatalogItem) => void;
 }) {
   const meta = useMemo(
-    () => props.categoryOptions.find((x) => x.key === props.category) ?? props.categoryOptions[0],
-    [props.category, props.categoryOptions]
+    () => props.locationOptions.find((x) => x.key === props.location) ?? props.locationOptions[0],
+    [props.location, props.locationOptions]
   );
 
   const showOriginalUnderNickname = props.nickname.trim().length > 0 && props.selectedCatalogItem?.name;
@@ -58,7 +58,7 @@ export default function ProductDraftCard(props: {
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        <TouchableOpacity style={styles.chip} activeOpacity={0.85} onPress={props.onPressCategory}>
+        <TouchableOpacity style={styles.chip} activeOpacity={0.85} onPress={props.onPresslocation}>
           <Ionicons name={meta.icon} size={16} color={BRAND_PRIMARY} />
           <Text style={styles.chipText}>{meta.label}</Text>
           <Ionicons name="chevron-down" size={16} color={BRAND_MUTED} />

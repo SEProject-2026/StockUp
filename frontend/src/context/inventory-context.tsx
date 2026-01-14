@@ -5,13 +5,13 @@ import React, {
   ReactNode,
 } from "react";
 
-export type Category = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
+export type location = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
 
 
 export type InventoryItem = {
   id: string;
   name: string;
-  category: Category;
+  location: location;
   quantity: number;
   expiresAt?: string;
 };

@@ -6,14 +6,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
 import QuickActionButton from "@/src/components/ui/buttons/QuickActionButton";
-import CategoryAreaButton from "@/src/components/homes/CategoryAreaButton";
+import locationAreaButton from "@/src/components/homes/locationAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStatusCard";
 import SideTitleCard from "@/src/components/ui/cards/SideTitleCard";
 import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
 import { getAllStock, type ProductDTO } from "@/src/api/stock";
-import type { Category } from "@/src/context/inventory-context";
+import type { location } from "@/src/context/inventory-context";
 
 import { setSelectedHomeId } from "./selected-home";
 
@@ -22,12 +22,12 @@ const BRAND_BLUE_SOFT = "#F0FAFF";
 type HomeItem = {
   id: string;
   name: string;
-  category: Category;
+  location: location;
   quantity: number;
   expiresAt?: string;
 };
 
-function locationToCategory(location?: string | null): Category {
+function locationTolocation(location?: string | null): location {
   switch ((location ?? "").toUpperCase()) {
     case "FRIDGE":
       return "fridge";
@@ -46,13 +46,13 @@ function locationToCategory(location?: string | null): Category {
 
 function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
   const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
-  const category = locationToCategory(dto.location);
+  const location = locationTolocation(dto.location);
 
   if (dto.items?.length) {
     return dto.items.map((it) => ({
       id: `${dto.id}__${it.expiration_date ?? "none"}`,
       name: displayName,
-      category,
+      location,
       quantity: it.quantity,
       expiresAt: it.expiration_date ?? undefined,
     }));
@@ -62,7 +62,7 @@ function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
     {
       id: `${dto.id}__none`,
       name: displayName,
-      category,
+      location,
       quantity: dto.quantity ?? 0,
       expiresAt: undefined,
     },
@@ -118,11 +118,11 @@ export default function HomeDashboardScreen() {
       expiringSoon = 0;
 
     homeItems.forEach((item) => {
-      if (item.category === "fridge") fridge++;
-      if (item.category === "freezer") freezer++;
-      if (item.category === "pantry") pantry++;
-      if (item.category === "cleaning") cleaningSupplies++;
-      if (item.category === "other") other++;
+      if (item.location === "fridge") fridge++;
+      if (item.location === "freezer") freezer++;
+      if (item.location === "pantry") pantry++;
+      if (item.location === "cleaning") cleaningSupplies++;
+      if (item.location === "other") other++;
 
       if (item.expiresAt) {
         const exp = new Date(item.expiresAt);
@@ -186,62 +186,62 @@ export default function HomeDashboardScreen() {
             >
               <SideTitleCard label={"אזורי\nהבית"} />
 
-              <CategoryAreaButton
+              <locationAreaButton
                 label="מקרר"
                 value={stats.fridge}
                 icon="snow-outline"
                 onPress={() =>
                   router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "fridge", homeId: currentHomeId },
+                    pathname: "/inventory/[location]",
+                    params: { location: "fridge", homeId: currentHomeId },
                   })
                 }
               />
 
-              <CategoryAreaButton
+              <locationAreaButton
                 label="מקפיא"
                 value={stats.freezer}
                 icon="cube-outline"
                 onPress={() =>
                   router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "freezer", homeId: currentHomeId },
+                    pathname: "/inventory/[location]",
+                    params: { location: "freezer", homeId: currentHomeId },
                   })
                 }
               />
 
-              <CategoryAreaButton
+              <locationAreaButton
                 label="מזווה"
                 value={stats.pantry}
                 icon="restaurant-outline"
                 onPress={() =>
                   router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "pantry", homeId: currentHomeId },
+                    pathname: "/inventory/[location]",
+                    params: { location: "pantry", homeId: currentHomeId },
                   })
                 }
               />
 
-              <CategoryAreaButton
+              <locationAreaButton
                 label="ציוד ניקוי"
                 value={stats.cleaningSupplies}
                 icon="water-outline"
                 onPress={() =>
                   router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "cleaning-supplies", homeId: currentHomeId },
+                    pathname: "/inventory/[location]",
+                    params: { location: "cleaning-supplies", homeId: currentHomeId },
                   })
                 }
               />
 
-              <CategoryAreaButton
+              <locationAreaButton
                 label="אחר"
                 value={stats.other}
                 icon="ellipsis-horizontal-outline"
                 onPress={() =>
                   router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "other", homeId: currentHomeId },
+                    pathname: "/inventory/[location]",
+                    params: { location: "other", homeId: currentHomeId },
                   })
                 }
               />

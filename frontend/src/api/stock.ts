@@ -175,7 +175,7 @@ export async function filterStockByExpiration(homeId: string, type: ExpirationTy
 
 // --- Receipt Scan (OCR) ---
 
-export type StorageCategory =
+export type Storagelocation =
   | "fridge"
   | "freezer"
   | "pantry"
@@ -187,7 +187,7 @@ export type DetectedReceiptItemDTO = {
   name: string;
   quantity: number;
   unit: string; 
-  storage_category?: StorageCategory | null;
+  storage_location?: Storagelocation | null;
 };
 
 export type ReceiptDTO = {

@@ -8,7 +8,7 @@ type Props = {
   variant: "warning" | "neutral";
 };
 
-const CATEGORY_LABELS: Record<InventoryItem["category"], string> = {
+const location_LABELS: Record<InventoryItem["location"], string> = {
   fridge: "מקרר",
   freezer: "מקפיא",
   pantry: "מזווה",
@@ -17,7 +17,7 @@ const CATEGORY_LABELS: Record<InventoryItem["category"], string> = {
 };
 
 export default function HomeItemRow({ item, variant }: Props) {
-  const categoryLabel = CATEGORY_LABELS[item.category] ?? "אחר";
+  const locationLabel = location_LABELS[item.location] ?? "אחר";
   const isWarning = variant === "warning";
 
   return (
@@ -37,7 +37,7 @@ export default function HomeItemRow({ item, variant }: Props) {
               isWarning && styles.metaTextWarning,
             ]}
           >
-            {categoryLabel}
+            {locationLabel}
             {item.expiresAt ? " · תוקף " + item.expiresAt : ""}
           </Text>
         </View>

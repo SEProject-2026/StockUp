@@ -50,7 +50,7 @@ const SHADOW = Platform.select({
 // Locations (UI-level)
 // --------------------
 type LocationKey = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
-type StorageCategory = LocationKey;
+type Storagelocation = LocationKey;
 type IconProps = Omit<
   ComponentProps<typeof MaterialCommunityIcons>,
   "name"
@@ -85,7 +85,7 @@ const LOCATION_ICON: Record<
 };
 
 
-function storageCategoryToLocationType(cat?: string | null): string {
+function storagelocationToLocationType(cat?: string | null): string {
   const s = String(cat ?? "").toLowerCase().trim();
   switch (s) {
     case "fridge":
@@ -101,14 +101,14 @@ function storageCategoryToLocationType(cat?: string | null): string {
   }
 }
 
-function normalizeCategory(v: any): StorageCategory {
+function normalizelocation(v: any): Storagelocation {
   const s = String(v ?? "").trim().toLowerCase();
   if (s === "fridge" || s === "freezer" || s === "pantry" || s === "cleaning" || s === "other") return s;
   return "other";
 }
 
-function categoryToDefaultLocation(cat?: any): LocationKey {
-  return normalizeCategory(cat);
+function locationToDefaultLocation(cat?: any): LocationKey {
+  return normalizelocation(cat);
 }
 
 type DetectedItem = {
@@ -118,7 +118,7 @@ type DetectedItem = {
   quantity: number;
   unit?: string;
 
-  storage_category?: StorageCategory;
+  storage_location?: Storagelocation;
   location: LocationKey;
 };
 
@@ -176,9 +176,9 @@ function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
 
       if (!name) return null;
 
-      const storage_category = it.storage_category ?? it.storageCategory ?? it.category;
-      const normalizedCat = normalizeCategory(storage_category);
-      const location = categoryToDefaultLocation(normalizedCat);
+      const storage_location = it.storage_location ?? it.storagelocation ?? it.location;
+      const normalizedCat = normalizelocation(storage_location);
+      const location = locationToDefaultLocation(normalizedCat);
 
       return {
         id: uuid(),
@@ -186,7 +186,7 @@ function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
         name,
         quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
         unit,
-        storage_category: normalizedCat,
+        storage_location: normalizedCat,
         location,
       } as DetectedItem;
     })
@@ -347,7 +347,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
     const payload = items.map((x) => ({
       name: x.name.trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
-      location: storageCategoryToLocationType(x.location ?? x.storage_category ?? "other"),
+      location: storagelocationToLocationType(x.location ?? x.storage_location ?? "other"),
     }));
 
     const bad = payload.find((p) => !p.name || p.quantity <= 0);
@@ -694,7 +694,7 @@ function AddItemModal({
                   name: name.trim(),
                   quantity: q,
                   unit: unit.trim() || undefined,
-                  storage_category: "other",
+                  storage_location: "other",
                   location,
                 });
               }}

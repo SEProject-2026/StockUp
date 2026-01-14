@@ -1,5 +1,5 @@
 // src/features/inventory/filters.constants.ts
-import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
+import type { locationKey } from "@/src/components/inventory/inventory.utils";
 import type { Ionicons } from "@expo/vector-icons";
 
 export type StatusFilter = "all" | "soon" | "expired";
@@ -13,7 +13,7 @@ export const COLORS = {
 } as const;
 
 export const CATEGORIES: Array<{
-  key: CategoryKey;
+  key: locationKey;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }> = [
@@ -25,4 +25,4 @@ export const CATEGORIES: Array<{
   { key: "other", label: "אחר", icon: "ellipsis-horizontal-outline" },
 ];
 
-export const QUICK_KEYS: CategoryKey[] = ["all", "fridge", "freezer", "pantry"];
+export const QUICK_KEYS: locationKey[] = ["all", "fridge", "freezer", "pantry"];

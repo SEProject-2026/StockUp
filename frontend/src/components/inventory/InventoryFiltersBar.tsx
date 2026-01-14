@@ -3,17 +3,17 @@ import React, { useState } from "react";
 import { View, TextInput, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
-import InventoryCategoryTabs from "./InventoryCategoryTabs";
+import type { locationKey } from "@/src/components/inventory/inventory.utils";
+import InventorylocationTabs from "./InventoryLocationTabs";
 import InventoryStatusChips from "./InventoryStatusChips";
-import InventoryCategoryPickerModal from "./InventoryCategoryPickerModal";
+import InventorylocationPickerModal from "./InventoryLocationPickerModal";
 import { COLORS, type StatusFilter } from "./filters.constants";
 
 type Props = {
   hideTabs?: boolean;
 
-  selectedTab: CategoryKey;
-  onChangeTab: (tab: CategoryKey) => void;
+  selectedTab: locationKey;
+  onChangeTab: (tab: locationKey) => void;
 
   search: string;
   onChangeSearch: (value: string) => void;
@@ -39,7 +39,7 @@ export const InventoryFiltersBar: React.FC<Props> = ({
   return (
     <>
       {!hideTabs && (
-        <InventoryCategoryTabs
+        <InventorylocationTabs
           selectedTab={selectedTab}
           onChangeTab={onChangeTab}
           onOpenMore={() => setCatOpen(true)}
@@ -48,7 +48,6 @@ export const InventoryFiltersBar: React.FC<Props> = ({
 
       {filtersVisible && (
         <>
-          {/* Search (כמו שהיה, בלי TextField) */}
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={18} color={COLORS.BRAND_MUTED} />
             <TextInput
@@ -67,7 +66,7 @@ export const InventoryFiltersBar: React.FC<Props> = ({
         </>
       )}
 
-      <InventoryCategoryPickerModal
+      <InventorylocationPickerModal
         open={catOpen}
         selectedTab={selectedTab}
         onClose={() => setCatOpen(false)}

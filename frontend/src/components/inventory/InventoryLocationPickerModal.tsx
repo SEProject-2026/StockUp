@@ -1,15 +1,15 @@
-// src/features/inventory/components/InventoryCategoryPickerModal.tsx
+// src/features/inventory/components/InventorylocationPickerModal.tsx
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
+import type { locationKey } from "@/src/components/inventory/inventory.utils";
 import { CATEGORIES, COLORS } from "./filters.constants";
 
-export default function InventoryCategoryPickerModal(props: {
+export default function InventorylocationPickerModal(props: {
   open: boolean;
-  selectedTab: CategoryKey;
+  selectedTab: locationKey;
   onClose: () => void;
-  onPick: (c: CategoryKey) => void;
+  onPick: (c: locationKey) => void;
 }) {
   return (
     <Modal visible={props.open} animationType="fade" transparent onRequestClose={props.onClose}>
