@@ -60,6 +60,44 @@ async def add_product(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.post("/scan", response_model=GeneralResponse)
+async def scan_receipt(
+    file: UploadFile = File(...),
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    try:
+        import tempfile, shutil, os
+
+        suffix = os.path.splitext(file.filename or "")[1] or ".bin"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            shutil.copyfileobj(file.file, tmp)
+
+        try:
+            result = await stock_service.scan_receipt(
+                user_id=user_id,
+                home_id=home_id,
+                file_path=tmp_path,    
+            )
+
+            return GeneralResponse(
+                status="success",
+                data=result.model_dump(),
+            )
+
+        finally:
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Scanning failed: {str(e)}",
+        )
+
 @router.patch("/{product_id}/quantity", response_model=GeneralResponse)
 async def update_quantity(
     product_id: UUID,

@@ -1,5 +1,5 @@
-// app/receipts/review.tsx
-import React, { useMemo, useState } from "react";
+// frontend/app/receipts/review.tsx
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,9 +16,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
 import PrimaryButton from "@/src/ui/PrimaryButton";
-// או למשל:
-// import PrimaryButton from "@/components/PrimaryButton";
-// import { PrimaryButton } from "@/components/ui/buttons";
+import { getSelectedHomeId } from "../home/selected-home";
+import { addProduct } from "@/src/api/stock";
+import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 const BRAND_BG = "#F4F4F4";
@@ -28,32 +28,68 @@ const TEXT_MUTED = "#6B7280";
 const BRAND_PINK = "#FF4FA3";
 const BRAND_PINK_SOFT = "#FFE0EF";
 
+// --------------------
+// Locations (UI-level)
+// --------------------
+type LocationKey = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
+type StorageCategory = LocationKey;
+
+const LOCATION_LABEL: Record<LocationKey, string> = {
+  fridge: "מקרר",
+  freezer: "מקפיא",
+  pantry: "מזווה",
+  cleaning: "ניקיון וטואלטיקה",
+  other: "אחר",
+};
+
+const LOCATION_ICON: Record<LocationKey, keyof typeof Ionicons.glyphMap> = {
+  fridge: "snow-outline",
+  freezer: "ice-cream-outline",
+  pantry: "cube-outline",
+  cleaning: "sparkles-outline",
+  other: "help-circle-outline",
+};
+function storageCategoryToLocationType(cat?: string | null): string {
+  const s = String(cat ?? "").toLowerCase().trim();
+
+  switch (s) {
+    case "fridge":
+      return "FRIDGE";
+    case "freezer":
+      return "FREEZER";
+    case "pantry":
+      return "PANTRY";
+    case "cleaning":
+      return "CLEANING_SUPPLIES"; 
+    default:
+      return "OTHER";
+  }
+}
+function normalizeCategory(v: any): StorageCategory {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (s === "fridge" || s === "freezer" || s === "pantry" || s === "cleaning" || s === "other") return s;
+  return "other";
+}
+
+function categoryToDefaultLocation(cat?: any): LocationKey {
+  return normalizeCategory(cat);
+}
+
 type DetectedItem = {
   id: string;
+  barcode?: string;
   name: string;
   quantity: number;
   unit?: string;
+
+  storage_category?: StorageCategory; 
+  location: LocationKey; 
 };
 
 function uuid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-/** TODO: החליפי ל-action אמיתי אצלכם (API/Store) */
-async function addManyToHomeInventoryMock(
-  homeId: string,
-  items: Array<{ name: string; quantity: number; unit?: string }>
-) {
-  await new Promise((r) => setTimeout(r, 250));
-  return true;
-}
-
-/**
- * 👇 טריק תאימות:
- * אנחנו מעבירים גם `title` וגם `children`.
- * - אם ה-PrimaryButton שלכם בנוי עם title → הוא ישתמש ב-title ויתעלם מ-children.
- * - אם הוא בנוי עם children → הוא יציג את children ויתעלם מה-title.
- */
 function PrimaryButtonCompat(props: {
   title: string;
   onPress: () => void;
@@ -61,13 +97,11 @@ function PrimaryButtonCompat(props: {
   disabled?: boolean;
 }) {
   const { title, onPress, leftIcon, disabled } = props;
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Btn: any = PrimaryButton;
 
   return (
     <Btn title={title} onPress={onPress} disabled={disabled}>
-      {/* אם PrimaryButton תומך children – זה ייראה טוב; אם לא – לרוב יתעלם */}
       <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8 }}>
         {leftIcon}
         <Text style={{ fontWeight: "800", color: TEXT_DARK }}>{title}</Text>
@@ -76,18 +110,109 @@ function PrimaryButtonCompat(props: {
   );
 }
 
+function parseReceiptParam(receiptParam?: string): any | null {
+  if (!receiptParam) return null;
+  try {
+    return JSON.parse(receiptParam);
+  } catch {}
+  try {
+    return JSON.parse(decodeURIComponent(receiptParam));
+  } catch {}
+  try {
+    return JSON.parse(decodeURIComponent(decodeURIComponent(receiptParam)));
+  } catch {}
+  return null;
+}
+
+function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
+  if (!receipt) return [];
+
+  // תומך גם ב-GeneralResponse עטוף
+  const inner = receipt?.data?.receipt ?? receipt?.data ?? receipt;
+
+  const rawItems = inner.items ?? inner.detected_items ?? inner?.data?.items ?? [];
+  if (!Array.isArray(rawItems)) return [];
+
+  return rawItems
+    .map((it: any) => {
+      const name = String(it.name ?? it.product_name ?? it.title ?? "").trim();
+      const qRaw = it.quantity ?? it.qty ?? 1;
+      const quantity = Number(String(qRaw).replace(",", "."));
+      const unit = it.unit ? String(it.unit) : undefined;
+
+      if (!name) return null;
+
+      const storage_category = it.storage_category ?? it.storageCategory ?? it.category;
+      const normalizedCat = normalizeCategory(storage_category);
+      const location = categoryToDefaultLocation(normalizedCat);
+
+      return {
+        id: uuid(),
+        barcode: it.barcode ? String(it.barcode) : undefined,
+        name,
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        unit,
+        storage_category: normalizedCat,
+        location,
+      } as DetectedItem;
+    })
+    .filter(Boolean) as DetectedItem[];
+}
+
+function LocationPill({ loc }: { loc: LocationKey }) {
+  return (
+    <View style={styles.locPill}>
+      <Ionicons name={LOCATION_ICON[loc]} size={14} color={TEXT_DARK} />
+      <Text style={styles.locPillText}>{LOCATION_LABEL[loc]}</Text>
+    </View>
+  );
+}
+
+function LocationSelector({
+  value,
+  onChange,
+}: {
+  value: LocationKey;
+  onChange: (v: LocationKey) => void;
+}) {
+  const options: LocationKey[] = ["fridge", "freezer", "pantry", "cleaning", "other"];
+
+  return (
+    <View style={{ marginTop: 10 }}>
+      <Text style={styles.fieldLabel}>מיקום בבית</Text>
+      <View style={styles.locRow}>
+        {options.map((opt) => {
+          const active = value === opt;
+          return (
+            <Pressable
+              key={opt}
+              onPress={() => onChange(opt)}
+              style={[styles.locChip, active && styles.locChipActive]}
+            >
+              <Ionicons name={LOCATION_ICON[opt]} size={16} color={TEXT_DARK} />
+              <Text style={styles.locChipText}>{LOCATION_LABEL[opt]}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function ReceiptReviewDetectedProductsScreen() {
-  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
-  const currentHomeId = String(homeId ?? "");
+  const { receipt } = useLocalSearchParams<{ receipt?: string }>();
 
-  const [items, setItems] = useState<DetectedItem[]>([
-    { id: uuid(), name: "חלב 3%", quantity: 2, unit: "יח׳" },
-    { id: uuid(), name: "לחם מלא", quantity: 1, unit: "יח׳" },
-    { id: uuid(), name: "עגבניות", quantity: 1.2, unit: "ק״ג" },
-  ]);
+  const receiptFromParam = useMemo(() => parseReceiptParam(receipt), [receipt]);
+  const receiptObj = useMemo(() => receiptFromParam ?? consumeLastScannedReceipt(), [receiptFromParam]);
 
+  const [items, setItems] = useState<DetectedItem[]>([]);
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setItems(mapReceiptToDetectedItems(receiptObj));
+  }, [receiptObj]);
 
   const totalCount = useMemo(() => items.length, [items.length]);
 
@@ -100,10 +225,8 @@ export default function ReceiptReviewDetectedProductsScreen() {
   }
 
   async function onConfirmAddAll() {
-    if (!currentHomeId) {
-      Alert.alert("שגיאה", "חסר homeId כדי להוסיף למלאי.");
-      return;
-    }
+    if (saving) return;
+
     if (items.length === 0) {
       Alert.alert("אין מוצרים", "אין מה להוסיף למלאי.");
       return;
@@ -112,7 +235,8 @@ export default function ReceiptReviewDetectedProductsScreen() {
     const payload = items.map((x) => ({
       name: x.name.trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
-      unit: x.unit?.trim() || undefined,
+      location: storageCategoryToLocationType(x.location ?? x.storage_category ?? "other"),
+
     }));
 
     const bad = payload.find((p) => !p.name || p.quantity <= 0);
@@ -121,19 +245,36 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
+    setSaving(true);
     try {
-      await addManyToHomeInventoryMock(currentHomeId, payload);
-      Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.");
-      router.back();
-    } catch {
-      Alert.alert("נכשל", "לא הצלחנו להוסיף למלאי. נסי שוב.");
+      const homeId = await getSelectedHomeId();
+      if (!homeId) {
+        Alert.alert("שגיאה", "לא נבחר בית פעיל. חזרי ובחרי בית.");
+        return;
+      }
+
+      const results = await Promise.allSettled(payload.map((p) => addProduct(homeId, p)));
+
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - ok;
+
+      if (failed === 0) {
+        Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.");
+        router.back();
+        return;
+      }
+
+      Alert.alert("נוספו חלקית", `נוספו ${ok} מוצרים, נכשלו ${failed}.`);
+    } catch (e: any) {
+      Alert.alert("נכשל", e?.message ?? "לא הצלחנו להוסיף למלאי. נסי שוב.");
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* HEADER (כמו אצלך) */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.appTitle}>StockUp</Text>
@@ -145,7 +286,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
           </Pressable>
         </View>
 
-        {/* כותרת + הוסף */}
         <View style={styles.sectionHeaderRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sectionTitle}>מוצרים שזוהו</Text>
@@ -158,7 +298,18 @@ export default function ReceiptReviewDetectedProductsScreen() {
           </Pressable>
         </View>
 
-        {/* LIST */}
+        {!receiptObj && (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="alert-circle-outline" size={22} color={TEXT_MUTED} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.emptyTitle}>אין נתוני סריקה</Text>
+              <Text style={styles.emptyText}>חזרי למסך ההעלאה ונסי שוב.</Text>
+            </View>
+          </View>
+        )}
+
         <View style={{ gap: 10 }}>
           {items.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -177,10 +328,15 @@ export default function ReceiptReviewDetectedProductsScreen() {
                   <Text style={styles.itemName} numberOfLines={1}>
                     {item.name}
                   </Text>
-                  <Text style={styles.itemMeta}>
-                    כמות: {item.quantity}
-                    {item.unit ? ` ${item.unit}` : ""}
-                  </Text>
+
+                  <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8, marginTop: 6 }}>
+                    <Text style={styles.itemMeta}>
+                      כמות: {item.quantity}
+                      {item.unit ? ` ${item.unit}` : ""}
+                    </Text>
+
+                    <LocationPill loc={item.location} />
+                  </View>
                 </View>
 
                 <View style={styles.editBubble}>
@@ -191,15 +347,13 @@ export default function ReceiptReviewDetectedProductsScreen() {
           )}
         </View>
 
-        {/* ✅ CTA עם PrimaryButton של האפליקציה */}
         <PrimaryButtonCompat
-          title="אישור והוספה למלאי"
+          title={saving ? "מוסיף למלאי..." : "אישור והוספה למלאי"}
           onPress={onConfirmAddAll}
           leftIcon={<Ionicons name="checkmark-circle-outline" size={20} color={TEXT_DARK} />}
-          disabled={items.length === 0}
+          disabled={items.length === 0 || saving}
         />
 
-        {/* Modals */}
         <EditItemModal
           item={editItem}
           onClose={() => setEditItem(null)}
@@ -240,12 +394,14 @@ function EditItemModal({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
+  const [location, setLocation] = useState<LocationKey>("other");
 
   React.useEffect(() => {
     if (!item) return;
     setName(item.name ?? "");
     setQuantity(String(item.quantity ?? 1));
     setUnit(item.unit ?? "");
+    setLocation(item.location ?? "other");
   }, [item]);
 
   if (!item) return null;
@@ -266,6 +422,8 @@ function EditItemModal({
           />
           <Field label="יחידה (אופציונלי)" value={unit} onChangeText={setUnit} placeholder="יח׳ / ק״ג / ל׳" />
 
+          <LocationSelector value={location} onChange={setLocation} />
+
           <View style={styles.modalActions}>
             <Pressable style={styles.dangerBtn} onPress={() => onDelete(item.id)}>
               <Ionicons name="trash-outline" size={18} color={TEXT_DARK} />
@@ -279,7 +437,6 @@ function EditItemModal({
             </Pressable>
           </View>
 
-          {/* ✅ כפתור שמירה עם PrimaryButton */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButtonCompat
               title="שמור"
@@ -294,6 +451,7 @@ function EditItemModal({
                   name: name.trim(),
                   quantity: q,
                   unit: unit.trim() || undefined,
+                  location,
                 });
               }}
               leftIcon={<Ionicons name="save-outline" size={18} color={TEXT_DARK} />}
@@ -317,12 +475,14 @@ function AddItemModal({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
+  const [location, setLocation] = useState<LocationKey>("other");
 
   React.useEffect(() => {
     if (!open) return;
     setName("");
     setQuantity("1");
     setUnit("");
+    setLocation("other");
   }, [open]);
 
   if (!open) return null;
@@ -343,6 +503,8 @@ function AddItemModal({
           />
           <Field label="יחידה (אופציונלי)" value={unit} onChangeText={setUnit} placeholder="יח׳ / ק״ג / ל׳" />
 
+          <LocationSelector value={location} onChange={setLocation} />
+
           <View style={styles.modalActions}>
             <View style={{ flex: 1 }} />
             <Pressable style={styles.secondaryBtn} onPress={onClose}>
@@ -350,7 +512,6 @@ function AddItemModal({
             </Pressable>
           </View>
 
-          {/* ✅ הוספה עם PrimaryButton */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButtonCompat
               title="הוסף"
@@ -364,6 +525,8 @@ function AddItemModal({
                   name: name.trim(),
                   quantity: q,
                   unit: unit.trim() || undefined,
+                  storage_category: "other",
+                  location,
                 });
               }}
               leftIcon={<Ionicons name="add-circle-outline" size={18} color={TEXT_DARK} />}
@@ -399,14 +562,7 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BRAND_BG },
-
-  // “גובה”/צפיפות כמו המסך שלך: לא מוגזם, הרבה אוויר אבל לא גבוה מדי
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24,
-    gap: 18,
-  },
+  container: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24, gap: 18 },
 
   headerRow: { flexDirection: "row-reverse", alignItems: "center" },
   appTitle: { fontSize: 22, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
@@ -422,11 +578,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  sectionHeaderRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 10,
-  },
+  sectionHeaderRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
   sectionSubtitle: { fontSize: 12, color: TEXT_MUTED, textAlign: "right", marginTop: 4 },
 
@@ -453,7 +605,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   itemName: { fontSize: 14, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
-  itemMeta: { fontSize: 12, color: TEXT_MUTED, textAlign: "right", marginTop: 4 },
+  itemMeta: { fontSize: 12, color: TEXT_MUTED, textAlign: "right" },
 
   editBubble: {
     width: 34,
@@ -463,6 +615,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  locPill: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: BRAND_BLUE_SOFT,
+    borderWidth: 1,
+    borderColor: "#DCEBFA",
+  },
+  locPillText: { fontSize: 12, fontWeight: "800", color: TEXT_DARK, textAlign: "right" },
+
+  locRow: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  locChip: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  locChipActive: {
+    backgroundColor: BRAND_BLUE_SOFT,
+    borderColor: "#BFDDF6",
+  },
+  locChipText: { fontSize: 12, fontWeight: "800", color: TEXT_DARK, textAlign: "right" },
 
   emptyCard: {
     flexDirection: "row-reverse",
@@ -486,19 +674,8 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 14, fontWeight: "700", color: TEXT_DARK, textAlign: "right" },
   emptyText: { fontSize: 12, color: TEXT_MUTED, textAlign: "right", marginTop: 4 },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 16 },
+  modalCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 16, borderWidth: 1, borderColor: "#E5E7EB" },
   modalTitle: { fontSize: 16, fontWeight: "800", color: TEXT_DARK, textAlign: "right" },
 
   fieldLabel: { marginTop: 2, fontSize: 12, color: TEXT_MUTED, textAlign: "right" },
@@ -515,12 +692,7 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
   },
 
-  modalActions: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 14,
-  },
+  modalActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8, marginTop: 14 },
   dangerBtn: {
     flexDirection: "row-reverse",
     alignItems: "center",
@@ -530,11 +702,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: BRAND_PINK_SOFT,
   },
-  secondaryBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: BRAND_BLUE_SOFT,
-  },
+  secondaryBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: BRAND_BLUE_SOFT },
   modalBtnText: { fontSize: 13, fontWeight: "800", color: TEXT_DARK },
 });

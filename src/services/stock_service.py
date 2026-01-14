@@ -1,6 +1,7 @@
+import os
 from sys import exception
-from uuid import UUID
-from typing import List, Optional, Dict
+from uuid import UUID, uuid4
+from typing import Any, List, Optional, Dict
 from datetime import date
 from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
 from src.domain.smart_home.product import Product
@@ -9,6 +10,8 @@ from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
 from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
+from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
 
 class StockService:
  
@@ -47,12 +50,66 @@ class StockService:
             await self._product_repository.update(product)
         return product
         
-    ##########################################################################################
-    async def scan_receipt(self, user_id: UUID, home_id: UUID, image_file: bytes) -> List[Dict]:
-        """Processes a receipt image (OCR) and returns detected items for verification."""
-        raise NotImplementedError("Not implemented yet")
-    ###########################################################################################
+    
+    async def scan_receipt(
+        self,
+        user_id: UUID,
+        home_id: UUID,
+        file_path: str,                 
+    ):
+        """Processes a receipt and returns detected items for verification.
+        If return_debug=True returns (ReceiptDTO, debug_dict)
+        """
+        await self._check_access(user_id, home_id)
 
+        if not isinstance(file_path, (str, os.PathLike)):
+            raise TypeError(f"file_path must be a path string, got: {type(file_path)}")
+
+        scanner = ReceiptScanner()
+        chain_name, scanned_items = scanner.parse_receipt(str(file_path))  # dict[barcode] -> (qty, unit)
+
+        scanned_barcodes = list(scanned_items.keys())
+
+        catalog_items = await self._catalog_provider.get_items_by_barcodes(
+            scanned_barcodes,
+            chain_name
+        )
+        catalog_items = catalog_items or []
+
+        catalog_by_barcode = {
+            ci.barcode: ci for ci in catalog_items if getattr(ci, "barcode", None)
+        }
+
+        receipt_items_dto: list[ReceiptItemDTO] = []
+        for barcode in scanned_barcodes:
+            qty, unit = scanned_items[barcode]
+            ci = catalog_by_barcode.get(barcode)
+
+            name = ci.name if ci else f"(לא נמצא בקטלוג) {barcode}"
+            safe_unit = unit if unit else "יחידה" 
+            storage_category = getattr(ci, "storage_category", None) if ci else None
+
+            receipt_items_dto.append(
+                ReceiptItemDTO(
+                    barcode=barcode,
+                    name=name,
+                    quantity=float(qty),
+                    unit=safe_unit,
+                    storage_category=storage_category,
+                )
+            )
+
+        receipt_dto = ReceiptDTO(
+            id=uuid4(),
+            home_id=home_id,
+            user_id=user_id,
+            chain=chain_name,
+            items=receipt_items_dto,
+        )
+
+        return receipt_dto
+
+        
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
         
         await self._check_access(user_id, home_id)

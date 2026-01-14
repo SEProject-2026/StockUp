@@ -12,6 +12,7 @@ class CatalogItem(BaseModel):
     name: str
     manufacturer: Optional[str] = None
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
+    storage_category: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,6 +33,20 @@ class ICatalogProvider(ABC):
             chain_name: (Optional) The specific retail chain context.
                         If provided, the provider attempts to find a chain-specific definition.
                         If not found (or not provided), it falls back to the global definition.
+        """
+        pass
+    @abstractmethod
+    async def get_items_by_barcodes(self, barcodes: List[str], chain_name: Optional[str] = None) -> List[CatalogItem]:
+        """
+        Retrieves multiple products by a list of barcodes.
+        Optimized for batch operations to avoid N+1 queries.
+
+        Args:
+            barcodes: A list of barcode strings to search for.
+            chain_name: (Optional) The specific retail chain context.
+
+        Returns:
+            List[CatalogItem]: A list of found products. Barcodes that are not found are typically skipped.
         """
         pass
 

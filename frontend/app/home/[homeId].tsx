@@ -36,7 +36,7 @@ function locationToCategory(location?: string | null): Category {
     case "PANTRY":
       return "pantry";
     case "CLEANING_SUPPLIES":
-      return "cleaning supplies";
+      return "cleaning";
     case "OTHER":
       return "other";
     default:
@@ -121,7 +121,7 @@ export default function HomeDashboardScreen() {
       if (item.category === "fridge") fridge++;
       if (item.category === "freezer") freezer++;
       if (item.category === "pantry") pantry++;
-      if (item.category === "cleaning supplies") cleaningSupplies++;
+      if (item.category === "cleaning") cleaningSupplies++;
       if (item.category === "other") other++;
 
       if (item.expiresAt) {
