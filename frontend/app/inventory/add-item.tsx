@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
-import PrimaryButton from "@/src/ui/PrimaryButton";
+import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 import { addProduct } from "@/src/api/stock";
 
 import { CATEGORY_OPTIONS, routeToCategory, locationMap } from "@/src/components/add-item/types";

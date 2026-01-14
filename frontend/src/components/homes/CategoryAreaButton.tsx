@@ -1,6 +1,6 @@
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
-import ActionCardButton from "../../ui/ActionCardButton";
+import ActionCardButton from "../../components/ui/buttons/ActionCardButton";
 
 type Props = {
   label: "מקרר" | "מקפיא" | "מזווה" | "ציוד ניקוי" | "אחר";

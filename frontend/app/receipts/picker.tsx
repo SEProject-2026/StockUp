@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as DocumentPicker from "expo-document-picker";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
-import PrimaryButton from "@/src/ui/PrimaryButton";
+import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 
 export default function ReceiptPickerScreen() {
   const [fileUri, setFileUri] = useState<string | null>(null);

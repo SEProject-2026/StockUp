@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
-import PrimaryButton from "@/src/ui/PrimaryButton";
+import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 import { getSelectedHomeId } from "../home/selected-home";
 import { addProduct } from "@/src/api/stock";
 import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";

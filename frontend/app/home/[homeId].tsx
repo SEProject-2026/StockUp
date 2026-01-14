@@ -5,11 +5,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
-import QuickActionButton from "@/src/ui/QuickActionButton";
+import QuickActionButton from "@/src/components/ui/buttons/QuickActionButton";
 import CategoryAreaButton from "@/src/components/homes/CategoryAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStatusCard";
-import SideTitleCard from "@/src/ui/SideTitleCard";
+import SideTitleCard from "@/src/components/ui/cards/SideTitleCard";
 import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
 import { getAllStock, type ProductDTO } from "@/src/api/stock";

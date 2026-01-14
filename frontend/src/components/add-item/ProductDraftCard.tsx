@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TextInput, Platform, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import PrimaryButton from "@/src/ui/PrimaryButton";
+import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 import type { Category } from "./types";
 import SuggestionsList from "@/src/components/add-item/SuggestionsList";
 import type { CatalogItem } from "@/src/api/catalog";
@@ -75,7 +75,7 @@ export default function ProductDraftCard(props: {
           <TextInput
             value={props.name}
             onChangeText={props.onChangeName}
-            placeholder="התחילי להקליד..."
+            placeholder="התחל להקליד..."
             placeholderTextColor="#9CA3AF"
             style={[styles.input, { flex: 1 }]}
             textAlign="right"
@@ -130,7 +130,6 @@ export default function ProductDraftCard(props: {
             <TextInput
               value={props.quantity}
               onChangeText={props.onChangeQuantity}
-              placeholder="1"
               placeholderTextColor="#9CA3AF"
               keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
               style={styles.input}

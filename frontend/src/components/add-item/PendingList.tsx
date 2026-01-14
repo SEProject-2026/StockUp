@@ -27,7 +27,7 @@ export default function PendingList(props: {
       {props.items.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="list-outline" size={18} color={BRAND_MUTED} />
-          <Text style={styles.emptyText}>הוסיפי פריטים לרשימה ואז שמרי הכל יחד.</Text>
+          <Text style={styles.emptyText}>הוסף פריטים לרשימה ואז שמור הכל יחד.</Text>
         </View>
       ) : (
         props.items.map((item) => (

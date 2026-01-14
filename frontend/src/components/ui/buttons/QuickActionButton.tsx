@@ -1,6 +1,6 @@
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
-import ActionCardButton from "@/src/ui/ActionCardButton";
+import ActionCardButton from "@/src/ui/buttons/ActionCardButton";
 
 type Props = {
   label: string;

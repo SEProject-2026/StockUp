@@ -20,7 +20,7 @@ export default function AddHomeCard({ onPress }: Props) {
         </View>
         <Text style={styles.addTitle}>הוספת בית</Text>
         <Text style={styles.addSubtitle} numberOfLines={2}>
-          צרי בית חדש למלאי משותף
+          צור בית חדש למלאי משותף
         </Text>
       </View>
     </TouchableOpacity>
