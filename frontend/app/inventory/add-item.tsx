@@ -13,12 +13,14 @@ import type { location, DraftItem } from "@/src/components/add-item/types";
 
 import ProductDraftCard from "@/src/components/add-item/ProductDraftCard";
 import PendingList from "@/src/components/add-item/PendingList";
-import locationPickerModal from "@/src/components/add-item/locationPickerModal";
+import LocationPickerModal from "@/src/components/add-item/LocationPickerModal";
 import BarcodeScannerModal from "@/src/components/add-item/BarcodeScannerModal";
 import DatePickerModal from "@/src/components/add-item/DatePickerModal";
 
 import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
 import { searchCatalog, getCatalogByBarcode, type CatalogItem } from "@/src/api/catalog";
+
+import { setLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
 
 const BRAND_BG = "#F4F4F4";
 
@@ -59,7 +61,13 @@ function normalizeCatalogOne(raw: any): CatalogItem | null {
 }
 
 export default function BatchAddItemsScreen() {
-  const { homeId, location: locationParam } = useLocalSearchParams<{ homeId?: string; location?: string }>();
+  const { homeId, location: locationParam, mode } = useLocalSearchParams<{
+    homeId?: string;
+    location?: string;
+    mode?: string;
+  }>();
+
+  const isReceiptReviewMode = mode === "receipt-review";
   const currentHomeId = homeId ? String(homeId) : "";
 
   const initiallocation = useMemo<location>(() => routeTolocation(locationParam), [locationParam]);
@@ -218,7 +226,64 @@ export default function BatchAddItemsScreen() {
     if (editingId === id) resetDraft(true);
   }
 
+  // ✅ במצב receipt-review: מחזירים את הרשימה (pending) למסך זיהוי המוצרים – בלי שרת
+  function returnToReceiptReview() {
+    const drafts: {
+      name: string;
+      quantity: number;
+      barcode?: string | null;
+      nickname?: string | null;
+      expiration_date?: string | null;
+      location: any;
+    }[] = [];
+
+    // 1) pending קיים
+    for (const p of pending) {
+      drafts.push({
+        name: p.name.trim(),
+        quantity: Number.isFinite(p.quantity) && p.quantity > 0 ? p.quantity : 1,
+        barcode: p.barcode ?? null,
+        nickname: p.nickname ?? null,
+        expiration_date: p.expiresAt ? p.expiresAt.toISOString().slice(0, 10) : null,
+        location: p.location,
+      });
+    }
+
+    // 2) אם אין pending אבל הדראפט הנוכחי תקין – נחזיר גם אותו
+    // (כדי שלא תצטרכי ללחוץ "הוספה לרשימה" לפני)
+    if (drafts.length === 0) {
+      const finalName = (selectedCatalogItem?.name ?? name.trim()).trim();
+      const qty = parseInt(quantity, 10);
+
+      if (finalName && Number.isFinite(qty) && qty > 0) {
+        drafts.push({
+          name: finalName,
+          quantity: qty,
+          barcode: barcode.trim() ? barcode.trim() : null,
+          nickname: nickname.trim() ? nickname.trim() : null,
+          expiration_date: expiresAt ? expiresAt.toISOString().slice(0, 10) : null,
+          location,
+        });
+      }
+    }
+
+    if (drafts.length === 0) {
+      Alert.alert("אין מוצרים", "הוסיפי מוצר (או הוסיפי לרשימה) לפני חזרה למסך הקבלה.");
+      return;
+    }
+
+    setLastAddItemReturnDrafts(drafts as any);
+    router.back();
+  }
+
   async function onBulkAdd() {
+    // ✅ receipt-review mode: לא מוסיפים לשרת בכלל
+    if (isReceiptReviewMode) {
+      returnToReceiptReview();
+      return;
+    }
+
+    // ✅ מצב רגיל: הוספה למלאי באמת
     if (!currentHomeId) {
       Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
       return;
@@ -275,7 +340,7 @@ export default function BatchAddItemsScreen() {
           pointerEvents="none"
         />
 
-        <ScreenHeader title="הוספה מרובה" onBack={() => router.back()} />
+        <ScreenHeader title={isReceiptReviewMode ? "הוספת מוצר (לקבלה)" : "הוספה מרובה"} onBack={() => router.back()} />
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <ProductDraftCard
@@ -314,26 +379,28 @@ export default function BatchAddItemsScreen() {
             }}
           />
 
-          <PendingList
-            items={pending}
-            locationOptions={location_OPTIONS}
-            onEdit={loadItemToDraft}
-            onRemove={removeFromList}
-          />
+          <PendingList items={pending} locationOptions={location_OPTIONS} onEdit={loadItemToDraft} onRemove={removeFromList} />
 
           <View style={{ height: 90 }} />
         </ScrollView>
 
         <View style={styles.bottomBar}>
           <PrimaryButton
-            title={`הוספה למלאי (${pending.length})`}
+            title={
+              isReceiptReviewMode
+                ? `הוספה לרשימת הקבלה (${pending.length || (canAddToList ? 1 : 0)})`
+                : `הוספה למלאי (${pending.length})`
+            }
             onPress={onBulkAdd}
-            disabled={pending.length === 0}
-            style={[styles.saveButton, pending.length === 0 && { opacity: 0.55 }]}
+            disabled={isReceiptReviewMode ? pending.length === 0 && !canAddToList : pending.length === 0}
+            style={[
+              styles.saveButton,
+              (isReceiptReviewMode ? pending.length === 0 && !canAddToList : pending.length === 0) && { opacity: 0.55 },
+            ]}
           />
         </View>
 
-        <locationPickerModal
+        <LocationPickerModal
           open={catOpen}
           selected={location}
           options={location_OPTIONS}
@@ -344,11 +411,7 @@ export default function BatchAddItemsScreen() {
           }}
         />
 
-        <BarcodeScannerModal
-          open={scanOpen}
-          onClose={() => setScanOpen(false)}
-          onScanned={(value) => setBarcode(value)}
-        />
+        <BarcodeScannerModal open={scanOpen} onClose={() => setScanOpen(false)} onScanned={(value) => setBarcode(value)} />
 
         <DatePickerModal
           open={dateOpen}

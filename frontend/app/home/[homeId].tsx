@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
 import QuickActionButton from "@/src/components/ui/buttons/QuickActionButton";
-import locationAreaButton from "@/src/components/homes/locationAreaButton";
+import LocationAreaButton from "@/src/components/homes/LocationAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStatusCard";
 import SideTitleCard from "@/src/components/ui/cards/SideTitleCard";
@@ -151,6 +151,9 @@ export default function HomeDashboardScreen() {
       .slice(0, 3);
   }, [homeItems]);
 
+  const goInventory = (loc: string) => {
+    router.push(`/inventory/${loc}?homeId=${currentHomeId}`);
+  };
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.main}>
@@ -186,64 +189,39 @@ export default function HomeDashboardScreen() {
             >
               <SideTitleCard label={"אזורי\nהבית"} />
 
-              <locationAreaButton
+              <LocationAreaButton
                 label="מקרר"
                 value={stats.fridge}
                 icon="snow-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[location]",
-                    params: { location: "fridge", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("fridge")}
               />
 
-              <locationAreaButton
+              <LocationAreaButton
                 label="מקפיא"
                 value={stats.freezer}
                 icon="cube-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[location]",
-                    params: { location: "freezer", homeId: currentHomeId },
-                  })
-                }
-              />
+                onPress={() => goInventory("freezer")}
+              />     
 
-              <locationAreaButton
+              <LocationAreaButton
                 label="מזווה"
                 value={stats.pantry}
                 icon="restaurant-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[location]",
-                    params: { location: "pantry", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("pantry")}
               />
 
-              <locationAreaButton
+              <LocationAreaButton
                 label="ציוד ניקוי"
                 value={stats.cleaningSupplies}
                 icon="water-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[location]",
-                    params: { location: "cleaning-supplies", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("cleaning")}
               />
 
-              <locationAreaButton
+              <LocationAreaButton
                 label="אחר"
                 value={stats.other}
                 icon="ellipsis-horizontal-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[location]",
-                    params: { location: "other", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("other")}
               />
             </ScrollView>
           </View>
