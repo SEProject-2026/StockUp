@@ -11,51 +11,46 @@ class DbProductRepository(IProductRepository):
         self.db = db
 
     async def save(self, product: Product) -> None:
-        """
-        Saves or updates the Aggregate Root (Product) and its children (Items).
-        """
-        # 1. Check if product exists
+        """Standard save for single product additions - Always commits."""
+        self._perform_upsert_logic(product)
+        self.db.commit()
+
+    async def save_all(self, products: List[Product]) -> None:
+        """Bulk save for receipts - Commits once at the end."""
+        for product in products:
+            self._perform_upsert_logic(product)
+        self.db.commit()
+
+    def _perform_upsert_logic(self, product: Product) -> None:
+        """Internal helper to handle the mapping logic without commit."""
         db_product = self.db.query(ProductModel).filter(ProductModel.id == str(product.id)).first()
 
         if not db_product:
-            # CREATE
             db_product = ProductModel(
                 id=str(product.id),
                 home_id=str(product.home_id),
                 original_name=product.original_name,
                 nickname=product.nickname,
                 barcode=product.barcode
-                # Note: 'quantity' and 'location' are NOT stored on ProductModel anymore
             )
             self.db.add(db_product)
         else:
-            # UPDATE (Fields on the Aggregate Root)
             db_product.original_name = product.original_name
             db_product.nickname = product.nickname
             db_product.barcode = product.barcode
 
-        # 2. Handle Items (The Children)
-        # Approach: Replace all items logic (Simpler for consistency)
-        # In a highly optimized system, we would diff the lists, but for now replace is safe.
-        
-        # Clear existing DB items
         db_product.items = []
-        
-        # Convert Domain Items -> DB Models
-        new_db_items = []
-        for item in product.items:
-            db_item = ProductItemModel(
+        db_product.items = [
+            ProductItemModel(
                 id=str(item.id),
                 product_id=str(product.id),
                 quantity=item.quantity,
                 expiration_date=item.expiration_date,
                 location=item.location.name if item.location else "OTHER"
-            )
-            new_db_items.append(db_item)
-            
-        db_product.items = new_db_items
-        
-        self.db.commit()
+            ) for item in product.items
+        ]
+        # Flush ensures the SQL is sent to the DB buffer
+        self.db.flush()
 
     async def get_by_id(self, product_id: UUID) -> Optional[Product]:
         db_product = (

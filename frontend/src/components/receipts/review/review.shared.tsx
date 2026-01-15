@@ -2,6 +2,8 @@ import React, { ComponentProps, JSX } from "react";
 import { View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
+import type { LocationType } from "@/src/api/stock";
+
 
 export const BRAND = {
   BG: "#F5F6F8",
@@ -55,7 +57,7 @@ export function uuid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-export function storagelocationToLocationType(cat?: string | null): string {
+export function storagelocationToLocationType(cat?: string | null): LocationType {
   const s = String(cat ?? "").toLowerCase().trim();
   switch (s) {
     case "fridge":

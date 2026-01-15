@@ -42,16 +42,18 @@ class CsvCatalogProvider(ICatalogProvider):
                     barcode = row.get("Barcode", "").strip()
                     name = row.get("ItemName", "").strip()
                     chain = row.get("Chain", "GLOBAL").strip()
-                    storage_location = row.get("SuggestedStoragelocation", "").strip()
+                    location = row.get("SuggestedStorageCategory", "OTHER").strip().upper()
+                    if location == "":
+                        location = "OTHER"
                     if not barcode or not name:
                         continue
-                        
+                                            
                     item = CatalogItem(
                         barcode=barcode,
                         name=name,
                         manufacturer=row.get("ManufacturerName", ""),
                         chain_source=chain,
-                        storage_location=storage_location
+                        location=location
                     )
                     
                     self._all_items.append(item)
@@ -81,13 +83,19 @@ class CsvCatalogProvider(ICatalogProvider):
         """
         Retrieves an item by barcode.
         """
+        padded_barcode = "729" + "0" * (10 - len(barcode)) + barcode
         if chain_name:
             key = f"{chain_name}_{barcode}"
-            chain_item = self._chain_map.get(key)
-            if chain_item:
-                return chain_item
-        
-        return self._global_map.get(barcode)
+            item = self._chain_map.get(key)
+            if item:
+                return item
+            
+            item = self._chain_map.get(f"{chain_name}_{padded_barcode}")
+            if item:
+                return item
+        item = self._global_map.get(barcode) or self._global_map.get(padded_barcode)
+        return item
+            
     
     async def get_items_by_barcodes(self, barcodes: List[str], chain_name: Optional[str] = None) -> List[CatalogItem]:
         """

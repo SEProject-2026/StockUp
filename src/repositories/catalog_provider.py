@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
+from src.domain.smart_home.enums import LocationType
+
 # === DTO (Data Transfer Object) ===
 class CatalogItem(BaseModel):
     """
@@ -12,7 +14,7 @@ class CatalogItem(BaseModel):
     name: str
     manufacturer: Optional[str] = None
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
-    storage_location: Optional[str] = None
+    location: Optional[LocationType] = LocationType.OTHER
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -261,3 +261,37 @@ export async function scanReceipt(
     body: form,
   });
 }
+
+export type ReceiptItemRequestDTO = {
+  name: string;
+  quantity: number; // float
+  barcode?: string | null;
+  expiration_date?: string | null; // "YYYY-MM-DD"
+  location?: LocationType | null;
+  nickname?: string | null;
+};
+
+export type AddReceiptRequest = {
+  items: ReceiptItemRequestDTO[];
+};
+
+export type AddReceiptResponseData = {
+  added_count: number;
+};
+
+export async function addReceipt(
+  homeId: string,
+  payload: AddReceiptRequest
+) {
+  return authFetch<GeneralResponse<AddReceiptResponseData>>(
+    "/stock/add-receipt",
+    {
+      method: "POST",
+      headers: {
+        "X-Home-ID": homeId,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+}

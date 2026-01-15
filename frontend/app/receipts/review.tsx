@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 import { getSelectedHomeId } from "../home/selected-home";
-import { addProduct } from "@/src/api/stock";
+import { addReceipt } from "@/src/api/stock";
 import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";
 import { consumeLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
 
@@ -133,7 +133,6 @@ export default function ReceiptReviewDetectedProductsScreen() {
     router.push({ pathname: "/inventory/add-item", params: { mode: "receipt-review" } });
   }, []);
 
-  // ✅ FIX: addProduct payload כולל nickname/barcode/expiration_date/location enum
   const onConfirmAddAll = useCallback(async () => {
     if (saving) return;
 
@@ -142,7 +141,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
-    const payload = items.map((x: any) => ({
+    const receiptItems = items.map((x: any) => ({
       name: String(x.name ?? "").trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
       barcode: x.barcode ? String(x.barcode) : null,
@@ -151,7 +150,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
       location: storagelocationToLocationType(x.location ?? x.storage_location ?? "other"),
     }));
 
-    const bad = payload.find((p) => !p.name || p.quantity <= 0);
+    const bad = receiptItems.find((p) => !p.name || p.quantity <= 0);
     if (bad) {
       Alert.alert("שגיאה", "ודאו שלכל מוצר יש שם וכמות תקינה.");
       return;
@@ -167,31 +166,29 @@ export default function ReceiptReviewDetectedProductsScreen() {
         return;
       }
 
-      // const results = await Promise.allSettled(payload.map((p) => addProduct(homeId!, p)));
+      const res = await addReceipt(homeId, { items: receiptItems });
 
-      // const ok = results.filter((r) => r.status === "fulfilled").length;
-      // const failed = results.length - ok;
+      if (res.status === "success") {
+        const added = res.data?.added_count ?? receiptItems.length;
 
-      // if (failed === 0) {
-      //   Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.", [
-      //     {
-      //       text: "אישור",
-      //       onPress: () => {
-      //         router.replace({ pathname: "/home/[homeId]", params: { homeId: homeId! } });
-      //       },
-      //     },
-      //   ]);
-      //   return;
-      // }
+        Alert.alert("התווסף!", `נוספו ${added} פריטים למלאי המרכזי.`, [
+          {
+            text: "אישור",
+            onPress: () => {
+              if (homeId) {
+                router.replace({ pathname: "/home/[homeId]", params: { homeId } });
+              }
+            },
+          },
+        ]);
+        return;
+      }
 
-      // Alert.alert("נוספו חלקית", `נוספו ${ok} מוצרים, נכשלו ${failed}.`);
+      Alert.alert("נכשל", res.message ?? "לא הצלחנו להוסיף למלאי. נסו שוב.");
     } catch (e: any) {
       Alert.alert("נכשל", e?.message ?? "לא הצלחנו להוסיף למלאי. נסו שוב.");
     } finally {
       setSaving(false);
-      if (homeId) {
-        router.replace({ pathname: "/home/[homeId]", params: { homeId } });
-      }
     }
   }, [items, saving]);
 

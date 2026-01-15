@@ -1,3 +1,4 @@
+import asyncio
 import os
 from sys import exception
 from uuid import UUID, uuid4
@@ -9,7 +10,7 @@ from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
-from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType
+from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType, UnitType
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
 
@@ -26,41 +27,33 @@ class StockService:
     # ==========================================
 
     async def add_product(
-        self, 
-        name: str, 
-        user_id: UUID, 
-        home_id: UUID, 
-        quantity: int,  
-        barcode: Optional[str]= None,
-        expiration_date: Optional[date]= None, 
-        location: Optional[LocationType]= LocationType.OTHER, 
-        nickname: Optional[str]= None
-    ) -> Product:
-        
+    self, 
+    name: str, 
+    user_id: UUID, 
+    home_id: UUID, 
+    quantity: int,  
+    barcode: Optional[str] = None,
+    expiration_date: Optional[date] = None, 
+    location: Optional[LocationType] = LocationType.OTHER, 
+    nickname: Optional[str] = None
+) -> Product:
+        """Standard operation for single item additions."""
         await self._check_access(user_id, home_id)
+        
+        if name == "Unknown Product":
+            return None
+
         product = await self._product_repository.get_by_original_name(home_id, name)
         
         if not product:
-            product = Product(
-                id=uuid4(),
-                home_id=home_id,
-                original_name=name,
-                barcode=barcode,
-                nickname=nickname
-            )
+            product = Product(id=uuid4(), home_id=home_id, original_name=name, barcode=barcode, nickname=nickname)
+        
+        if nickname:
+            product.set_nickname(nickname)
             
-            product.add_item(quantity, location, expiration_date)
-            
-            await self._product_repository.save(product)
-            
-        else:
-            if nickname:
-                product.set_nickname(nickname)
-                
-            product.add_item(quantity, location, expiration_date)
-            
-            await self._product_repository.update(product)
-            
+        product.add_item(quantity, location, expiration_date)
+        
+        await self._product_repository.save(product) # This triggers immediate commit
         return product
         
     
@@ -83,32 +76,26 @@ class StockService:
 
         scanned_barcodes = list(scanned_items.keys())
 
-        catalog_items = await self._catalog_provider.get_items_by_barcodes(
-            scanned_barcodes,
-            chain_name
-        )
-        catalog_items = catalog_items or []
-
-        catalog_by_barcode = {
-            ci.barcode: ci for ci in catalog_items if getattr(ci, "barcode", None)
-        }
-
         receipt_items_dto: list[ReceiptItemDTO] = []
         for barcode in scanned_barcodes:
             qty, unit = scanned_items[barcode]
-            ci = catalog_by_barcode.get(barcode)
-
-            name = ci.name if ci else f"(לא נמצא בקטלוג) {barcode}"
-            safe_unit = unit if unit else "יחידה" 
-            storage_location = getattr(ci, "storage_location", None) if ci else None
-
-            receipt_items_dto.append(
-                ReceiptItemDTO(
-                    barcode=barcode,
-                    name=name,
-                    quantity=float(qty),
-                    unit=safe_unit,
-                    location=storage_location,
+            ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+            if ci:
+                receipt_items_dto.append(
+                    ReceiptItemDTO(
+                        barcode=barcode,
+                        name=ci.name,
+                        quantity=float(qty),
+                        unit=unit,
+                        location=ci.location,
+                )
+            )
+            else:
+                receipt_items_dto.append(
+                    ReceiptItemDTO(
+                        name="Unknown Product",
+                        quantity=float(qty),
+                        unit=unit,
                 )
             )
 
@@ -122,38 +109,47 @@ class StockService:
 
         return receipt_dto
 
-
     async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
-        """
-        Processes a full ReceiptDTO and persists items to inventory.
-        """
-        # Verify access permissions
+        """High-performance operation for full receipts."""
         await self._check_access(receipt_dto.user_id, receipt_dto.home_id)
 
+        # 1. Bulk Pre-fetch (Performance)
+        existing_products = await self._product_repository.list_all_by_home(receipt_dto.home_id)
+        products_map = {p.original_name: p for p in existing_products}
+        
+        products_to_save = {}
         count = 0
 
         for item in receipt_dto.items:
-            try:
-                # Use existing add_product logic (Upsert)
-                # Passing all fields directly from the updated ReceiptItemDTO
-                await self.add_product(
-                    name=item.name,
-                    user_id=receipt_dto.user_id,
+            if item.name == "Unknown Product":
+                continue
+            
+            # 2. Logic in memory
+            product = products_map.get(item.name)
+            if not product:
+                product = Product(
+                    id=uuid4(),
                     home_id=receipt_dto.home_id,
-                    quantity=int(item.quantity), # Casting float to int as per add_product signature
+                    original_name=item.name,
                     barcode=item.barcode,
-                    expiration_date=item.expiration_date, # Passed from DTO
-                    location=item.location,
-                    nickname=item.nickname # Passed from DTO
+                    nickname=item.nickname
                 )
+                products_map[item.name] = product # Handle duplicates within the same receipt
                 
-                count += 1
-            except Exception as e:
-                # Log error but continue processing other items
-                print(f"Error processing receipt item {item.name}: {e}")
+            if item.nickname:
+                product.set_nickname(item.nickname)
+                
+            product.add_item(int(item.quantity), item.location, item.expiration_date)
+            print(f"Adding {item.quantity} of {item.name} to stock.")
+            
+            # Collect for bulk save
+            products_to_save[product.id] = product
+            count += 1
 
-        # Future TODO: Save the receipt record itself to DB
-        
+        # 3. Batch Save (One commit for all)
+        if products_to_save:
+            await self._product_repository.save_all(list(products_to_save.values()))
+
         return count
         
     async def remove_item(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID) -> Optional[Product]:

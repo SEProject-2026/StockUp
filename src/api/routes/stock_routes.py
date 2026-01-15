@@ -389,6 +389,7 @@ async def add_receipt(
                 ) for item in request.items
             ]
         )
+        
 
         # Process via service which delegates to add_product for upsert logic
         processed_count = await service.add_receipt(receipt_dto)

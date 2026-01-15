@@ -15,6 +15,11 @@ class IProductRepository(ABC):
         pass
 
     @abstractmethod
+    async def save_all(self, products: List[Product]) -> None:
+        """Creates multiple inventory items in a batch operation."""
+        pass
+
+    @abstractmethod
     async def get_by_id(self, product_id: UUID) -> Optional[Product]:
         """Retrieves a single item by its ID."""
         pass
