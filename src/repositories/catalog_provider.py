@@ -12,7 +12,7 @@ class CatalogItem(BaseModel):
     name: str
     manufacturer: Optional[str] = None
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
-    storage_category: Optional[str] = None
+    storage_location: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -11,15 +11,15 @@ import { InventoryFiltersBar } from "@/src/components/inventory/InventoryFilters
 import { GroupedInventoryList } from "@/src/components/inventory/GroupedInventoryList";
 import { EditItemModal } from "@/src/components/inventory/EditItemModal";
 
-import type { CategoryKey } from "@/src/components/inventory/inventory.utils";
+import type { locationKey } from "@/src/components/inventory/inventory.utils";
 import { useInventoryData } from "@/src/hooks/useInventoryData";
 
 export function InventoryScreenBase({
-  initialCategory = "all",
+  initiallocation = "all",
   title = "מלאי",
   hideTabs = false,
 }: {
-  initialCategory?: CategoryKey;
+  initiallocation?: locationKey;
   title?: string;
   hideTabs?: boolean;
 }) {
@@ -28,7 +28,7 @@ export function InventoryScreenBase({
 
   const inv = useInventoryData({
     homeId: currentHomeId,
-    initialCategory,
+    initiallocation,
     hideTabs,
   });
 
@@ -111,7 +111,7 @@ export function InventoryScreenBase({
 }
 
 export default function InventoryScreen() {
-  return <InventoryScreenBase initialCategory="all" title="מלאי" hideTabs={false} />;
+  return <InventoryScreenBase initiallocation="all" title="מלאי" hideTabs={false} />;
 }
 
 const styles = StyleSheet.create({

@@ -1,7 +1,7 @@
 import React from "react";
 import { Modal, Pressable, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Category } from "./types";
+import type { location } from "./types";
 
 const BRAND_PRIMARY = "#0284C7";
 const BRAND_TEXT = "#111827";
@@ -9,12 +9,12 @@ const BRAND_MUTED = "#6B7280";
 const BRAND_BORDER = "#E5E7EB";
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
-export default function CategoryPickerModal(props: {
+export default function locationPickerModal(props: {
   open: boolean;
-  selected: Category;
-  options: Array<{ key: Category; label: string; icon: keyof typeof Ionicons.glyphMap }>;
+  selected: location;
+  options: Array<{ key: location; label: string; icon: keyof typeof Ionicons.glyphMap }>;
   onClose: () => void;
-  onSelect: (c: Category) => void;
+  onSelect: (c: location) => void;
 }) {
   return (
     <Modal visible={props.open} animationType="fade" transparent onRequestClose={props.onClose}>

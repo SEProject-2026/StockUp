@@ -13,7 +13,7 @@ import { InventoryItem } from "@/src/context/inventory-context";
 type GroupedInventory = {
   key: string;
   name: string;
-  category: InventoryItem["category"];
+  location: InventoryItem["location"];
   totalQuantity: number;
   items: InventoryItem[];
 };
@@ -117,32 +117,32 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
   onEditItem,
   onDeleteItem,
 }) => {
-  const categoryLabel =
-    group.category === "fridge"
+  const locationLabel =
+    group.location === "fridge"
       ? "מקרר"
-      : group.category === "freezer"
+      : group.location === "freezer"
       ? "מקפיא"
-      : group.category === "pantry"
+      : group.location === "pantry"
       ? "מזווה"
-      : group.category === "cleaning"
+      : group.location === "cleaning"
       ? "חומרי ניקוי"
       : "אחר";
 
-  const categoryColor =
-    group.category === "fridge"
+  const locationColor =
+    group.location === "fridge"
       ? "#0284C7"
-      : group.category === "freezer"
+      : group.location === "freezer"
       ? "#6366F1"
-      : group.category === "pantry"
+      : group.location === "pantry"
       ? "#F97316"
-      : group.category === "cleaning"
+      : group.location === "cleaning"
       ? "#10B981"
       : "#6B7280";
 
   return (
     <View style={styles.groupCard}>
       <View style={styles.itemRow}>
-        <View style={[styles.itemStrip, { backgroundColor: categoryColor }]} />
+        <View style={[styles.itemStrip, { backgroundColor: locationColor }]} />
         <Pressable style={styles.itemMain} onPress={onToggle}>
           <View style={styles.itemHeaderRow}>
             <Text style={styles.itemName}>{group.name}</Text>
@@ -166,7 +166,7 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
                 size={14}
                 color={BRAND_MUTED}
               />
-              <Text style={styles.itemMetaText}>{categoryLabel}</Text>
+              <Text style={styles.itemMetaText}>{locationLabel}</Text>
             </View>
             <Text style={styles.groupCountText}>
               {group.items.length} רשומות

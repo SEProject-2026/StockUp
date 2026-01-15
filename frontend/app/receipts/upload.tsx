@@ -9,7 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import UploadCard from "@/src/components/receipts/UploadCard";
-import InfoBox from "@/src/ui/InfoBox";
+import InfoBox from "@/src/components/ui/InfoBox";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 
 export default function ReceiptUploadScreen() {

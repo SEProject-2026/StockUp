@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { DraftItem, Category } from "./types";
+import type { DraftItem, location } from "./types";
 
 const BRAND_TEXT = "#111827";
 const BRAND_MUTED = "#6B7280";
@@ -13,7 +13,7 @@ const BRAND_PINK_SOFT = "#FFE0EF";
 
 export default function PendingList(props: {
   items: DraftItem[];
-  categoryOptions: Array<{ key: Category; label: string }>;
+  locationOptions: Array<{ key: location; label: string }>;
   onEdit: (item: DraftItem) => void;
   onRemove: (id: string) => void;
 }) {
@@ -27,7 +27,7 @@ export default function PendingList(props: {
       {props.items.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="list-outline" size={18} color={BRAND_MUTED} />
-          <Text style={styles.emptyText}>הוסיפי פריטים לרשימה ואז שמרי הכל יחד.</Text>
+          <Text style={styles.emptyText}>הוסף פריטים לרשימה ואז שמור הכל יחד.</Text>
         </View>
       ) : (
         props.items.map((item) => (
@@ -38,7 +38,7 @@ export default function PendingList(props: {
               </Text>
               <Text style={styles.meta}>
                 כמות: {item.quantity} •{" "}
-                {props.categoryOptions.find((x) => x.key === item.category)?.label ?? "קטגוריה"}
+                {props.locationOptions.find((x) => x.key === item.location)?.label ?? "קטגוריה"}
                 {item.barcode ? " • ברקוד" : ""}
                 {item.expiresAt ? " • תוקף" : ""}
               </Text>
