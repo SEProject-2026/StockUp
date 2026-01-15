@@ -955,3 +955,106 @@ async def test_get_home_products_success():
     
     # Verify return type is List[Product]
     assert isinstance(products[0], Product)
+
+
+
+import pytest
+from datetime import date
+from uuid import uuid4
+from src.domain.receipt import ReceiptDTO, ReceiptItemDTO
+from src.domain.smart_home.enums import LocationType
+from tests.container import testing_container
+
+@pytest.mark.asyncio
+async def test_add_receipt_success():
+    """
+    Scenario: Process a receipt with multiple items.
+    Expected: All items are added to the inventory, and the correct count is returned.
+    """
+    # 1. Setup environment
+    user_id, home_id = await setup_env() # Helper from your existing test suite
+    service = testing_container.stock_service
+    
+    # 2. Create ReceiptDTO
+    items = [
+        ReceiptItemDTO(
+            name="Milk",
+            quantity=2.0,
+            barcode="111",
+            expiration_date=date.today(),
+            location=LocationType.FRIDGE
+        ),
+        ReceiptItemDTO(
+            name="Bread",
+            quantity=1.0,
+            barcode="222",
+            expiration_date=None,
+            location=LocationType.PANTRY
+        )
+    ]
+    
+    receipt_dto = ReceiptDTO(
+        id=uuid4(),
+        home_id=home_id,
+        user_id=user_id,
+        items=items
+    )
+    
+    # 3. Act
+    added_count = await service.add_receipt(receipt_dto)
+    
+    # 4. Assert
+    assert added_count == 2
+    
+    # Verify persistence via repository
+    products = await testing_container.stock_repo.list_all_by_home(home_id)
+    assert len(products) == 2
+    
+    names = {p.original_name for p in products}
+    assert "Milk" in names
+    assert "Bread" in names
+
+@pytest.mark.asyncio
+async def test_add_receipt_merges_with_existing_inventory():
+    """
+    Scenario: Receipt contains an item that already exists in the fridge.
+    Expected: The quantities are merged into the existing product.
+    """
+    user_id, home_id = await setup_env()
+    service = testing_container.stock_service
+
+    # 1. Pre-add an item to inventory
+    # Explicitly passing all required positional arguments to avoid TypeError
+    await service.add_product(
+        name="Butter",
+        user_id=user_id,
+        home_id=home_id,
+        quantity=1,
+        barcode="",           
+        expiration_date=None,   
+        location=LocationType.FRIDGE,
+        nickname=None           
+    )
+    
+    # 2. Add same item via receipt
+    receipt_dto = ReceiptDTO(
+        id=uuid4(),
+        home_id=home_id,
+        user_id=user_id,
+        items=[
+            ReceiptItemDTO(
+                name="Butter",
+                quantity=3.0,
+                barcode="", # Fix: Must be a string
+                location=LocationType.FRIDGE
+            )
+        ]
+    )
+    
+    # Act: add_receipt uses add_product internally which handles the merge logic
+    await service.add_receipt(receipt_dto)
+    
+    # Assert
+    products = await testing_container.stock_repo.list_all_by_home(home_id)
+    assert len(products) == 1 # Product aggregate remains the same
+    assert products[0].total_quantity == 4 # Quantity is summed

@@ -31,14 +31,13 @@ class StockService:
         user_id: UUID, 
         home_id: UUID, 
         quantity: int,  
-        barcode: Optional[str],
-        expiration_date: Optional[date], 
-        location: Optional[LocationType], 
-        nickname: Optional[str]
+        barcode: Optional[str]= None,
+        expiration_date: Optional[date]= None, 
+        location: Optional[LocationType]= LocationType.OTHER, 
+        nickname: Optional[str]= None
     ) -> Product:
         
         await self._check_access(user_id, home_id)
-        
         product = await self._product_repository.get_by_original_name(home_id, name)
         
         if not product:

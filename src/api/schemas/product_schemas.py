@@ -106,7 +106,6 @@ class UpdateProductNicknameRequest(BaseModel):
         ..., 
         min_length=2, 
         max_length=50, 
-        strip_whitespace=True, 
         description="New nickname cannot be empty"
     )
 
@@ -115,3 +114,16 @@ class UpdateItemLocationRequest(BaseModel):
         ..., 
         description="New location from the allowed enum values"
     )
+
+
+
+class ReceiptItem(BaseModel):
+    name: str = Field(..., min_length=2)
+    quantity: int = Field(..., gt=0)
+    barcode: Optional[str] = None
+    expiration_date: Optional[date] = None
+    location: LocationType = LocationType.OTHER
+    nickname: Optional[str] = None
+
+class AddReceiptRequest(BaseModel):
+    items: List[ReceiptItem]

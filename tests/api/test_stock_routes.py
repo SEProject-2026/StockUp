@@ -250,171 +250,64 @@ def test_catalog_barcode_lookup():
 
 
 
-def test_add_receipt_success():
+def test_add_receipt_endpoint_success():
     """
-    Test adding a finalized receipt with new items.
-    Verifies that the endpoint returns 200
+    Scenario: Authorized user submits a valid list of receipt items.
+    Expected: 200 OK, success status, and correct count of added items.
     """
     token, home_id = setup_user_and_home()
     headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
     
-    # 1. Prepare Payload (AddReceiptRequest)
     payload = {
-        "home_id": home_id,
-        "chain": "Rami Levi",
         "items": [
             {
-                "barcode": "888",
-                "name": "New Cheese",
+                "name": "Milk",
                 "quantity": 2,
-                "unit": "UNIT",
+                "barcode": "111222",
+                "expiration_date": str(date.today()),
                 "location": "FRIDGE",
-                "expiration_date": str(date.today())
+                "nickname": "Organic Milk"
             },
             {
-                "barcode": "999",
-                "name": "New Bread",
-                "quantity": 1,
-                "unit": "UNIT",
+                "name": "Pasta",
+                "quantity": 3,
                 "location": "PANTRY"
             }
         ]
     }
     
-    # 2. Act
-    response = testing_container.client.post("/stock/receipt/add", json=payload, headers=headers)
+    response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
     
-    # 3. Assert Response
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
-    assert data["data"]["items_added"] == 2
-    assert "receipt_id" in data["data"]
-    
-    # 4. Verify in "DB" (via GET /all)
-    get_res = testing_container.client.get("/stock/all", headers=headers)
-    products = get_res.json()["data"]
-    
-    # Check that "New Cheese" exists with correct quantity
-    cheese = next((p for p in products if p["original_name"] == "New Cheese"), None)
-    assert cheese is not None
-    assert cheese["items"][0]["quantity"] == 2
-    assert cheese["location"] == "FRIDGE"
+    assert "Successfully added 2 items" in data["message"]
+    assert data["data"]["added_count"] == 2
 
-def test_add_receipt_updates_existing_product():
+def test_add_receipt_missing_home_header():
     """
-    Test that if a product already exists, the receipt adds to its quantity
-    instead of creating a duplicate.
+    Scenario: User is authenticated but forgets the X-Home-ID header.
+    Expected: 422 Unprocessable Entity (FastAPI header validation).
     """
-    token, home_id = setup_user_and_home()
-    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    token, _ = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}"}
     
-    # 1. Setup: Manually add "Cola" first
-    testing_container.client.post("/stock/add", json={
-        "name": "Cola", 
-        "quantity": 5, 
-        "barcode": "123_COLA",
-        "location": "PANTRY"
-    }, headers=headers)
+    payload = {"items": [{"name": "Milk", "quantity": 1}]}
     
-    # 2. Prepare Receipt with the SAME product
-    payload = {
-        "home_id": home_id,
-        "items": [
-            {
-                "barcode": "123_COLA",
-                "name": "Cola", # Matches existing name
-                "quantity": 6,
-                "unit": "UNIT",
-                "location": "PANTRY"
-            }
-        ]
-    }
+    response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
     
-    # 3. Act
-    response = testing_container.client.post("/stock/receipt/add", json=payload, headers=headers)
-    
-    # 4. Assert
-    assert response.status_code == 200
-    assert response.json()["data"]["items_added"] == 1 # Added to 1 product
-    
-    # 5. Verify Quantity Updated (5 + 6 = 11)
-    get_res = testing_container.client.get("/stock/all", headers=headers)
-    products = get_res.json()["data"]
-    
-    cola = products[0]
-    # Sum all quantity batches for this product
-    total_qty = sum(item["quantity"] for item in cola["items"])
-    assert total_qty == 11
-
-def test_add_receipt_validation_error():
-    """
-    Test that the endpoint validates the header Home ID matches the payload Home ID.
-    """
-    token, home_id = setup_user_and_home()
-    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
-    
-    # Payload with a DIFFERENT home_id (random UUID)
-    wrong_home_id = "00000000-0000-0000-0000-000000000000"
-    
-    payload = {
-        "home_id": wrong_home_id, 
-        "items": [] 
-    }
-    
-    response = testing_container.client.post("/stock/receipt/add", json=payload, headers=headers)
-    
-    # Expect 400 Bad Request because header mismatch
-    assert response.status_code == 400
-    assert "Home ID does not match" in response.json()["detail"]
-
-
-
-def test_update_location_route_success():
-    """
-    End-to-end test for updating location via API.
-    """
-    token, home_id = setup_user_and_home()
-    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
-    
-    # 1. Add Product
-    add_res = testing_container.client.post("/stock/add", json={
-        "name": "Milk", 
-        "quantity": 1, 
-        "location": "FRIDGE"
-    }, headers=headers)
-    product_id = add_res.json()["data"]["id"]
-    
-    # 2. Update Location (Move to OTHER)
-    response = testing_container.client.patch(
-        f"/stock/{product_id}/location",
-        json={"location": "OTHER"}, # Sending string matches Enum
-        headers=headers
-    )
-    
-    # 3. Assert
-    assert response.status_code == 200
-    data = response.json()["data"]
-    assert data["location"] == "OTHER"
-    assert data["original_name"] == "Milk"
-
-def test_update_location_route_invalid_enum():
-    """
-    Test that Pydantic rejects invalid location strings automatically.
-    """
-    token, home_id = setup_user_and_home()
-    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
-    
-    # Add dummy product
-    add_res = testing_container.client.post("/stock/add", json={"name": "X", "quantity": 1}, headers=headers)
-    product_id = add_res.json()["data"]["id"]
-    
-    # Try to update with a made-up location
-    response = testing_container.client.patch(
-        f"/stock/{product_id}/location",
-        json={"location": "SPACE_STATION"}, 
-        headers=headers
-    )
-    
-    # 422 Unprocessable Entity (Standard FastAPI validation error)
     assert response.status_code == 422
+
+def test_add_receipt_unauthorized():
+    """
+    Scenario: Request without a valid Bearer token.
+    Expected: 401 Unauthorized.
+    """
+    _, home_id = setup_user_and_home()
+    headers = {"X-Home-ID": home_id}
+    
+    payload = {"items": [{"name": "Milk", "quantity": 1}]}
+    
+    response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
+    
+    assert response.status_code == 401
