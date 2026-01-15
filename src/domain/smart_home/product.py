@@ -107,10 +107,21 @@ class Product:
         raise ValueError(f"Item {item_id} not found in product {self.id}")
 
     def update_item_quantity(self, item_id: UUID, new_quantity: int) -> None:
-        """Updates quantity for specific ID."""
-        if new_quantity <= 0:
-            raise ValueError("Quantity must be positive. To delete, use 'remove_item'.")
+        """
+        Updates quantity for specific ID.
+        Smart Logic: 
+        - If new_quantity is 0 -> Removes the item.
+        - If new_quantity < 0 -> Raises Error.
+        """
+        if new_quantity < 0:
+            raise ValueError("Quantity cannot be negative")
 
+        if new_quantity == 0:
+            # Domain logic: 0 means "remove this line"
+            self.remove_item(item_id)
+            return
+
+        # Regular update
         for item in self._items:
             if item.id == item_id:
                 item.quantity = new_quantity

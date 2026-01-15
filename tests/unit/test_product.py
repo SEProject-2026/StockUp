@@ -115,7 +115,30 @@ def test_update_quantity_negative_fails(empty_product):
     empty_product.add_item(5, LocationType.FRIDGE)
     item_id = empty_product.items[0].id
     
-    with pytest.raises(ValueError, match="must be positive"):
+    with pytest.raises(ValueError, match="cannot be negative"):
+        empty_product.update_item_quantity(item_id, -1)
+
+def test_update_quantity_to_zero_removes_item(empty_product):
+    """
+    Scenario: Setting quantity to 0 via update should trigger removal.
+    """
+    empty_product.add_item(5, LocationType.FRIDGE)
+    item_id = empty_product.items[0].id
+    
+    # Act: Update to 0
+    empty_product.update_item_quantity(item_id, 0)
+    
+    # Assert: Item should be gone
+    assert len(empty_product.items) == 0
+    assert empty_product.total_quantity == 0
+
+def test_update_quantity_negative_fails(empty_product):
+    """Should prevent setting negative quantity."""
+    empty_product.add_item(5, LocationType.FRIDGE)
+    item_id = empty_product.items[0].id
+    
+    # Only strictly negative numbers throw error now
+    with pytest.raises(ValueError, match="cannot be negative"):
         empty_product.update_item_quantity(item_id, -1)
 
 # ==========================================

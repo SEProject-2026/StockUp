@@ -6,10 +6,11 @@ from src.domain.smart_home.enums import LocationType, ExpirationType
 
 
 class ProductItemDTO(BaseModel):
-    expiration_date: Optional[date]
+    id: UUID
     quantity: int
-    status: ExpirationType
-
+    expiration_date: Optional[date]
+    location: LocationType        
+    status: ExpirationType        
 
 class ProductDTO(BaseModel):
     id: UUID
@@ -17,8 +18,8 @@ class ProductDTO(BaseModel):
     original_name: str
     nickname: Optional[str] = None
     barcode: Optional[str] = None
-    location: Optional[LocationType] = None
-    quantity: int
+    
+    total_quantity: int           
     items: List[ProductItemDTO] = []
 
     @classmethod
