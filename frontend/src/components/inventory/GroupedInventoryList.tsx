@@ -1,33 +1,20 @@
-import React, { useState, useRef } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  Pressable,
-  TouchableOpacity,
-} from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { View, Text, FlatList, StyleSheet, Pressable, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { InventoryItem } from "@/src/context/inventory-context";
 
-type GroupedInventory = {
-  key: string;
-  name: string;
-  location: InventoryItem["location"];
-  totalQuantity: number;
-  items: InventoryItem[];
-};
+import type { InventoryRow, ProductGroupVM } from "@/src/components/inventory/inventory.utils";
+import { locationColor, locationLabel } from "@/src/components/inventory/inventory.utils";
 
 const BRAND_TEXT = "#111827";
 const BRAND_MUTED = "#6B7280";
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
 type Props = {
-  groupedItems: GroupedInventory[];
+  groupedItems: ProductGroupVM[];
   searchQuery: string;
-  onChangeQty: (id: string, delta: number) => void;
-  onEditItem: (item: InventoryItem) => void;
-  onDeleteItem: (id: string) => void;
+  onChangeQty: (itemId: string, delta: number) => void;
+  onEditItem: (item: InventoryRow) => void;
+  onDeleteItem: (itemId: string) => void;
   onAddItem: () => void;
 };
 
@@ -39,44 +26,34 @@ export const GroupedInventoryList: React.FC<Props> = ({
   onDeleteItem,
   onAddItem,
 }) => {
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    {}
-  );
-  const listRef = useRef<FlatList<GroupedInventory>>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const listRef = useRef<FlatList<ProductGroupVM>>(null);
   const isSearching = searchQuery.trim().length >= 2;
 
-  const toggleGroup = (groupKey: string) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupKey]: !prev[groupKey],
-    }));
+  const toggle = (key: string) => {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
     <FlatList
       ref={listRef}
       data={groupedItems}
-      keyExtractor={(group) => group.key}
+      keyExtractor={(g) => g.key}
       contentContainerStyle={styles.listContent}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="none"
       removeClippedSubviews={false}
-      maintainVisibleContentPosition={{
-        minIndexForVisible: 1,
-        autoscrollToTopThreshold: 40,
-      }}
+      maintainVisibleContentPosition={{ minIndexForVisible: 1, autoscrollToTopThreshold: 40 }}
       ListEmptyComponent={
-        <Text style={styles.emptyText}>
-          לא נמצאו פריטים בקטגוריה / חיפוש הזה.
-        </Text>
+        <Text style={styles.emptyText}>לא נמצאו פריטים בקטגוריה / חיפוש הזה.</Text>
       }
-      renderItem={({ item: group }) => (
-        <GroupedInventoryRow
-          group={group}
-          expanded={isSearching ? false : !!expandedGroups[group.key]}
+      renderItem={({ item: g }) => (
+        <ProductGroupCard
+          group={g}
+          expanded={isSearching ? false : !!expanded[g.key]}
           onToggle={() => {
             if (isSearching) return;
-            toggleGroup(group.key);
+            toggle(g.key);
           }}
           onChangeQty={onChangeQty}
           onEditItem={onEditItem}
@@ -90,9 +67,7 @@ export const GroupedInventoryList: React.FC<Props> = ({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.addTitle}>הוספת מוצר חדש</Text>
-            <Text style={styles.addSubtitle}>
-              הוספת פריט נוסף למלאי שלך, לפי האזור הנבחר.
-            </Text>
+            <Text style={styles.addSubtitle}>הוספת פריט נוסף למלאי שלך, לפי האזור הנבחר.</Text>
           </View>
         </TouchableOpacity>
       }
@@ -100,76 +75,50 @@ export const GroupedInventoryList: React.FC<Props> = ({
   );
 };
 
-type RowProps = {
-  group: GroupedInventory;
+function ProductGroupCard(props: {
+  group: ProductGroupVM;
   expanded: boolean;
   onToggle: () => void;
-  onChangeQty: (id: string, delta: number) => void;
-  onEditItem: (item: InventoryItem) => void;
-  onDeleteItem: (id: string) => void;
-};
+  onChangeQty: (itemId: string, delta: number) => void;
+  onEditItem: (item: InventoryRow) => void;
+  onDeleteItem: (itemId: string) => void;
+}) {
+  const { group, expanded, onToggle, onChangeQty, onEditItem, onDeleteItem } = props;
 
-const GroupedInventoryRow: React.FC<RowProps> = ({
-  group,
-  expanded,
-  onToggle,
-  onChangeQty,
-  onEditItem,
-  onDeleteItem,
-}) => {
-  const locationLabel =
-    group.location === "fridge"
-      ? "מקרר"
-      : group.location === "freezer"
-      ? "מקפיא"
-      : group.location === "pantry"
-      ? "מזווה"
-      : group.location === "cleaning"
-      ? "חומרי ניקוי"
-      : "אחר";
-
-  const locationColor =
-    group.location === "fridge"
-      ? "#0284C7"
-      : group.location === "freezer"
-      ? "#6366F1"
-      : group.location === "pantry"
-      ? "#F97316"
-      : group.location === "cleaning"
-      ? "#10B981"
-      : "#6B7280";
+  // strip color: if only one location, use it; otherwise neutral
+  const stripColor = useMemo(() => {
+    if (group.sections.length === 1) return locationColor(group.sections[0].location);
+    return "#E5E7EB";
+  }, [group.sections]);
 
   return (
     <View style={styles.groupCard}>
       <View style={styles.itemRow}>
-        <View style={[styles.itemStrip, { backgroundColor: locationColor }]} />
+        <View style={[styles.itemStrip, { backgroundColor: stripColor }]} />
+
         <Pressable style={styles.itemMain} onPress={onToggle}>
           <View style={styles.itemHeaderRow}>
-            <Text style={styles.itemName}>{group.name}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemName} numberOfLines={1}>
+                {group.title}
+              </Text>
+              {group.subtitle ? (
+                <Text style={styles.itemSubtitle} numberOfLines={1}>
+                  {group.subtitle}
+                </Text>
+              ) : null}
+            </View>
 
             <View style={styles.groupHeaderRight}>
-              <Text style={styles.groupTotalQtyText}>
-                סה״כ x{group.totalQuantity}
-              </Text>
-              <Ionicons
-                name={expanded ? "chevron-up" : "chevron-down"}
-                size={18}
-                color="#0369A1"
-              />
+              <Text style={styles.groupTotalQtyText}>סה״כ x{group.totalQuantity}</Text>
+              <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color="#0369A1" />
             </View>
           </View>
 
           <View style={styles.itemMetaRow}>
-            <View style={styles.itemMetaGroup}>
-              <Ionicons
-                name="location-outline"
-                size={14}
-                color={BRAND_MUTED}
-              />
-              <Text style={styles.itemMetaText}>{locationLabel}</Text>
-            </View>
-            <Text style={styles.groupCountText}>
-              {group.items.length} רשומות
+            <Text style={styles.groupCountText}>{countItems(group)} רשומות</Text>
+            <Text style={styles.locationsHintText}>
+              {group.sections.length === 1 ? locationLabel(group.sections[0].location) : `${group.sections.length} אזורים`}
             </Text>
           </View>
         </Pressable>
@@ -177,181 +126,85 @@ const GroupedInventoryRow: React.FC<RowProps> = ({
 
       {expanded && (
         <View style={styles.groupChildrenContainer}>
-          {group.items
-            .slice()
-            .sort((a: any, b: any) =>
-              (a.expiresAt ?? "").localeCompare(b.expiresAt ?? "")
-            )
-            .map((item: any) => {
-              const showOriginal =
-                item.originalName &&
-                item.originalName.trim() &&
-                item.originalName !== group.name;
+          {group.sections.map((sec) => (
+            <View key={sec.location} style={styles.sectionBlock}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.sectionDot, { backgroundColor: locationColor(sec.location) }]} />
+                <Text style={styles.sectionTitle}>
+                  {locationLabel(sec.location)} • x{sec.totalQuantity}
+                </Text>
+              </View>
 
-              return (
-                <View key={item.id} style={styles.batchRow}>
-                  <View style={styles.batchInfo}>
-                    <View style={styles.batchTextCol}>
-                      {showOriginal ? (
-                        <Text style={styles.batchOriginalText} numberOfLines={1}>
-                          {item.originalName}
-                        </Text>
-                      ) : null}
-
-                      <View style={styles.batchDateRow}>
-                        <Ionicons
-                          name="time-outline"
-                          size={14}
-                          color={BRAND_MUTED}
-                        />
-                        <Text style={styles.batchInfoText}>
-                          {item.expiresAt
-                            ? `תוקף: ${item.expiresAt}`
-                            : "ללא תאריך תוקף"}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.batchActions}>
-                    <View style={styles.qtyControl}>
-                      <TouchableOpacity
-                        style={styles.qtyButton}
-                        onPress={() => onChangeQty(item.id, -1)}
-                      >
-                        <Text style={styles.qtyButtonText}>−</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.qtyValue}>{item.quantity}</Text>
-                      <TouchableOpacity
-                        style={styles.qtyButton}
-                        onPress={() => onChangeQty(item.id, 1)}
-                      >
-                        <Text style={styles.qtyButtonText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.batchIconButton}
-                      onPress={() => onEditItem(item)}
-                    >
-                      <Ionicons
-                        name="create-outline"
-                        size={18}
-                        color="#0369A1"
-                      />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.batchIconButton}
-                      onPress={() => onDeleteItem(item.id)}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={18}
-                        color="#DC2626"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
+              {sec.items.map((item) => (
+                <BatchRow
+                  key={item.itemId}
+                  item={item}
+                  onChangeQty={onChangeQty}
+                  onEditItem={onEditItem}
+                  onDeleteItem={onDeleteItem}
+                />
+              ))}
+            </View>
+          ))}
         </View>
       )}
     </View>
   );
-};
+}
+
+function countItems(group: ProductGroupVM) {
+  return group.sections.reduce((acc, s) => acc + s.items.length, 0);
+}
+
+function BatchRow(props: {
+  item: InventoryRow;
+  onChangeQty: (itemId: string, delta: number) => void;
+  onEditItem: (item: InventoryRow) => void;
+  onDeleteItem: (itemId: string) => void;
+}) {
+  const { item, onChangeQty, onEditItem, onDeleteItem } = props;
+
+  return (
+    <View style={styles.batchRow}>
+      <View style={styles.batchInfo}>
+        <View style={styles.batchTextCol}>
+          <View style={styles.batchDateRow}>
+            <Ionicons name="time-outline" size={14} color={BRAND_MUTED} />
+            <Text style={styles.batchInfoText}>
+              {item.expirationDate ? `תוקף: ${item.expirationDate}` : "ללא תאריך תוקף"}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.batchActions}>
+        <View style={styles.qtyControl}>
+          <TouchableOpacity style={styles.qtyButton} onPress={() => onChangeQty(item.itemId, -1)}>
+            <Text style={styles.qtyButtonText}>−</Text>
+          </TouchableOpacity>
+          <Text style={styles.qtyValue}>{item.quantity}</Text>
+          <TouchableOpacity style={styles.qtyButton} onPress={() => onChangeQty(item.itemId, 1)}>
+            <Text style={styles.qtyButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.batchIconButton} onPress={() => onEditItem(item)}>
+          <Ionicons name="create-outline" size={18} color="#0369A1" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.batchIconButton} onPress={() => onDeleteItem(item.itemId)}>
+          <Ionicons name="trash-outline" size={18} color="#DC2626" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
-    gap: 8,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: 32,
-    color: BRAND_MUTED,
-    fontSize: 14,
-  },
+  listContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40, gap: 8 },
+  emptyText: { textAlign: "center", marginTop: 32, color: BRAND_MUTED, fontSize: 14 },
+
   groupCard: { marginBottom: 8 },
-  groupHeaderRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  groupTotalQtyText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#0369A1",
-  },
-  groupCountText: { fontSize: 12, color: BRAND_MUTED },
-  groupChildrenContainer: {
-    marginHorizontal: 10,
-    marginTop: 4,
-    marginBottom: 2,
-    borderLeftWidth: 1,
-    borderLeftColor: "#E5E7EB",
-    paddingLeft: 8,
-    gap: 4,
-  },
-
-  batchRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-  },
-
-  batchInfo: {
-    flex: 1,
-    alignItems: "flex-end",
-  },
-
-  batchTextCol: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-    flex: 1,
-  },
-
-  batchDateRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-  },
-
-  batchInfoText: {
-    fontSize: 12,
-    color: BRAND_MUTED,
-    textAlign: "right",
-  },
-
-  batchOriginalText: {
-    fontSize: 12,
-    color: BRAND_TEXT,
-    fontWeight: "700",
-    textAlign: "right",
-  },
-
-  batchActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: 8,
-  },
-
-  batchIconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-
   itemRow: {
     flexDirection: "row",
     borderRadius: 16,
@@ -362,32 +215,66 @@ const styles = StyleSheet.create({
   },
   itemStrip: { width: 4 },
   itemMain: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
+
   itemHeaderRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 4,
+    gap: 10,
   },
+  groupHeaderRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  groupTotalQtyText: { fontSize: 13, fontWeight: "600", color: "#0369A1" },
+
   itemName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "800",
     textAlign: "right",
-    marginLeft: 8,
     color: BRAND_TEXT,
   },
+  itemSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: BRAND_MUTED,
+    textAlign: "right",
+  },
+
   itemMetaRow: {
     flexDirection: "row-reverse",
     justifyContent: "space-between",
-    marginTop: 4,
+    marginTop: 6,
+    alignItems: "center",
   },
-  itemMetaGroup: {
+  groupCountText: { fontSize: 12, color: BRAND_MUTED },
+  locationsHintText: { fontSize: 12, color: BRAND_MUTED },
+
+  groupChildrenContainer: {
+    marginHorizontal: 10,
+    marginTop: 6,
+    marginBottom: 2,
+    borderLeftWidth: 1,
+    borderLeftColor: "#E5E7EB",
+    paddingLeft: 8,
+    gap: 10,
+  },
+
+  sectionBlock: { gap: 6 },
+  sectionHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  sectionDot: { width: 8, height: 8, borderRadius: 4 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", color: BRAND_TEXT, textAlign: "right" },
+
+  batchRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "space-between",
+    paddingVertical: 6,
   },
-  itemMetaText: { fontSize: 12, color: BRAND_MUTED },
+  batchInfo: { flex: 1, alignItems: "flex-end" },
+  batchTextCol: { alignItems: "flex-end", justifyContent: "center", flex: 1 },
+  batchDateRow: { flexDirection: "row-reverse", alignItems: "center", gap: 6, marginTop: 2 },
+  batchInfoText: { fontSize: 12, color: BRAND_MUTED, textAlign: "right" },
 
+  batchActions: { flexDirection: "row", alignItems: "center", gap: 6, marginLeft: 8 },
   qtyControl: {
     flexDirection: "row",
     alignItems: "center",
@@ -407,17 +294,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#0284C7",
   },
-  qtyButtonText: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  qtyValue: {
-    minWidth: 18,
-    textAlign: "center",
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#0369A1",
+  qtyButtonText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
+  qtyValue: { minWidth: 18, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#0369A1" },
+
+  batchIconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
 
   addCard: {
@@ -440,16 +328,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  addTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: BRAND_TEXT,
-    textAlign: "right",
-  },
-  addSubtitle: {
-    fontSize: 12,
-    color: BRAND_MUTED,
-    marginTop: 2,
-    textAlign: "right",
-  },
+  addTitle: { fontSize: 15, fontWeight: "600", color: BRAND_TEXT, textAlign: "right" },
+  addSubtitle: { fontSize: 12, color: BRAND_MUTED, marginTop: 2, textAlign: "right" },
 });

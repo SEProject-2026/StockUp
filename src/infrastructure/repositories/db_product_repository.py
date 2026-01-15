@@ -2,8 +2,8 @@ from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from src.repositories.i_product_repository import IProductRepository
-from src.domain.smart_home.product import Product
-from src.domain.smart_home.enums import LocationType, ExpirationType
+from src.domain.smart_home.product import Product, ProductItem
+from src.domain.smart_home.enums import LocationType
 from src.infrastructure.db.models import ProductModel, ProductItemModel
 
 class DbProductRepository(IProductRepository):
@@ -11,41 +11,49 @@ class DbProductRepository(IProductRepository):
         self.db = db
 
     async def save(self, product: Product) -> None:
-        db_product = self.db.query(ProductModel).filter(ProductModel.id == str(product.get_id())).first()
+        """
+        Saves or updates the Aggregate Root (Product) and its children (Items).
+        """
+        # 1. Check if product exists
+        db_product = self.db.query(ProductModel).filter(ProductModel.id == str(product.id)).first()
 
-        if db_product:
-            # Update existing product
-            db_product.original_name = product.get_original_name()
-            db_product.nickname = product.get_nickname()
-            db_product.quantity = product.get_quantity()
-            db_product.location = product.get_location().name if product.get_location() else None
-            
-            # Clear existing items to rewrite them from the domain entity
-            db_product.items = [] 
-        else:
-            # Create new product
+        if not db_product:
+            # CREATE
             db_product = ProductModel(
-                id=str(product.get_id()),
-                home_id=str(product.get_home_id()),
-                original_name=product.get_original_name(),
-                nickname=product.get_nickname(),
-                barcode=product.get_barcode(),
-                quantity=product.get_quantity(),
-                location=product.get_location().name if product.get_location() else None
+                id=str(product.id),
+                home_id=str(product.home_id),
+                original_name=product.original_name,
+                nickname=product.nickname,
+                barcode=product.barcode
+                # Note: 'quantity' and 'location' are NOT stored on ProductModel anymore
             )
             self.db.add(db_product)
+        else:
+            # UPDATE (Fields on the Aggregate Root)
+            db_product.original_name = product.original_name
+            db_product.nickname = product.nickname
+            db_product.barcode = product.barcode
 
-        # Create ProductItemModel instances from the domain dictionary
-        new_items = []
-        for exp_date, (qty, exp_type) in product.get_expiration_dates().items():
-            item = ProductItemModel(
-                expiration_date=exp_date,
-                quantity=qty,
-                expiration_type=exp_type.name 
-            )
-            new_items.append(item)
+        # 2. Handle Items (The Children)
+        # Approach: Replace all items logic (Simpler for consistency)
+        # In a highly optimized system, we would diff the lists, but for now replace is safe.
         
-        db_product.items = new_items 
+        # Clear existing DB items
+        db_product.items = []
+        
+        # Convert Domain Items -> DB Models
+        new_db_items = []
+        for item in product.items:
+            db_item = ProductItemModel(
+                id=str(item.id),
+                product_id=str(product.id),
+                quantity=item.quantity,
+                expiration_date=item.expiration_date,
+                location=item.location.name if item.location else "OTHER"
+            )
+            new_db_items.append(db_item)
+            
+        db_product.items = new_db_items
         
         self.db.commit()
 
@@ -86,6 +94,7 @@ class DbProductRepository(IProductRepository):
         return [self._to_domain(p) for p in db_products]
 
     async def update(self, product: Product) -> None:
+        # Save handles both insert and update
         await self.save(product)
 
     async def delete(self, product_id: UUID) -> None:
@@ -94,15 +103,12 @@ class DbProductRepository(IProductRepository):
             self.db.delete(db_product)
             self.db.commit()
 
-    async def get_by_name(self, home_id: UUID, name: str) -> Optional[Product]:
+    async def get_by_original_name(self, home_id: UUID, name: str) -> Optional[Product]:
         db_product = (
             self.db.query(ProductModel)
             .options(joinedload(ProductModel.items))
             .filter(ProductModel.home_id == str(home_id))
-            .filter(
-                (ProductModel.original_name == name) | 
-                (ProductModel.nickname == name)
-            )
+            .filter(ProductModel.original_name == name)
             .first()
         )
         if not db_product:
@@ -110,45 +116,47 @@ class DbProductRepository(IProductRepository):
         return self._to_domain(db_product)
 
     async def get_by_location(self, home_id: UUID, location: str) -> List[Product]:
+        """
+        Complex Query: Find products that have AT LEAST one item in the given location.
+        """
         db_products = (
             self.db.query(ProductModel)
-            .options(joinedload(ProductModel.items))
+            .join(ProductItemModel) # Join to filter by item location
             .filter(ProductModel.home_id == str(home_id))
-            .filter(ProductModel.location == location)
+            .filter(ProductItemModel.location == location)
+            .options(joinedload(ProductModel.items)) # Eager load all items (even not matching ones)
+            .distinct()
             .all()
         )
         return [self._to_domain(p) for p in db_products]
-         
-    async def get_by_expiration_filter(self, home_id: UUID, home_expiration_range: int, filter_type: ExpirationType) -> List[Product]:
-        # Fetching all products and filtering in memory (simplest approach for complex domain logic)
-        all_products = await self.list_all_by_home(home_id)
-        # Assuming the service layer or domain logic handles the specific filtering based on ExpirationType
-        return all_products 
+
+    # --- Mapper ---
 
     def _to_domain(self, db_model: ProductModel) -> Product:
-        # Create base object
+        # 1. Create the Aggregate Root
         product = Product(
+            id=UUID(db_model.id),
             home_id=UUID(db_model.home_id),
             original_name=db_model.original_name,
-            quantity=0, # Will be recalculated
-            expiration_range=7, # Default, or fetched if needed
             barcode=db_model.barcode,
-            location=LocationType[db_model.location] if db_model.location else None,
             nickname=db_model.nickname
         )
         
-        # Restore ID
-        product._id = UUID(db_model.id)
-        
-        # Restore expiration dictionary from items
-        product._expiration_dates_to_quantity = {}
-        total_qty = 0
-        
-        for item in db_model.items:
-            e_type = ExpirationType[item.expiration_type] if item.expiration_type else ExpirationType.FRESH
-            product._expiration_dates_to_quantity[item.expiration_date] = (item.quantity, e_type)
-            total_qty += item.quantity
+        # 2. Reconstitute Items
+        # We manually add them to the protected list _items to bypass business logic in add_item
+        # (Since we are just loading state from DB, not adding new items)
+        restored_items = []
+        for db_item in db_model.items:
+            loc_enum = LocationType[db_item.location] if db_item.location else LocationType.OTHER
             
-        product._quantity = total_qty
+            domain_item = ProductItem(
+                id=UUID(db_item.id),
+                quantity=db_item.quantity,
+                expiration_date=db_item.expiration_date,
+                location=loc_enum
+            )
+            restored_items.append(domain_item)
+            
+        product._items = restored_items
         
         return product

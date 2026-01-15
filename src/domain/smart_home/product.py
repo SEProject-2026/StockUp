@@ -1,217 +1,211 @@
+from __future__ import annotations
+from typing import List, Optional
+from uuid import UUID, uuid4
 from datetime import date
-from typing import Optional
-from uuid import uuid4, UUID
-from src.domain.smart_home.enums import ExpirationType, LocationType
+from dataclasses import dataclass, field
+from src.domain.smart_home.enums import LocationType, ExpirationType
 
+@dataclass
+class ProductItem:
+    """
+    Represents a specific batch/line in the inventory.
+    """
+    id: UUID = field(default_factory=uuid4)
+    quantity: int = 0
+    expiration_date: Optional[date] = None
+    location: LocationType = LocationType.OTHER
 
-class ProductBuilder:
+    def get_status(self, warning_days: int) -> ExpirationType:
+        """
+        Calculates status dynamically based on home settings.
+        :param warning_days: The threshold defined by the home configuration (e.g., 3 days).
+        """
+        if self.expiration_date is None:
+            return ExpirationType.FRESH 
 
-    def __init__(self, home_id: UUID, name: str, quantity: int, expiration_range: int):
-        self._home_id = home_id
-        self._original_name = name
-        self._quantity = quantity
-        self._expiration_range = expiration_range
-        self._barcode: Optional[str] = None
-        self._nickname: Optional[str] = None
-        self._location: Optional[LocationType] = None
-        self._expiration_date: Optional[date] = None
+        today = date.today()
+        delta = (self.expiration_date - today).days
 
-    def with_barcode(self, barcode: str) -> 'ProductBuilder':
-        self._barcode = barcode
-        return self
-
-    def with_nickname(self, new_nickname: str) -> 'ProductBuilder':
-        self._nickname = new_nickname
-        return self
-
-    def with_location(self, location: LocationType) -> 'ProductBuilder':
-        if location:
-            self._location = location
-        return self
-
-    def with_expiration_date(self, exp_date: date) -> 'ProductBuilder':
-        self._expiration_date = exp_date
-        return self
-    
-    def with_expiration_range(self, exp_range: int) -> 'ProductBuilder':
-        self._expiration_range = exp_range
-        return self
-
-    def build(self) -> 'Product':
-        return Product(
-            home_id=self._home_id,
-            barcode=self._barcode,
-            original_name=self._original_name,
-            quantity=self._quantity,
-            location=self._location,
-            nickname=self._nickname,
-            expiration_date=self._expiration_date,
-            expiration_range=self._expiration_range
-        )
-
+        if delta < 0:
+            return ExpirationType.EXPIRED
+        elif 0 <= delta <= warning_days:
+            return ExpirationType.GOING_TO_EXPIRE
+        else:
+            return ExpirationType.FRESH
 
 class Product:
-
-    def builder(home_id: UUID, name: str, quantity: int, expiration_range: int) -> 'ProductBuilder':
-        return ProductBuilder(home_id, name, quantity, expiration_range)
-    
-    NICKNAME_MAX_LENGTH = 20
-
-    def __init__(self, 
-                home_id: UUID,
-                original_name: str,
-                quantity: int, 
-                expiration_range: int,
-                barcode: Optional[str] = None,
-                location: LocationType = LocationType.OTHER, 
-                nickname: Optional[str] = None,
-                expiration_date: Optional[date] = None):
+    def __init__(
+        self, 
+        id: UUID, 
+        home_id: UUID, 
+        original_name: str,
+        barcode: Optional[str] = None,
+        nickname: Optional[str] = None
+    ):
+        self.id = id
+        self.home_id = home_id
+        self.original_name = original_name
+        self.barcode = barcode
+        self.nickname = nickname
         
-        self._id = uuid4()
-        self._home_id = home_id
-        self._barcode = barcode
-        self._original_name = original_name
-        self.set_nickname(nickname)
-        self.set_quantity(quantity)
-        self._location = location
-        self._expiration_dates_to_quantity = {} # expiration_date: (quantity, ExpirationType)
-        self.set_expiration_date_and_type(expiration_date, quantity, expiration_range)
+        # Internal storage
+        self._items: List[ProductItem] = []
 
-    # Getters
-    def get_id(self) -> UUID:
-        return self._id
+    # ==========================================
+    # Properties
+    # ==========================================
 
-    def get_home_id(self) -> UUID:
-        return self._home_id
+    @property
+    def items(self) -> List[ProductItem]:
+        """Returns a copy of the list to prevent external modification."""
+        return list(self._items)
 
-    def get_barcode(self) -> str:
-        return self._barcode
+    @property
+    def total_quantity(self) -> int:
+        """Calculates total stock across all batches."""
+        return sum(item.quantity for item in self._items)
 
-    def get_original_name(self) -> str:
-        return self._original_name
+    # ==========================================
+    # Domain Actions
+    # ==========================================
 
-    def get_nickname(self) -> Optional[str]:
-        return self._nickname
-
-    def get_quantity(self) -> int:
-        return self._quantity
-    
-    def get_location(self) -> Optional[LocationType]:
-        return self._location
-
-    def get_expiration_dates(self) -> dict[date, tuple[int, ExpirationType]]:
-        return self._expiration_dates_to_quantity 
-    def get_expiration_type(self, expiration_date: date) -> Optional[ExpirationType]:
-        if expiration_date in self._expiration_dates_to_quantity:
-            _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
-            return expiration_type
-        return None
-    
-    # Setters
     def set_nickname(self, new_nickname: str) -> None:
-        if new_nickname is None:
-            self._nickname = None
-            return
-        if self._is_valid_name(new_nickname):
-            self._nickname = new_nickname    
+        self.nickname = new_nickname
 
-    def set_expiration_date_and_type(self, expiration_date: Optional[date], quantity: int, expiration_range: int) -> None:
-        if expiration_date is None:
-            self._expiration_dates_to_quantity[expiration_date] = (quantity, ExpirationType.FRESH)
-        else:
-            days_until_expiration = (expiration_date - date.today()).days
-            if days_until_expiration <= 0:
-                expiration_type = ExpirationType.EXPIRED
-            elif days_until_expiration <= expiration_range:
-                expiration_type = ExpirationType.GOING_TO_EXPIRE
-            else:
-                expiration_type = ExpirationType.FRESH
-            self._expiration_dates_to_quantity[expiration_date] = (quantity, expiration_type)
-    
-    def update_expiration_date(self, old_date: date, new_date: date, expiration_range: Optional[int]) -> None:
-        if old_date in self._expiration_dates_to_quantity:
-            quantity, _ = self._expiration_dates_to_quantity.pop(old_date)
-            if new_date in self._expiration_dates_to_quantity:
-                existing_quantity, _ = self._expiration_dates_to_quantity[new_date]
-                quantity += existing_quantity
-            self.set_expiration_date_and_type(new_date, quantity, expiration_range)
-        else:
-            raise ValueError("Old expiration date not found.")
-    
-    def set_quantity(self, new_quantity: int) -> None:
-        if new_quantity < 0:
-            raise ValueError("Quantity cannot be negative.")
-        self._quantity = new_quantity
+    def add_item(self, quantity: int, location: Optional[LocationType] = None, expiration_date: Optional[date] = None) -> None:
+        """
+        Smart Add:
+        If location is None, defaults to LocationType.OTHER.
+        """
+        if quantity <= 0:
+            raise ValueError("Quantity to add must be positive")
 
-    async def remove_product_date(self, expiration_date: Optional[date]) -> 'Product':
-        # case: product without expiration date
-        if expiration_date is None:
-            if None in self._expiration_dates_to_quantity:
-                date_quantity, _ = self._expiration_dates_to_quantity.pop(None)
-                self._quantity -= date_quantity
-                return self
-            else:
-                raise ValueError("Product has no item without expiration date.")
-            
-        # case: product with expiration date
-        if expiration_date in self._expiration_dates_to_quantity:
-            date_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
-            del self._expiration_dates_to_quantity[expiration_date]
-            self._quantity = self._quantity - date_quantity 
-            return self
-        else:
-            raise ValueError(f"item of date {expiration_date} not found for this product.")
+        # Resolve default location inside the domain
+        effective_location = location if location else LocationType.OTHER
+
+        # 1. Try to merge with existing batch using effective_location
+        for item in self._items:
+            if item.location == effective_location and item.expiration_date == expiration_date:
+                item.quantity += quantity
+                return
+
+        # 2. Create new batch
+        new_item = ProductItem(
+            quantity=quantity,
+            expiration_date=expiration_date,
+            location=effective_location # Guaranteed to be a real Enum, not None
+        )
+        self._items.append(new_item)
+
+    def remove_item(self, item_id: UUID) -> None:
+        """Completely removes a specific line item."""
+        for i, item in enumerate(self._items):
+            if item.id == item_id:
+                self._items.pop(i)
+                return
         
-    async def update_date_quantity(self, expiration_date: date, new_quantity: int) -> 'Product':
-        if not isinstance(new_quantity, int):
-            raise ValueError("Quantity must be a number.")
+        raise ValueError(f"Item {item_id} not found in product {self.id}")
+
+    def update_item_quantity(self, item_id: UUID, new_quantity: int) -> None:
+        """
+        Updates quantity for specific ID.
+        Smart Logic: 
+        - If new_quantity is 0 -> Removes the item.
+        - If new_quantity < 0 -> Raises Error.
+        """
         if new_quantity < 0:
-            raise ValueError("Quantity cannot be negative.")
-        elif new_quantity == 0:
-            return await self.remove_product_date(expiration_date)
+            raise ValueError("Quantity cannot be negative")
+
+        if new_quantity == 0:
+            # Domain logic: 0 means "remove this line"
+            self.remove_item(item_id)
+            return
+
+        # Regular update
+        for item in self._items:
+            if item.id == item_id:
+                item.quantity = new_quantity
+                return
+        
+        raise ValueError(f"Item {item_id} not found")
+
+    # ==========================================
+    # Update Methods with Merge Logic
+    # ==========================================
+
+    def update_item_location(self, item_id: UUID, new_location: LocationType) -> None:
+        """
+        Updates the location of a specific item.
+        If an item with the same expiration_date already exists in the new_location,
+        it merges them (adds quantity to the target and removes the source).
+        """
+        # 1. Find the item to move
+        item_to_move = next((i for i in self._items if i.id == item_id), None)
+        if not item_to_move:
+            raise ValueError(f"Item {item_id} not found")
+
+        # Optimization: If location hasn't changed, do nothing
+        if item_to_move.location == new_location:
+            return
+
+        # 2. Check for merge target (Same location, Same date, Different ID)
+        target_item = next((
+            i for i in self._items 
+            if i.location == new_location 
+            and i.expiration_date == item_to_move.expiration_date
+            and i.id != item_id
+        ), None)
+
+        if target_item:
+            # Merge Logic: Add quantity to target, remove source
+            target_item.quantity += item_to_move.quantity
+            self._items.remove(item_to_move)
         else:
-            if expiration_date in self._expiration_dates_to_quantity:
-                _, expiration_type = self._expiration_dates_to_quantity[expiration_date]
-                self._expiration_dates_to_quantity[expiration_date] = (new_quantity, expiration_type)
-                self._quantity = sum(q for q, _ in self._expiration_dates_to_quantity.values())
-                return self
-            else:
-                raise ValueError(f"item of date {expiration_date} not found for this product.")
-            
-    async def add_to_existing_product(self, expiration_date: date, new_quantity: int, expiration_range: int) -> None:
-        if expiration_date in self._expiration_dates_to_quantity:
-            old_quantity, _ = self._expiration_dates_to_quantity[expiration_date]
-            await self.update_date_quantity(expiration_date, new_quantity + old_quantity)
+            # Update Logic: Just change location
+            item_to_move.location = new_location
+
+    def update_item_date(self, item_id: UUID, new_date: Optional[date]) -> None:
+        """
+        Updates expiration date.
+        If changing date creates a duplicate (same location + new date already exists),
+        it merges the quantities and deletes the old item ID.
+        """
+        # 1. Find the source item
+        source_item = self._get_item_by_id(item_id)
+        
+        if source_item.expiration_date == new_date:
+            return 
+
+        # 2. Check for merge conflict
+        target_item = self._find_merge_candidate(
+            exclude_id=item_id,
+            location=source_item.location,
+            expiration_date=new_date
+        )
+
+        if target_item:
+            # Merge source into target
+            target_item.quantity += source_item.quantity
+            self._items.remove(source_item)
         else:
-            self.set_expiration_date_and_type(expiration_date, new_quantity, expiration_range)
-            self._quantity += new_quantity
-            
-    def set_location(self, new_location: LocationType) -> None:
-        self._location = new_location
+            # Just update
+            source_item.expiration_date = new_date
 
-    def _is_valid_name(self, new_nickname: str) -> bool:
-        if new_nickname.strip() == "":
-            raise ValueError("Nickname cannot be empty.")
-        if len(new_nickname) > self.NICKNAME_MAX_LENGTH:
-            raise ValueError(f"Nickname is too long (max {self.NICKNAME_MAX_LENGTH} chars).")
-        if "  " in new_nickname:
-            raise ValueError("Nickname cannot contain consecutive spaces.")
-        clean_name = new_nickname.replace(" ", "")
-        if not clean_name.isalnum():
-            raise ValueError("Nickname must contain only letters or numbers.")
-        return True
-  
-    def to_dict(self) -> dict:
-        return {
-            "id": str(self._id),
-            "home_id": str(self._home_id),
-            "barcode": self._barcode,
-            "original_name": self._original_name,
-            "nickname": self._nickname,
-            "quantity": self._quantity,
-            "location": self._location.name if self._location else None,
-            "expiration_dates_to_quantity": {str(k): (v[0], str(v[1])) for k, v in self._expiration_dates_to_quantity.items()},
-        }
+    # ==========================================
+    # Private Helpers
+    # ==========================================
 
-         
+    def _get_item_by_id(self, item_id: UUID) -> ProductItem:
+        for item in self._items:
+            if item.id == item_id:
+                return item
+        raise ValueError(f"Item {item_id} not found")
 
+    def _find_merge_candidate(self, exclude_id: UUID, location: LocationType, expiration_date: Optional[date]) -> Optional[ProductItem]:
+        """
+        Looks for ANOTHER item that matches the location/date criteria to allow merging.
+        """
+        for item in self._items:
+            if item.id != exclude_id and item.location == location and item.expiration_date == expiration_date:
+                return item
+        return None

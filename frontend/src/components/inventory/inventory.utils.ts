@@ -3,17 +3,42 @@ import type { ProductDTO, LocationType, ExpirationType } from "@/src/api/stock";
 
 export type InventoryRow = InventoryItem & {
   productId: string;
+  itemId: string;
+
   expirationDate: string | null;
   originalName: string;
   hasNickname: boolean;
-  status?: string;
+
+  status?: ExpirationType;
 };
 
 export type locationKey = location | "all";
 export type StatusFilter = "all" | "soon" | "expired";
 
-export function mapLocationTolocation(location?: string | null): location {
-  switch ((location ?? "").toUpperCase()) {
+// ----- Group VM (what the list wants) -----
+export type ProductGroupVM = {
+  key: string; // unique: productId + originalName (extra safety)
+  productId: string;
+
+  title: string; // nickname if exists else original
+  subtitle?: string; // original (only if nickname exists)
+
+  // used for sorting/search
+  originalName: string;
+  nickname?: string | null;
+
+  totalQuantity: number;
+
+  sections: Array<{
+    location: location; // ui
+    totalQuantity: number;
+    items: InventoryRow[];
+  }>;
+};
+
+// Backend LocationType -> UI location
+export function mapLocationTolocation(loc?: string | null): location {
+  switch ((loc ?? "").toUpperCase()) {
     case "FRIDGE":
       return "fridge";
     case "FREEZER":
@@ -23,12 +48,12 @@ export function mapLocationTolocation(location?: string | null): location {
     case "CLEANING_SUPPLIES":
       return "cleaning";
     case "OTHER":
-      return "other";
     default:
       return "other";
   }
 }
 
+// UI location -> Backend LocationType
 export function locationToLocationType(cat: location): LocationType {
   switch (cat) {
     case "fridge":
@@ -40,15 +65,15 @@ export function locationToLocationType(cat: location): LocationType {
     case "cleaning":
       return "CLEANING_SUPPLIES";
     case "other":
-      return "OTHER";
     default:
       return "OTHER";
   }
 }
 
-export function statusFilterToExpirationType(sf: StatusFilter): ExpirationType {
+export function statusFilterToExpirationType(sf: StatusFilter): ExpirationType | null {
   if (sf === "soon") return "GOING_TO_EXPIRE";
-  return "EXPIRED";
+  if (sf === "expired") return "EXPIRED";
+  return null;
 }
 
 export function toIsoDateOnly(s?: string | null) {
@@ -70,12 +95,15 @@ export function dtoToRows(dto: ProductDTO): InventoryRow[] {
       const exp = it.expiration_date ? String(it.expiration_date) : null;
 
       return {
-        id: `${dto.id}__${exp ?? "none"}`,
+        id: String(it.id), // InventoryItem.id -> itemId
         name: displayName,
         quantity: it.quantity,
-        location: mapLocationTolocation(dto.location),
+        location: mapLocationTolocation(it.location),
         expiresAt: exp ?? undefined,
+
         productId: String(dto.id),
+        itemId: String(it.id),
+
         expirationDate: exp,
         originalName: dto.original_name,
         hasNickname,
@@ -84,17 +112,22 @@ export function dtoToRows(dto: ProductDTO): InventoryRow[] {
     });
   }
 
+  // fallback
   return [
     {
-      id: `${dto.id}__none`,
+      id: `${dto.id}__fallback`,
       name: displayName,
-      quantity: dto.quantity ?? 0,
-      location: mapLocationTolocation(dto.location),
+      quantity: dto.total_quantity ?? 0,
+      location: "other",
       expiresAt: undefined,
+
       productId: String(dto.id),
+      itemId: `${dto.id}__fallback`,
+
       expirationDate: null,
       originalName: dto.original_name,
       hasNickname,
+      status: undefined,
     },
   ];
 }
@@ -104,7 +137,33 @@ export function rowsSignature(rows: InventoryRow[]) {
   return sorted
     .map(
       (r) =>
-        `${r.id}:${r.productId}:${r.quantity}:${r.expiresAt ?? ""}:${r.name}:${r.originalName}:${r.hasNickname ? 1 : 0}:${r.status ?? ""}`
+        `${r.id}:${r.productId}:${r.itemId}:${r.quantity}:${r.expiresAt ?? ""}:${r.name}:${r.originalName}:${
+          r.hasNickname ? 1 : 0
+        }:${r.status ?? ""}:${r.location}`
     )
     .join("|");
+}
+
+export function locationLabel(loc: location) {
+  return loc === "fridge"
+    ? "מקרר"
+    : loc === "freezer"
+    ? "מקפיא"
+    : loc === "pantry"
+    ? "מזווה"
+    : loc === "cleaning"
+    ? "חומרי ניקוי"
+    : "אחר";
+}
+
+export function locationColor(loc: location) {
+  return loc === "fridge"
+    ? "#0284C7"
+    : loc === "freezer"
+    ? "#6366F1"
+    : loc === "pantry"
+    ? "#F97316"
+    : loc === "cleaning"
+    ? "#10B981"
+    : "#6B7280";
 }

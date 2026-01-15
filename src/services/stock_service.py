@@ -1,7 +1,7 @@
 import os
 from sys import exception
 from uuid import UUID, uuid4
-from typing import Any, List, Optional, Dict
+from typing import Any, Callable, List, Optional, Dict
 from datetime import date
 from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
 from src.domain.smart_home.product import Product
@@ -25,29 +25,43 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
-                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Product:
-
-        home_expr_range = await self._check_access(user_id, home_id)
-        product = await self._product_repository.get_by_name(home_id, name)
+    async def add_product(
+        self, 
+        name: str, 
+        user_id: UUID, 
+        home_id: UUID, 
+        quantity: int,  
+        barcode: Optional[str],
+        expiration_date: Optional[date], 
+        location: Optional[LocationType], 
+        nickname: Optional[str]
+    ) -> Product:
+        
+        await self._check_access(user_id, home_id)
+        
+        product = await self._product_repository.get_by_original_name(home_id, name)
+        
         if not product:
-            product = (
-                Product.builder(
-                    home_id=home_id,
-                    name=name,
-                    quantity=quantity,
-                    expiration_range=home_expr_range
-                )
-                .with_barcode(barcode)
-                .with_nickname(nickname)
-                .with_location(location)
-                .with_expiration_date(expiration_date)
-                .build()
+            product = Product(
+                id=uuid4(),
+                home_id=home_id,
+                original_name=name,
+                barcode=barcode,
+                nickname=nickname
             )
+            
+            product.add_item(quantity, location, expiration_date)
+            
             await self._product_repository.save(product)
+            
         else:
-            await product.add_to_existing_product(expiration_date, quantity, home_expr_range)
+            if nickname:
+                product.set_nickname(nickname)
+                
+            product.add_item(quantity, location, expiration_date)
+            
             await self._product_repository.update(product)
+            
         return product
         
     
@@ -110,111 +124,203 @@ class StockService:
         return receipt_dto
 
         
-    async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
-        
+    async def remove_item(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID) -> Optional[Product]:
+        """
+        Removes a specific item batch (line) from the product.
+        If the product becomes empty (0 quantity), it deletes the product entity entirely.
+        """
         await self._check_access(user_id, home_id)
+        
+        # 1. Get Product
         product = await self._product_repository.get_by_id(product_id)
-        if not product or product.get_home_id() != home_id:
+        
+        # Validation: Check existence and ownership
+        if not product or product.home_id != home_id:
             raise ValueError("Product not found in this home")
         
-        product = await product.remove_product_date(date)
-        if product.get_quantity() > 0:
+        # 2. Domain Action (Delete logic is inside the Domain Entity)
+        # This will raise ValueError if item_id doesn't exist
+        product.remove_item(item_id)
+        
+        # 3. Persistence Logic
+        if product.total_quantity > 0:
+            # If items remain -> Update
             await self._product_repository.update(product)
             return product
         else:
+            # If empty -> Delete the Aggregate Root
             await self._product_repository.delete(product_id)
             return None
 
-
-    async def update_date_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, date: date, new_quantity: int) -> Optional[Product]:
-
+    async def update_item_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_quantity: int) -> Optional[Product]:
+        """
+        Updates quantity. 
+        Delegates the logic of "0 means delete" to the Product domain entity.
+        """
         await self._check_access(user_id, home_id)
+        
         product = await self._product_repository.get_by_id(product_id)
-        if not product or product.get_home_id() != home_id:
+        if not product or product.home_id != home_id:
             raise ValueError("Product not found")
+
+        # 1. Domain Action
+        # The product itself handles whether to update or remove the item based on qty
+        product.update_item_quantity(item_id, new_quantity)
         
-        product = await product.update_date_quantity(date, new_quantity)
-        if product.get_quantity() > 0:
+        # 2. Persistence & Cleanup
+        # If the Product is now empty (because we removed the last item), delete it.
+        if product.total_quantity > 0:
             await self._product_repository.update(product)
             return product
         else:
             await self._product_repository.delete(product_id)
             return None
 
-
-    async def update_expiration_date(self, user_id: UUID,  home_id: UUID, product_id: UUID, old_date: date, new_date: date) -> Product:
-
-        expiration_range = await self._check_access(user_id, home_id)
+    async def update_item_date(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_date: Optional[date]) -> Product:
+        """
+        Updates the expiration date of a specific batch.
+        The Product entity handles the logic: 
+        If the new date matches an existing batch in the same location -> Merges them.
+        """
+        await self._check_access(user_id, home_id)
+        
         product = await self._product_repository.get_by_id(product_id)
-        if not product or product.get_home_id() != home_id:
-            raise ValueError("Product not found in this home")
+        if not product or product.home_id != home_id:
+            raise ValueError("Product not found")
 
-        product.update_expiration_date(old_date, new_date, expiration_range)
+        # Domain Action (Handles Merge logic internally)
+        product.update_item_date(item_id, new_date)
+        
+        await self._product_repository.update(product)
+        return product
+    
+    async def update_item_location(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_location: LocationType) -> Product:
+        """
+        Moves a specific item to a new location (e.g. Pantry -> Fridge).
+        """
+        await self._check_access(user_id, home_id)
+        
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.home_id != home_id:
+            raise ValueError("Product not found")
+
+        # Domain Action
+        product.update_item_location(item_id, new_location)
+        
         await self._product_repository.update(product)
         return product
         
 
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:
-
+        """
+        Updates the display nickname of the product (e.g. 'Milk' -> 'Morning Coffee').
+        """
         await self._check_access(user_id, home_id)
 
         product = await self._product_repository.get_by_id(product_id)
-        if not product or product.get_home_id() != home_id:
-            raise ValueError("Product not found in this home")
+        
+        # Validation: Direct property access
+        if not product or product.home_id != home_id:
+            raise ValueError("Product not found")
+
+        # Domain Action
         product.set_nickname(new_nickname)
+        
         await self._product_repository.update(product)
         return product
 
 
-    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[ProductDTO]:
-       
+    async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> List[ProductDTO]:
+        """
+        Returns products containing ONLY items in the specified location.
+        Note: We still need 'warning_days' here to calculate the visual status (Red/Green) 
+        for the returned items, even though we filter by location.
+        """
         await self._check_access(user_id, home_id)
+        
         products = await self._product_repository.list_all_by_home(home_id)
-        filtered_dtos = []
+        
+        # Future: warning_days = await self._home_repo.get_warning_days(home_id)
+        warning_days = 3 
+        
+        dtos = []
         for p in products:
-            dto = self._create_filtered_dto(p, filter_type)
+            # Filter condition: Item location must match
+            dto = self._create_filtered_dto(
+                product=p, 
+                warning_days=warning_days,
+                filter_func=lambda item: item.location == location
+            )
             if dto:
-                filtered_dtos.append(dto)
-        return filtered_dtos
-    
+                dtos.append(dto)
+                
+        return dtos
 
-    def _create_filtered_dto(self, product: Product, filter_type: ExpirationType) -> Optional[ProductDTO]:
+    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[ProductDTO]:
+        """
+        Returns products containing ONLY items with the specified expiration status.
+        """
+        warning_days=await self._check_access(user_id, home_id)
+        
+        products = await self._product_repository.list_all_by_home(home_id)
 
-        product_dates = product.get_expiration_dates()
-        filtered_items = []
-        view_quantity = 0
+        
+        dtos = []
+        for p in products:
+            # Filter condition: Item status (calculated using warning_days) must match
+            dto = self._create_filtered_dto(
+                product=p,
+                warning_days=warning_days, 
+                filter_func=lambda item: item.get_status(warning_days) == filter_type
+            )
+            if dto:
+                dtos.append(dto)
+                
+        return dtos
 
-        for exp_date, (date_quantity, exp_type) in product_dates.items():
-            if exp_type == filter_type:
-                filtered_items.append(ProductItemDTO(
-                    expiration_date=exp_date,
-                    quantity=date_quantity,
-                    status=exp_type
+    # --- Private Helper Method ---
+
+    def _create_filtered_dto(self, product: Product, warning_days: int, filter_func: Callable) -> Optional[ProductDTO]:
+        """
+        Internal helper to map Domain Entity to DTO while applying filters.
+        Calculates the 'view_quantity' based only on the filtered items.
+        """
+        filtered_items_dtos = []
+        view_total_quantity = 0
+
+        for item in product.items:
+            # 1. Apply the filter logic
+            if filter_func(item):
+                
+                # 2. Calculate runtime status for display (Requires warning_days)
+                status = item.get_status(warning_days)
+                
+                filtered_items_dtos.append(ProductItemDTO(
+                    id=item.id,
+                    quantity=item.quantity,
+                    expiration_date=item.expiration_date,
+                    location=item.location, 
+                    status=status
                 ))
-                view_quantity += date_quantity
+                view_total_quantity += item.quantity
 
-        if not filtered_items:
+        # If all items were filtered out, do not return the product at all
+        if not filtered_items_dtos:
             return None
-        filtered_items.sort(key=lambda x: x.expiration_date or date.max)
 
-        # use view_quantity for  total, not product.get_quantity()
+        # Sort items: closest expiration date first (None/No-Date goes last)
+        filtered_items_dtos.sort(key=lambda x: x.expiration_date or date.max)
+
         return ProductDTO(
-            id=product.get_id(),
-            home_id=product.get_home_id(),
-            original_name=product.get_original_name(),
-            nickname=product.get_nickname(),
-            barcode=product.get_barcode(),
-            location=product.get_location(),
-            quantity=view_quantity, 
-            items=filtered_items
+            id=product.id,
+            home_id=product.home_id,
+            original_name=product.original_name,
+            nickname=product.nickname,
+            # display_name removed per request
+            barcode=product.barcode,
+            total_quantity=view_total_quantity, # Logical quantity (sum of filtered items)
+            items=filtered_items_dtos
         )
-
-
-    async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> List[Product]:
- 
-        await self._check_access(user_id, home_id)
-        filtered_products = await self._product_repository.get_by_location(home_id, location)
-        return filtered_products
 
     """searches for products based on product name or nickname."""
     async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> List[Product]:
