@@ -1,8 +1,9 @@
+from datetime import date
 from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.domain.smart_home.enums import UnitType
+from src.domain.smart_home.enums import LocationType, UnitType
 
 
 class ReceiptItemDTO(BaseModel):
@@ -13,7 +14,9 @@ class ReceiptItemDTO(BaseModel):
     name: str = Field(..., description="The product name as extracted or matched")
     quantity: float = Field(..., gt=0, description="Quantity amount (must be positive)")
     unit: UnitType = Field(default=UnitType.UNIT, description="Unit of measurement")
-    storage_category: Optional[str] = Field(default=None, description="Suggested storage category from catalog (fridge/freezer/pantry/cleaning/other)")
+    location: Optional[LocationType] = Field(default=LocationType.OTHER, description="Suggested storage location from catalog (fridge/freezer/pantry/cleaning/other)")
+    expiration_date: Optional[date]= Field(None, description="Expiration date if available/applicable")
+    nickname: Optional[str] = Field(None, description="Optional nickname for the product")
 
     model_config = ConfigDict(from_attributes=True)
 

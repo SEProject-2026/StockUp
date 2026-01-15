@@ -204,3 +204,125 @@ def test_catalog_barcode_lookup():
         
         assert data["name"] == "Scanned Bamba"
         assert data["manufacturer"] == "Osem"
+
+
+
+
+
+def test_add_receipt_success():
+    """
+    Test adding a finalized receipt with new items.
+    Verifies that the endpoint returns 200
+    """
+    token, home_id = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # 1. Prepare Payload (AddReceiptRequest)
+    payload = {
+        "home_id": home_id,
+        "chain": "Rami Levi",
+        "items": [
+            {
+                "barcode": "888",
+                "name": "New Cheese",
+                "quantity": 2,
+                "unit": "UNIT",
+                "location": "FRIDGE",
+                "expiration_date": str(date.today())
+            },
+            {
+                "barcode": "999",
+                "name": "New Bread",
+                "quantity": 1,
+                "unit": "UNIT",
+                "location": "PANTRY"
+            }
+        ]
+    }
+    
+    # 2. Act
+    response = testing_container.client.post("/stock/receipt/add", json=payload, headers=headers)
+    
+    # 3. Assert Response
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["data"]["items_added"] == 2
+    assert "receipt_id" in data["data"]
+    
+    # 4. Verify in "DB" (via GET /all)
+    get_res = testing_container.client.get("/stock/all", headers=headers)
+    products = get_res.json()["data"]
+    
+    # Check that "New Cheese" exists with correct quantity
+    cheese = next((p for p in products if p["original_name"] == "New Cheese"), None)
+    assert cheese is not None
+    assert cheese["items"][0]["quantity"] == 2
+    assert cheese["location"] == "FRIDGE"
+
+def test_add_receipt_updates_existing_product():
+    """
+    Test that if a product already exists, the receipt adds to its quantity
+    instead of creating a duplicate.
+    """
+    token, home_id = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # 1. Setup: Manually add "Cola" first
+    testing_container.client.post("/stock/add", json={
+        "name": "Cola", 
+        "quantity": 5, 
+        "barcode": "123_COLA",
+        "location": "PANTRY"
+    }, headers=headers)
+    
+    # 2. Prepare Receipt with the SAME product
+    payload = {
+        "home_id": home_id,
+        "items": [
+            {
+                "barcode": "123_COLA",
+                "name": "Cola", # Matches existing name
+                "quantity": 6,
+                "unit": "UNIT",
+                "location": "PANTRY"
+            }
+        ]
+    }
+    
+    # 3. Act
+    response = testing_container.client.post("/stock/receipt/add", json=payload, headers=headers)
+    
+    # 4. Assert
+    assert response.status_code == 200
+    assert response.json()["data"]["items_added"] == 1 # Added to 1 product
+    
+    # 5. Verify Quantity Updated (5 + 6 = 11)
+    get_res = testing_container.client.get("/stock/all", headers=headers)
+    products = get_res.json()["data"]
+    
+    cola = products[0]
+    # Sum all quantity batches for this product
+    total_qty = sum(item["quantity"] for item in cola["items"])
+    assert total_qty == 11
+
+def test_add_receipt_validation_error():
+    """
+    Test that the endpoint validates the header Home ID matches the payload Home ID.
+    """
+    token, home_id = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # Payload with a DIFFERENT home_id (random UUID)
+    wrong_home_id = "00000000-0000-0000-0000-000000000000"
+    
+    payload = {
+        "home_id": wrong_home_id, 
+        "items": [] 
+    }
+    
+    response = testing_container.client.post("/stock/receipt/add", json=payload, headers=headers)
+    
+    # Expect 400 Bad Request because header mismatch
+    assert response.status_code == 400
+    assert "Home ID does not match" in response.json()["detail"]

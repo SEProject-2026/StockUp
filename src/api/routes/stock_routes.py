@@ -1,12 +1,14 @@
 from typing import List, Optional, Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query,File
 from sqlalchemy.orm import Session
 
+from src.domain.receipt import ReceiptDTO
 from src.infrastructure.db.database import get_db
 from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
+    AddReceiptRequest,
     ProductDTO, 
     AddProductRequest, 
     UpdateProductQuantityRequest, 
@@ -98,6 +100,47 @@ async def scan_receipt(
             status_code=500,
             detail=f"Scanning failed: {str(e)}",
         )
+
+@router.post("/receipt/add", response_model=GeneralResponse)
+async def add_receipt(
+    payload: AddReceiptRequest,
+    service: StockServiceDep,
+    home_id: UUID = Header(..., alias="X-Home-ID"), # Validate header matches payload if needed, or rely on payload
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Receives verified items from the frontend, creates a receipt record, 
+    and updates the home inventory.
+    """
+    # Optional: Validate that header home_id matches payload home_id
+    if payload.home_id != home_id:
+         raise HTTPException(status_code=400, detail="Header Home ID does not match body Home ID")
+
+    try:
+        # Construct the internal ReceiptDTO
+        receipt_dto = ReceiptDTO(
+            id=uuid4(),
+            home_id=payload.home_id,
+            user_id=user_id,
+            chain=payload.chain,
+            items=payload.items
+        )
+
+        added_count = await service.add_receipt(receipt_dto)
+        
+        return GeneralResponse(
+            status="success",
+            message=f"Receipt processed successfully. {added_count} items added/updated.",
+            data={
+                "receipt_id": str(receipt_dto.id),
+                "items_added": added_count
+            }
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+
 
 @router.patch("/{product_id}/quantity", response_model=GeneralResponse)
 async def update_quantity(

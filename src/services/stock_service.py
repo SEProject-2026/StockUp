@@ -95,7 +95,7 @@ class StockService:
                     name=name,
                     quantity=float(qty),
                     unit=safe_unit,
-                    storage_category=storage_category,
+                    location=storage_category,
                 )
             )
 
@@ -109,6 +109,39 @@ class StockService:
 
         return receipt_dto
 
+
+    async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
+        """
+        Processes a full ReceiptDTO and persists items to inventory.
+        """
+        # Verify access permissions
+        await self._check_access(receipt_dto.user_id, receipt_dto.home_id)
+
+        count = 0
+
+        for item in receipt_dto.items:
+            try:
+                # Use existing add_product logic (Upsert)
+                # Passing all fields directly from the updated ReceiptItemDTO
+                await self.add_product(
+                    name=item.name,
+                    user_id=receipt_dto.user_id,
+                    home_id=receipt_dto.home_id,
+                    quantity=int(item.quantity), # Casting float to int as per add_product signature
+                    barcode=item.barcode,
+                    expiration_date=item.expiration_date, # Passed from DTO
+                    location=item.location,
+                    nickname=item.nickname # Passed from DTO
+                )
+                
+                count += 1
+            except Exception as e:
+                # Log error but continue processing other items
+                print(f"Error processing receipt item {item.name}: {e}")
+
+        # Future TODO: Save the receipt record itself to DB
+        
+        return count
         
     async def remove_product(self, user_id: UUID, home_id: UUID, product_id: UUID, date: Optional[date]) -> Optional[Product]:
         

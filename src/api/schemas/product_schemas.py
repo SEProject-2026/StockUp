@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import List, Optional, Dict, Any
 from datetime import date
+from src.domain.receipt import ReceiptItemDTO
 from src.domain.smart_home.enums import LocationType, ExpirationType
 
 
@@ -65,3 +66,12 @@ class UpdateExpirationDateRequest(BaseModel):
 
 class UpdateProductNicknameRequest(BaseModel):
     nickname: str
+
+
+class AddReceiptRequest(BaseModel):
+    """
+    Body payload for submitting the final verified receipt items.
+    """
+    home_id: UUID = Field(..., description="The home ID to add items to")
+    chain: Optional[str] = Field(None, description="The name of the store/chain (e.g. Rami Levi)")
+    items: List[ReceiptItemDTO] = Field(..., description="List of verified items to add")
