@@ -135,30 +135,34 @@ class Product:
 
     def update_item_location(self, item_id: UUID, new_location: LocationType) -> None:
         """
-        Updates location. 
-        If moving creates a duplicate (same date + new location already exists), 
-        it merges the quantities and deletes the old item ID.
+        Updates the location of a specific item.
+        If an item with the same expiration_date already exists in the new_location,
+        it merges them (adds quantity to the target and removes the source).
         """
-        # 1. Find the source item
-        source_item = self._get_item_by_id(item_id)
-        
-        if source_item.location == new_location:
-            return 
+        # 1. Find the item to move
+        item_to_move = next((i for i in self._items if i.id == item_id), None)
+        if not item_to_move:
+            raise ValueError(f"Item {item_id} not found")
 
-        # 2. Check for merge conflict
-        target_item = self._find_merge_candidate(
-            exclude_id=item_id,
-            location=new_location,
-            expiration_date=source_item.expiration_date
-        )
+        # Optimization: If location hasn't changed, do nothing
+        if item_to_move.location == new_location:
+            return
+
+        # 2. Check for merge target (Same location, Same date, Different ID)
+        target_item = next((
+            i for i in self._items 
+            if i.location == new_location 
+            and i.expiration_date == item_to_move.expiration_date
+            and i.id != item_id
+        ), None)
 
         if target_item:
-            # Merge source into target
-            target_item.quantity += source_item.quantity
-            self._items.remove(source_item)
+            # Merge Logic: Add quantity to target, remove source
+            target_item.quantity += item_to_move.quantity
+            self._items.remove(item_to_move)
         else:
-            # Just update
-            source_item.location = new_location
+            # Update Logic: Just change location
+            item_to_move.location = new_location
 
     def update_item_date(self, item_id: UUID, new_date: Optional[date]) -> None:
         """

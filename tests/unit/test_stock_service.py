@@ -469,6 +469,90 @@ async def test_update_item_date_merges_duplicates():
     assert len(from_db.items) == 1
     assert from_db.total_quantity == 5
 
+@pytest.mark.asyncio
+async def test_update_item_location_success():
+    """
+    Scenario: Move an item from PANTRY to FRIDGE.
+    Expected: Location updates in memory and DB.
+    """
+    user_id, home_id = await setup_env()
+    
+    # 1. Add product to PANTRY
+    product = await testing_container.stock_service.add_product(
+        "Tuna", user_id, home_id, 2, "111", None, LocationType.PANTRY, None
+    )
+    item_id = product.items[0].id
+    
+    # 2. Act: Move to FRIDGE
+    updated_product = await testing_container.stock_service.update_item_location(
+        user_id, home_id, product.id, item_id, LocationType.FRIDGE
+    )
+    
+    # 3. Assert
+    assert len(updated_product.items) == 1
+    assert updated_product.items[0].location == LocationType.FRIDGE
+    
+    # Verify Persistence
+    from_db = await testing_container.stock_repo.get_by_id(product.id)
+    assert from_db.items[0].location == LocationType.FRIDGE
+
+
+@pytest.mark.asyncio
+async def test_update_item_location_fails_invalid_item_id():
+    """
+    Scenario: Try to update location for an item ID that doesn't exist.
+    Expected: ValueError.
+    """
+    user_id, home_id = await setup_env()
+    
+    product = await testing_container.stock_service.add_product(
+        "Tuna", user_id, home_id, 2, "111", None, LocationType.PANTRY, None
+    )
+    
+    fake_item_id = uuid4()
+    
+    with pytest.raises(ValueError, match="not found"):
+        await testing_container.stock_service.update_item_location(
+            user_id, home_id, product.id, fake_item_id, LocationType.FRIDGE
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_item_location_merges_duplicates():
+    """
+    Scenario: 
+    - Item A: Cola in FRIDGE (Qty 2)
+    - Item B: Cola in PANTRY (Qty 3)
+    Action: Move Item B to FRIDGE.
+    Expected: Since they share the same expiration date (None), 
+              they should MERGE into one FRIDGE item with Qty 5.
+    """
+    user_id, home_id = await setup_env()
+    
+    # 1. Add Item A (Fridge)
+    product = await testing_container.stock_service.add_product(
+        "Cola", user_id, home_id, 2, "111", None, LocationType.FRIDGE, None
+    )
+    # Add Item B (Pantry) - Adds to the same product entity
+    product = await testing_container.stock_service.add_product(
+        "Cola", user_id, home_id, 3, "111", None, LocationType.PANTRY, None
+    )
+    
+    assert len(product.items) == 2
+    item_pantry = next(i for i in product.items if i.location == LocationType.PANTRY)
+    
+    # 2. Act: Move Pantry item to Fridge
+    updated_product = await testing_container.stock_service.update_item_location(
+        user_id, home_id, product.id, item_pantry.id, LocationType.FRIDGE
+    )
+    
+    # 3. Assert
+    # Expectation: Items merged! Only 1 item remains.
+    assert len(updated_product.items) == 1
+    
+    merged_item = updated_product.items[0]
+    assert merged_item.location == LocationType.FRIDGE
+    assert merged_item.quantity == 5 # 2 + 3
 
 
 @pytest.mark.asyncio

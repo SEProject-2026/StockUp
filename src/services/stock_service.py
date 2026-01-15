@@ -193,6 +193,22 @@ class StockService:
         
         await self._product_repository.update(product)
         return product
+    
+    async def update_item_location(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_location: LocationType) -> Product:
+        """
+        Moves a specific item to a new location (e.g. Pantry -> Fridge).
+        """
+        await self._check_access(user_id, home_id)
+        
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.home_id != home_id:
+            raise ValueError("Product not found")
+
+        # Domain Action
+        product.update_item_location(item_id, new_location)
+        
+        await self._product_repository.update(product)
+        return product
         
 
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:
