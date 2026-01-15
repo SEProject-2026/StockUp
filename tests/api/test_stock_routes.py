@@ -326,3 +326,54 @@ def test_add_receipt_validation_error():
     # Expect 400 Bad Request because header mismatch
     assert response.status_code == 400
     assert "Home ID does not match" in response.json()["detail"]
+
+
+
+def test_update_location_route_success():
+    """
+    End-to-end test for updating location via API.
+    """
+    token, home_id = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # 1. Add Product
+    add_res = testing_container.client.post("/stock/add", json={
+        "name": "Milk", 
+        "quantity": 1, 
+        "location": "FRIDGE"
+    }, headers=headers)
+    product_id = add_res.json()["data"]["id"]
+    
+    # 2. Update Location (Move to OTHER)
+    response = testing_container.client.patch(
+        f"/stock/{product_id}/location",
+        json={"location": "OTHER"}, # Sending string matches Enum
+        headers=headers
+    )
+    
+    # 3. Assert
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["location"] == "OTHER"
+    assert data["original_name"] == "Milk"
+
+def test_update_location_route_invalid_enum():
+    """
+    Test that Pydantic rejects invalid location strings automatically.
+    """
+    token, home_id = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+    
+    # Add dummy product
+    add_res = testing_container.client.post("/stock/add", json={"name": "X", "quantity": 1}, headers=headers)
+    product_id = add_res.json()["data"]["id"]
+    
+    # Try to update with a made-up location
+    response = testing_container.client.patch(
+        f"/stock/{product_id}/location",
+        json={"location": "SPACE_STATION"}, 
+        headers=headers
+    )
+    
+    # 422 Unprocessable Entity (Standard FastAPI validation error)
+    assert response.status_code == 422

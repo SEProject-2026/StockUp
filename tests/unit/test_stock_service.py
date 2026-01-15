@@ -331,3 +331,56 @@ async def test_add_receipt_skips_failed_items_and_continues():
     count = await testing_container.stock_service.add_receipt(receipt_dto)
     
     assert count == 2
+
+
+
+
+@pytest.mark.asyncio
+async def test_update_location_success():
+    """
+    Test that the service correctly updates the location in the domain model and DB.
+    """
+    user_id, home_id = await setup_env()
+    
+    # 1. Add product in PANTRY
+    product = await testing_container.stock_service.add_product(
+        "Pasta", user_id, home_id, 1, "BARCODE", None, LocationType.PANTRY, None
+    )
+    
+    # 2. Move to FRIDGE
+    updated_product = await testing_container.stock_service.update_location(
+        user_id, home_id, product.get_id(), LocationType.FRIDGE
+    )
+    
+    # 3. Assert return value
+    assert updated_product.get_location() == LocationType.FRIDGE
+    
+    # 4. Verify in Repo (DB)
+    from_db = await testing_container.stock_repo.get_by_id(product.get_id())
+    assert from_db.get_location() == LocationType.FRIDGE
+
+@pytest.mark.asyncio
+async def test_update_location_fails_wrong_home_but_valid_home():
+    """
+    Security check: Ensure users can't move products belonging to other homes.
+    We create a second valid home to ensure the error is about ownership, 
+    not about the home not existing.
+    """
+    user_id, home_id = await setup_env()
+    
+    # 1. Create a real second home (to pass _check_access validation)
+    home_b = await testing_container.management_service.create_home(user_id, "Home B")
+    # Ensure we get the UUID correctly from the response entity
+    home_b_id = home_b.get_id() 
+
+    # 2. Add product to the first home (Home A)
+    product = await testing_container.stock_service.add_product(
+        "Secret Item", user_id, home_id, 1, "123", None, LocationType.PANTRY, None
+    )
+
+    # 3. Try to update the product using the second home's ID (Home B)
+    # The access check passes (user owns Home B), so we expect the logic error regarding product ownership:
+    with pytest.raises(ValueError, match="Product not found in this home"):
+        await testing_container.stock_service.update_location(
+            user_id, home_b_id, product.get_id(), LocationType.FRIDGE
+        )

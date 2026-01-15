@@ -10,7 +10,8 @@ from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
     AddReceiptRequest,
     ProductDTO, 
-    AddProductRequest, 
+    AddProductRequest,
+    UpdateProductLocationRequest, 
     UpdateProductQuantityRequest, 
     UpdateProductNicknameRequest,
     UpdateExpirationDateRequest
@@ -217,6 +218,30 @@ async def update_nickname(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+
+@router.patch("/{product_id}/location", response_model=GeneralResponse)
+async def update_location(
+    product_id: UUID,
+    request: UpdateProductLocationRequest,
+    service: StockServiceDep,
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    try:
+        updated_product = await service.update_location(
+            user_id=user_id,
+            home_id=home_id,
+            product_id=product_id,
+            new_location=request.location
+        )
+        
+        return GeneralResponse(
+            status="success",
+            message="Product location updated successfully",
+            data=ProductDTO.from_domain(updated_product)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.delete("/{product_id}", response_model=GeneralResponse)
 async def remove_product(

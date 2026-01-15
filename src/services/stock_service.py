@@ -197,6 +197,17 @@ class StockService:
         product.set_nickname(new_nickname)
         await self._product_repository.update(product)
         return product
+    
+    async def update_location(self, user_id: UUID, home_id: UUID, product_id: UUID, new_location: LocationType) -> Product:
+
+        await self._check_access(user_id, home_id)
+
+        product = await self._product_repository.get_by_id(product_id)
+        if not product or product.get_home_id() != home_id:
+            raise ValueError("Product not found in this home")
+        product.set_location(new_location)
+        await self._product_repository.update(product)
+        return product
 
 
     async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[ProductDTO]:

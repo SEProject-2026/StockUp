@@ -67,6 +67,9 @@ class UpdateExpirationDateRequest(BaseModel):
 class UpdateProductNicknameRequest(BaseModel):
     nickname: str
 
+class UpdateProductLocationRequest(BaseModel):
+    location: LocationType
+
 
 class AddReceiptRequest(BaseModel):
     """
