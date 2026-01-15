@@ -5,11 +5,11 @@ import {
   filterStockByExpiration,
   filterStockByLocation,
   getAllStock,
-  removeProduct,
   searchStock,
-  updateProductExpiration,
   updateProductNickname,
-  updateProductQuantity,
+  updateItemExpiration,
+  updateItemQuantity,
+  removeItem,
   type ProductDTO,
 } from "@/src/api/stock";
 
@@ -19,10 +19,11 @@ import {
   locationKey,
   StatusFilter,
   InventoryRow,
-  locationToLocationType,
+  ProductGroupVM,
   dtoToRows,
   rowsSignature,
   statusFilterToExpirationType,
+  locationToLocationType,
   toIsoDateOnly,
 } from "@/src/components/inventory/inventory.utils";
 
@@ -46,13 +47,10 @@ export function useInventoryData(params: {
   const [itemToEdit, setItemToEdit] = useState<InventoryRow | null>(null);
 
   const effectivelocation: locationKey = hideTabs ? initiallocation : selectedTab;
-
   const debouncedSearch = useDebouncedValue(search, 400);
 
   const requestSeqRef = useRef(0);
-
   const prevSigRef = useRef<string>("");
-
   const didInitialLoadRef = useRef<string | null>(null);
 
   const fetchProducts = useCallback(
@@ -66,7 +64,8 @@ export function useInventoryData(params: {
 
       if (sf !== "all") {
         const expType = statusFilterToExpirationType(sf);
-        const res = await filterStockByExpiration(homeId, expType);
+        // expType כאן לא null כי sf !== "all"
+        const res = await filterStockByExpiration(homeId, expType!);
         return res.data ?? [];
       }
 
@@ -86,8 +85,10 @@ export function useInventoryData(params: {
     (input: InventoryRow[], q: string, effCat: locationKey, sf: StatusFilter) => {
       let out = input;
 
+      // location tab filtering (UI)
       if (effCat !== "all") out = out.filter((r) => r.location === effCat);
 
+      // search filtering
       if (q.length >= 2) {
         const qq = q.toLowerCase();
         out = out.filter(
@@ -97,8 +98,9 @@ export function useInventoryData(params: {
         );
       }
 
+      // status filtering
       if (sf !== "all") {
-        const wanted = statusFilterToExpirationType(sf);
+        const wanted = statusFilterToExpirationType(sf)!;
         out = out.filter((r) => String(r.status ?? "").toUpperCase() === wanted);
       }
 
@@ -139,14 +141,7 @@ export function useInventoryData(params: {
         }
       }
     },
-    [
-      homeId,
-      debouncedSearch,
-      effectivelocation,
-      statusFilter,
-      fetchProducts,
-      applyClientFilters,
-    ]
+    [homeId, debouncedSearch, effectivelocation, statusFilter, fetchProducts, applyClientFilters]
   );
 
   useEffect(() => {
@@ -175,55 +170,113 @@ export function useInventoryData(params: {
     loadInventory("soft");
   }, [homeId, debouncedSearch, effectivelocation, statusFilter, loadInventory]);
 
-  const groupedItems = useMemo(() => {
-    const map = new Map<
+  // ✅ NEW: group by PRODUCT (not by location+name)
+  const groupedItems: ProductGroupVM[] = useMemo(() => {
+    const productMap = new Map<
       string,
       {
         key: string;
-        name: string;
-        location: InventoryRow["location"];
+        productId: string;
+        title: string;
+        subtitle?: string;
+        originalName: string;
+        nickname?: string | null;
         totalQuantity: number;
-        items: InventoryRow[];
+        byLoc: Map<string, { location: InventoryRow["location"]; totalQuantity: number; items: InventoryRow[] }>;
       }
     >();
 
     for (const r of rows) {
-      const key = `${r.location}__${r.name}`;
+      // separation rule: even if nickname same, do NOT merge different originalName
+      // productId is unique anyway, but originalName is part of your "identity" requirement.
+      const key = `${r.productId}__${r.originalName}`;
 
       const g =
-        map.get(key) ?? {
-          key,
-          name: r.name,
-          location: r.location,
-          totalQuantity: 0,
-          items: [] as InventoryRow[],
-        };
+        productMap.get(key) ??
+        (() => {
+          const hasNick = r.hasNickname;
+          const title = r.name; // already displayName (nickname or original)
+          const subtitle = hasNick ? r.originalName : undefined;
+
+          const fresh = {
+            key,
+            productId: r.productId,
+            title,
+            subtitle,
+            originalName: r.originalName,
+            nickname: hasNick ? title : null,
+            totalQuantity: 0,
+            byLoc: new Map<
+              string,
+              { location: InventoryRow["location"]; totalQuantity: number; items: InventoryRow[] }
+            >(),
+          };
+          productMap.set(key, fresh);
+          return fresh;
+        })();
 
       g.totalQuantity += r.quantity;
-      g.items.push(r);
-      map.set(key, g);
+
+      const locKey = r.location;
+      const sec =
+        g.byLoc.get(locKey) ??
+        (() => {
+          const created = { location: r.location, totalQuantity: 0, items: [] as InventoryRow[] };
+          g.byLoc.set(locKey, created);
+          return created;
+        })();
+
+      sec.totalQuantity += r.quantity;
+      sec.items.push(r);
     }
 
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "he"));
+    const groups: ProductGroupVM[] = Array.from(productMap.values()).map((g) => {
+      // sections sorted by: fridge, freezer, pantry, cleaning, other
+      const order: Record<string, number> = { fridge: 1, freezer: 2, pantry: 3, cleaning: 4, other: 5 };
+
+      const sections = Array.from(g.byLoc.values())
+        .sort((a, b) => (order[a.location] ?? 99) - (order[b.location] ?? 99))
+        .map((sec) => ({
+          location: sec.location,
+          totalQuantity: sec.totalQuantity,
+          items: sec.items
+            .slice()
+            .sort((a, b) => (a.expirationDate ?? "9999-12-31").localeCompare(b.expirationDate ?? "9999-12-31")),
+        }));
+
+      return {
+        key: g.key,
+        productId: g.productId,
+        title: g.title,
+        subtitle: g.subtitle,
+        originalName: g.originalName,
+        nickname: g.nickname,
+        totalQuantity: g.totalQuantity,
+        sections,
+      };
+    });
+
+    // sort by title (he)
+    return groups.sort((a, b) => a.title.localeCompare(b.title, "he"));
   }, [rows]);
 
+  // ✅ item-level qty update
   const changeQty = useCallback(
-    async (rowId: string, delta: number) => {
+    async (itemId: string, delta: number) => {
       if (!homeId) return;
 
-      const current = rows.find((r) => r.id === rowId);
+      const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
       if (!current) return;
 
       const next = current.quantity + delta;
       if (next < 0) return;
 
-      const optimistic = rows.map((r) => (r.id === rowId ? { ...r, quantity: next } : r));
+      const optimistic = rows.map((r) => (r.itemId === current.itemId ? { ...r, quantity: next } : r));
       setRows(optimistic);
       prevSigRef.current = rowsSignature(optimistic);
 
       try {
-        await updateProductQuantity(homeId, current.productId, {
-          expiration_date: current.expirationDate,
+        await updateItemQuantity(homeId, current.productId, current.itemId, {
           new_quantity: next,
         });
       } catch (e: any) {
@@ -234,11 +287,12 @@ export function useInventoryData(params: {
     [homeId, rows, loadInventory]
   );
 
+  // ✅ item-level delete
   const deleteRow = useCallback(
-    (rowId: string) => {
+    (itemId: string) => {
       if (!homeId) return;
 
-      const current = rows.find((r) => r.id === rowId);
+      const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
       if (!current) return;
 
       Alert.alert("מחיקה", `למחוק את "${current.name}"?`, [
@@ -248,9 +302,9 @@ export function useInventoryData(params: {
           style: "destructive",
           onPress: async () => {
             try {
-              await removeProduct(homeId, current.productId, current.expirationDate);
+              await removeItem(homeId, current.productId, current.itemId);
 
-              const nextRows = rows.filter((r) => r.id !== rowId);
+              const nextRows = rows.filter((r) => r.itemId !== current.itemId);
               setRows(nextRows);
               prevSigRef.current = rowsSignature(nextRows);
             } catch (e: any) {
@@ -264,33 +318,35 @@ export function useInventoryData(params: {
     [homeId, rows, loadInventory]
   );
 
+  // ✅ save edit: nickname is product-level, exp/qty are item-level
   const saveEdit = useCallback(
-    async (rowId: string, values: { name: string; quantity: number; expiresAt?: string }) => {
+    async (itemId: string, values: { name: string; quantity: number; expiresAt?: string }) => {
       if (!homeId) return;
 
-      const current = rows.find((r) => r.id === rowId);
+      const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
       if (!current) return;
 
-      const newName = values.name.trim();
+      const newDisplayName = values.name.trim();
       const newQty = values.quantity;
       const newExp = toIsoDateOnly(values.expiresAt ?? null);
-      const oldExp = current.expirationDate;
 
       try {
-        if (newName && newName !== current.name) {
-          await updateProductNickname(homeId, current.productId, { nickname: newName });
+        // rename display name -> nickname on PRODUCT
+        // (if they type the original name, we still set nickname; you can decide policy later)
+        if (newDisplayName && newDisplayName !== current.name) {
+          await updateProductNickname(homeId, current.productId, { nickname: newDisplayName });
         }
 
-        if (newExp !== oldExp) {
-          await updateProductExpiration(homeId, current.productId, {
-            old_date: oldExp,
+        // expiration -> item-level
+        if (newExp !== current.expirationDate) {
+          await updateItemExpiration(homeId, current.productId, current.itemId, {
             new_date: newExp,
           });
         }
 
+        // quantity -> item-level
         if (newQty !== current.quantity) {
-          await updateProductQuantity(homeId, current.productId, {
-            expiration_date: newExp,
+          await updateItemQuantity(homeId, current.productId, current.itemId, {
             new_quantity: newQty,
           });
         }
@@ -322,7 +378,7 @@ export function useInventoryData(params: {
     itemToEdit,
     setItemToEdit,
 
-    loadInventory, 
+    loadInventory,
     changeQty,
     deleteRow,
     saveEdit,

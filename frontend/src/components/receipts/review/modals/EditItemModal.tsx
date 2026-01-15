@@ -52,7 +52,7 @@ function LocationSelector(props: { value: LocationKey; onChange: (v: LocationKey
               onPress={() => props.onChange(opt)}
               style={[styles.locChip, active && styles.locChipActive]}
             >
-              {LOCATION_ICON[opt]({ size: 16, color: active ? BRAND.PINK : BRAND.TEXT })}
+              {LOCATION_ICON[opt]({ size: 16, color: active ? BRAND.BLUE_SOFT : BRAND.TEXT })}
               <Text style={styles.locChipText}>{LOCATION_LABEL[opt]}</Text>
             </Pressable>
           );
@@ -201,9 +201,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: BRAND.PINK_SOFT,
+    backgroundColor: BRAND.BLUE_SOFT,
     borderWidth: 1,
-    borderColor: "#FFD0E6",
+    borderColor: "#0284C7",
   },
   secondaryBtn: {
     paddingVertical: 10,
@@ -227,6 +227,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND.BORDER,
   },
-  locChipActive: { backgroundColor: BRAND.PINK_SOFT, borderColor: "#FFD0E6" },
+  locChipActive: { backgroundColor: BRAND.BLUE_SOFT, borderColor: "#0284C7" },
   locChipText: { fontSize: 12, fontWeight: "900", color: BRAND.TEXT, textAlign: "right" },
 });

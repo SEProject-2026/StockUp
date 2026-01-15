@@ -20,15 +20,17 @@ import { setSelectedHomeId } from "./selected-home";
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
 type HomeItem = {
-  id: string;
+  id: string;        
+  productId: string; 
   name: string;
   location: location;
   quantity: number;
   expiresAt?: string;
 };
 
-function locationTolocation(location?: string | null): location {
-  switch ((location ?? "").toUpperCase()) {
+
+function locationTolocation(loc?: string | null): location {
+  switch ((loc ?? "").toUpperCase()) {
     case "FRIDGE":
       return "fridge";
     case "FREEZER":
@@ -38,21 +40,21 @@ function locationTolocation(location?: string | null): location {
     case "CLEANING_SUPPLIES":
       return "cleaning";
     case "OTHER":
-      return "other";
     default:
       return "other";
   }
 }
 
+
 function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
   const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
-  const location = locationTolocation(dto.location);
 
   if (dto.items?.length) {
     return dto.items.map((it) => ({
-      id: `${dto.id}__${it.expiration_date ?? "none"}`,
+      id: String(it.id),           
+      productId: String(dto.id), 
       name: displayName,
-      location,
+      location: locationTolocation(it.location),
       quantity: it.quantity,
       expiresAt: it.expiration_date ?? undefined,
     }));
@@ -60,10 +62,11 @@ function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
 
   return [
     {
-      id: `${dto.id}__none`,
+      id: `${dto.id}__fallback`,
+      productId: String(dto.id),
       name: displayName,
-      location,
-      quantity: dto.quantity ?? 0,
+      location: "other",
+      quantity: dto.total_quantity ?? 0,
       expiresAt: undefined,
     },
   ];
