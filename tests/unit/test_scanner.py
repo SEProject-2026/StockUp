@@ -6,8 +6,8 @@ from uuid import uuid4
 scanner = ReceiptScanner()
 
 # file_path1 = r'tests\unit\8306975.pdf'
-file_path1 = r'tests\unit\receipt1.jpeg'
-file_path2 = r'tests\unit\receipt2.jpeg'
+file_path1 = r'tests\unit\receipt2_pic1.jpeg'
+file_path2 = r'tests\unit\receipt2_pic2.jpeg'
 
 chain_name, products = scanner.parse_receipt(file_path1, file_path2)
 
