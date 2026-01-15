@@ -100,8 +100,7 @@ class DbProductRepository(IProductRepository):
             .options(joinedload(ProductModel.items))
             .filter(ProductModel.home_id == str(home_id))
             .filter(
-                (ProductModel.original_name == name) | 
-                (ProductModel.nickname == name)
+                (ProductModel.original_name == name)
             )
             .first()
         )

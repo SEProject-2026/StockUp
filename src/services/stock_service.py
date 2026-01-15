@@ -25,29 +25,43 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
-    async def add_product(self, name: str, user_id: UUID, home_id: UUID, quantity: int,  barcode: Optional[str],
-                          expiration_date: Optional[date], location: Optional[LocationType], nickname: Optional[str]) -> Product:
-
-        home_expr_range = await self._check_access(user_id, home_id)
-        product = await self._product_repository.get_by_name(home_id, name)
+    async def add_product(
+        self, 
+        name: str, 
+        user_id: UUID, 
+        home_id: UUID, 
+        quantity: int,  
+        barcode: Optional[str],
+        expiration_date: Optional[date], 
+        location: Optional[LocationType], 
+        nickname: Optional[str]
+    ) -> Product:
+        
+        await self._check_access(user_id, home_id)
+        
+        product = await self._product_repository.get_by_original_name(home_id, name)
+        
         if not product:
-            product = (
-                Product.builder(
-                    home_id=home_id,
-                    name=name,
-                    quantity=quantity,
-                    expiration_range=home_expr_range
-                )
-                .with_barcode(barcode)
-                .with_nickname(nickname)
-                .with_location(location)
-                .with_expiration_date(expiration_date)
-                .build()
+            product = Product(
+                id=uuid4(),
+                home_id=home_id,
+                original_name=name,
+                barcode=barcode,
+                nickname=nickname
             )
+            
+            product.add_item(quantity, location, expiration_date)
+            
             await self._product_repository.save(product)
+            
         else:
-            await product.add_to_existing_product(expiration_date, quantity, home_expr_range)
+            if nickname:
+                product.set_nickname(nickname)
+                
+            product.add_item(quantity, location, expiration_date)
+            
             await self._product_repository.update(product)
+            
         return product
         
     
