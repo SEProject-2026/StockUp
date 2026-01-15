@@ -1,7 +1,7 @@
 from typing import List, Optional, Annotated
 from uuid import UUID, uuid4
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query,File
+from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query, File
 from sqlalchemy.orm import Session
 
 from src.domain.receipt import ReceiptDTO
@@ -11,10 +11,10 @@ from src.api.schemas.product_schemas import (
     AddReceiptRequest,
     ProductDTO, 
     AddProductRequest,
-    UpdateProductLocationRequest, 
-    UpdateProductQuantityRequest, 
-    UpdateProductNicknameRequest,
-    UpdateExpirationDateRequest
+    UpdateItemLocationRequest, 
+    UpdateItemQuantityRequest, 
+    UpdateItemExpirationRequest,
+    UpdateProductNicknameRequest
 )
 from src.api.schemas.common import GeneralResponse
 from src.domain.smart_home.enums import LocationType, ExpirationType
@@ -23,20 +23,18 @@ from src.api.security import get_current_user_id
 
 router = APIRouter(prefix="/stock", tags=["Stock Management"])
 
-# --- Dependency Injection Setup ---
-
+# --- Dependency Injection ---
 def get_stock_service(db: Session = Depends(get_db)) -> StockService:
     return AppContainer.get_stock_service(db)
 
 StockServiceDep = Annotated[StockService, Depends(get_stock_service)]
-
 
 # --- Routes ---
 
 @router.post("/add", response_model=GeneralResponse)
 async def add_product(
     request: AddProductRequest,
-    service: StockServiceDep, # <--- Injected Service
+    service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
@@ -51,117 +49,36 @@ async def add_product(
             location=request.location,
             nickname=request.nickname
         )
-        
-        product_dto = ProductDTO.from_domain(product)
-        
         return GeneralResponse(
             status="success",
             message="Product added successfully",
-            data=product_dto
+            data=ProductDTO.from_domain(product)
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/scan", response_model=GeneralResponse)
-async def scan_receipt(
-    service: StockServiceDep, # <--- Injected Service
-    file: UploadFile = File(...),
-    home_id: UUID = Header(..., alias="X-Home-ID"),
-    user_id: UUID = Depends(get_current_user_id),
-):
-    try:
-        import tempfile, shutil, os
-
-        suffix = os.path.splitext(file.filename or "")[1] or ".bin"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp_path = tmp.name
-            shutil.copyfileobj(file.file, tmp)
-
-        try:
-            result = await service.scan_receipt(
-                user_id=user_id,
-                home_id=home_id,
-                file_path=tmp_path,    
-            )
-
-            return GeneralResponse(
-                status="success",
-                data=result.model_dump(),
-            )
-
-        finally:
-            try:
-                os.remove(tmp_path)
-            except:
-                pass
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Scanning failed: {str(e)}",
-        )
-
-@router.post("/receipt/add", response_model=GeneralResponse)
-async def add_receipt(
-    payload: AddReceiptRequest,
-    service: StockServiceDep,
-    home_id: UUID = Header(..., alias="X-Home-ID"), # Validate header matches payload if needed, or rely on payload
-    user_id: UUID = Depends(get_current_user_id),
-):
-    """
-    Receives verified items from the frontend, creates a receipt record, 
-    and updates the home inventory.
-    """
-    # Optional: Validate that header home_id matches payload home_id
-    if payload.home_id != home_id:
-         raise HTTPException(status_code=400, detail="Header Home ID does not match body Home ID")
-
-    try:
-        # Construct the internal ReceiptDTO
-        receipt_dto = ReceiptDTO(
-            id=uuid4(),
-            home_id=payload.home_id,
-            user_id=user_id,
-            chain=payload.chain,
-            items=payload.items
-        )
-
-        added_count = await service.add_receipt(receipt_dto)
-        
-        return GeneralResponse(
-            status="success",
-            message=f"Receipt processed successfully. {added_count} items added/updated.",
-            data={
-                "receipt_id": str(receipt_dto.id),
-                "items_added": added_count
-            }
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-
-
-@router.patch("/{product_id}/quantity", response_model=GeneralResponse)
-async def update_quantity(
+@router.patch("/{product_id}/items/{item_id}/quantity", response_model=GeneralResponse)
+async def update_item_quantity(
     product_id: UUID,
-    request: UpdateProductQuantityRequest,
-    service: StockServiceDep, # <--- Injected Service
+    item_id: UUID,
+    request: UpdateItemQuantityRequest,
+    service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    """Updates the quantity of a specific item batch."""
     try:
-        updated_product = await service.update_date_quantity(
+        updated_product = await service.update_item_quantity(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
-            date=request.expiration_date, 
+            item_id=item_id,
             new_quantity=request.new_quantity
         )
         
         if updated_product is None:
-             return GeneralResponse(status="success", message="Product removed (quantity 0)", data=None)
+             return GeneralResponse(status="success", message="Product completely removed", data=None)
 
         return GeneralResponse(
             status="success",
@@ -171,21 +88,22 @@ async def update_quantity(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.patch("/{product_id}/expiration", response_model=GeneralResponse)
-async def update_expiration(
+@router.patch("/{product_id}/items/{item_id}/expiration", response_model=GeneralResponse)
+async def update_item_expiration(
     product_id: UUID,
-    request: UpdateExpirationDateRequest,
-    service: StockServiceDep, # <--- Injected Service
+    item_id: UUID,
+    request: UpdateItemExpirationRequest,
+    service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
-
 ):
+    """Updates the expiration date of a specific item batch."""
     try:
-        updated_product = await service.update_expiration_date(
+        updated_product = await service.update_item_date(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
-            old_date=request.old_date,
+            item_id=item_id,
             new_date=request.new_date
         )
         return GeneralResponse(
@@ -196,14 +114,40 @@ async def update_expiration(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.patch("/{product_id}/items/{item_id}/location", response_model=GeneralResponse)
+async def update_item_location(
+    product_id: UUID,
+    item_id: UUID,
+    request: UpdateItemLocationRequest,
+    service: StockServiceDep,
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """Moves an item to a new location."""
+    try:
+        updated_product = await service.update_item_location(
+            user_id=user_id,
+            home_id=home_id,
+            product_id=product_id,
+            item_id=item_id,
+            new_location=request.location
+        )
+        return GeneralResponse(
+            status="success",
+            data=ProductDTO.from_domain(updated_product)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 @router.patch("/{product_id}/nickname", response_model=GeneralResponse)
 async def update_nickname(
     product_id: UUID,
     request: UpdateProductNicknameRequest,
-    service: StockServiceDep, # <--- Injected Service
+    service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    """Updates the nickname of the Product aggregate."""
     try:
         updated_product = await service.update_nickname(
             user_id=user_id,
@@ -219,47 +163,24 @@ async def update_nickname(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.patch("/{product_id}/location", response_model=GeneralResponse)
-async def update_location(
+@router.delete("/{product_id}/items/{item_id}", response_model=GeneralResponse)
+async def remove_item(
     product_id: UUID,
-    request: UpdateProductLocationRequest,
+    item_id: UUID,
     service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    """Removes a specific item. If it's the last item, the Product is deleted."""
     try:
-        updated_product = await service.update_location(
+        result = await service.remove_item(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
-            new_location=request.location
+            item_id=item_id
         )
         
-        return GeneralResponse(
-            status="success",
-            message="Product location updated successfully",
-            data=ProductDTO.from_domain(updated_product)
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-@router.delete("/{product_id}", response_model=GeneralResponse)
-async def remove_product(
-    product_id: UUID,
-    service: StockServiceDep, # <--- Injected Service (Must come before Query with defaults)
-    expiration_date: Optional[date]= Query(None), 
-    home_id: UUID = Header(..., alias="X-Home-ID"),
-    user_id: UUID = Depends(get_current_user_id),
-):
-    try:
-        result = await service.remove_product(
-            user_id=user_id,
-            home_id=home_id,
-            product_id=product_id,
-            date=expiration_date
-        )
-        
-        message = "Product quantity reduced" if result else "Product completely removed"
+        message = "Item removed" if result else "Product completely removed"
         data = ProductDTO.from_domain(result) if result else None
         
         return GeneralResponse(status="success", message=message, data=data)
@@ -268,35 +189,19 @@ async def remove_product(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-# --- Search & Filter Routes (GET) ---
-
-@router.get("/search", response_model=GeneralResponse)
-async def search_products(
-    query: str,
-    service: StockServiceDep, # <--- Injected Service
-    home_id: UUID = Header(..., alias="X-Home-ID"),
-    user_id: UUID = Depends(get_current_user_id),
-):
-    try:
-        results = await service.search_product(user_id, home_id, query)
-        dtos = [ProductDTO.from_domain(p) for p in results]
-        
-        return GeneralResponse(status="success", data=dtos)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
+# --- Search & Filter Routes ---
 
 @router.get("/filter/location", response_model=GeneralResponse)
 async def filter_by_location(
     location: LocationType,
-    service: StockServiceDep, # <--- Injected Service
+    service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
+        # Service returns List[ProductDTO]
         results = await service.filter_by_location(user_id, home_id, location)
-        dtos = [ProductDTO.from_domain(p) for p in results]
-        return GeneralResponse(status="success", data=dtos)
+        return GeneralResponse(status="success", data=results)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -304,13 +209,30 @@ async def filter_by_location(
 @router.get("/filter/expiration", response_model=GeneralResponse)
 async def filter_by_expiration(
     type: ExpirationType,
-    service: StockServiceDep, # <--- Injected Service
+    service: StockServiceDep,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
+        # Service returns List[ProductDTO]
         results = await service.filter_by_expiration_type(user_id, home_id, type)
         return GeneralResponse(status="success", data=results)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/search", response_model=GeneralResponse)
+async def search_products(
+    query: str,
+    service: StockServiceDep,
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    try:
+        # Service returns List[Product], so we convert to DTOs
+        results = await service.search_product(user_id, home_id, query)
+        dtos = [ProductDTO.from_domain(p) for p in results]
+        return GeneralResponse(status="success", data=dtos)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
@@ -398,3 +320,43 @@ async def get_global_product_by_barcode(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+
+@router.post("/scan", response_model=GeneralResponse)
+async def scan_receipt(
+    service: StockServiceDep, # <--- Injected Service
+    file: UploadFile = File(...),
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    try:
+        import tempfile, shutil, os
+
+        suffix = os.path.splitext(file.filename or "")[1] or ".bin"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            shutil.copyfileobj(file.file, tmp)
+
+        try:
+            result = await service.scan_receipt(
+                user_id=user_id,
+                home_id=home_id,
+                file_path=tmp_path,    
+            )
+
+            return GeneralResponse(
+                status="success",
+                data=result.model_dump(),
+            )
+
+        finally:
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Scanning failed: {str(e)}",
+        )

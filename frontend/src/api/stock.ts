@@ -6,35 +6,52 @@ export type GeneralResponse<T> = {
   data?: T;
 };
 
+// ----------------------
+// Enums (match backend)
+// ----------------------
+
+export type LocationType =
+  | "FRIDGE"
+  | "FREEZER"
+  | "PANTRY"
+  | "CLEANING_SUPPLIES"
+  | "OTHER";
+
+export type ExpirationType = "FRESH" | "GOING_TO_EXPIRE" | "EXPIRED";
+
+// ----------------------
+// DTOs (match backend EXACT)
+// ----------------------
+
 export type ProductItemDTO = {
-  expiration_date: string | null; // "YYYY-MM-DD"
+  id: string; 
   quantity: number;
-  status: string;
+  expiration_date: string | null; // date => "YYYY-MM-DD"
+  location: LocationType;
+  status: ExpirationType;
 };
 
 export type ProductDTO = {
   id: string;
-  home_id: string;
+  home_id: string; 
   original_name: string;
   nickname?: string | null;
   barcode?: string | null;
-  location?: string | null;
-  quantity: number;
+
+  total_quantity: number;
   items: ProductItemDTO[];
 };
 
-/**
- * ⚠️ חשוב:
- * authFetch כנראה מוסיף baseURL + Authorization + Content-Type.
- * ל-JSON זה מעולה, אבל ל-FormData אסור לנו לשים Content-Type ידנית.
- */
+// ----------------------
+// Internal fetch wrapper
+// ----------------------
+
 function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) {
   const headers: Record<string, string> = {
     ...(options.headers as any),
     "X-Home-ID": homeId,
   };
 
-  // אם הבודי הוא string => זה JSON (כמו addProduct), נוסיף Content-Type אם לא קיים
   const bodyIsString = typeof options.body === "string";
   const hasContentType =
     Object.keys(headers).some((k) => k.toLowerCase() === "content-type");
@@ -43,20 +60,19 @@ function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) 
     headers["Content-Type"] = "application/json";
   }
 
-  // אם זה FormData — לא נוגעים ב-Content-Type בכלל
-  // (fetch ייצור את boundary לבד)
-  return authFetch<T>(path, {
-    ...options,
-    headers,
-  });
+  return authFetch<T>(path, { ...options, headers });
 }
+
+// ----------------------
+// Add / Get
+// ----------------------
 
 export type AddProductPayload = {
   name: string;
   quantity: number;
-  barcode?: string | null;
   expiration_date?: string | null; // "YYYY-MM-DD"
-  location?: string | null;
+  barcode?: string | null;
+  location?: LocationType; 
   nickname?: string | null;
 };
 
@@ -73,14 +89,19 @@ export async function getAllStock(homeId: string) {
   });
 }
 
-export async function updateProductQuantity(
+// ----------------------
+// Item-level updates (match backend routes)
+// ----------------------
+
+export async function updateItemQuantity(
   homeId: string,
   productId: string,
-  payload: { expiration_date: string | null; new_quantity: number }
+  itemId: string,
+  payload: { new_quantity: number } 
 ) {
-  return stockFetch<GeneralResponse<ProductDTO>>(
+  return stockFetch<GeneralResponse<ProductDTO | null>>(
     homeId,
-    `/stock/${productId}/quantity`,
+    `/stock/${productId}/items/${itemId}/quantity`,
     {
       method: "PATCH",
       body: JSON.stringify(payload),
@@ -88,25 +109,46 @@ export async function updateProductQuantity(
   );
 }
 
-export async function updateProductExpiration(
+export async function updateItemExpiration(
   homeId: string,
   productId: string,
-  payload: { old_date: string | null; new_date: string | null }
+  itemId: string,
+  payload: { new_date: string | null } 
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,
-    `/stock/${productId}/expiration`,
+    `/stock/${productId}/items/${itemId}/expiration`,
     {
       method: "PATCH",
       body: JSON.stringify(payload),
     }
   );
 }
+
+export async function updateItemLocation(
+  homeId: string,
+  productId: string,
+  itemId: string,
+  payload: { location: LocationType } 
+) {
+  return stockFetch<GeneralResponse<ProductDTO>>(
+    homeId,
+    `/stock/${productId}/items/${itemId}/location`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+// ----------------------
+// ✅ Product-level nickname (match backend)
+// ----------------------
 
 export async function updateProductNickname(
   homeId: string,
   productId: string,
-  payload: { nickname: string }
+  payload: { nickname: string } 
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,
@@ -118,33 +160,21 @@ export async function updateProductNickname(
   );
 }
 
-export async function removeProduct(
-  homeId: string,
-  productId: string,
-  expiration_date: string | null
-) {
-  const qs = expiration_date
-    ? `?expiration_date=${encodeURIComponent(expiration_date)}`
-    : "";
+// ----------------------
+// ✅ Remove item (match backend)
+// ----------------------
 
+export async function removeItem(homeId: string, productId: string, itemId: string) {
   return stockFetch<GeneralResponse<ProductDTO | null>>(
     homeId,
-    `/stock/${productId}${qs}`,
+    `/stock/${productId}/items/${itemId}`,
     { method: "DELETE" }
   );
 }
 
 // ----------------------
-// Search & Filter (GET)
+// Search & Filter (GET) - match backend
 // ----------------------
-
-export type LocationType =
-  | "FRIDGE"
-  | "FREEZER"
-  | "PANTRY"
-  | "CLEANING_SUPPLIES"
-  | "OTHER";
-export type ExpirationType = "FRESH" | "GOING_TO_EXPIRE" | "EXPIRED";
 
 export async function searchStock(homeId: string, query: string) {
   const q = encodeURIComponent(query);
@@ -173,7 +203,9 @@ export async function filterStockByExpiration(homeId: string, type: ExpirationTy
   );
 }
 
-// --- Receipt Scan (OCR) ---
+// ----------------------
+// Receipt scan (unchanged)
+// ----------------------
 
 export type Storagelocation =
   | "fridge"
@@ -186,7 +218,7 @@ export type DetectedReceiptItemDTO = {
   barcode: string;
   name: string;
   quantity: number;
-  unit: string; 
+  unit: string;
   storage_location?: Storagelocation | null;
 };
 
@@ -200,14 +232,6 @@ export type ReceiptDTO = {
 
 function isProbablyImage(mimeType?: string | null) {
   return !!mimeType && mimeType.startsWith("image/");
-}
-
-function withTimeout<T>(p: Promise<T>, ms: number, label: string) {
-  let t: any;
-  const timeout = new Promise<never>((_, reject) => {
-    t = setTimeout(() => reject(new Error(`${label} (timeout אחרי ${ms}ms)`)), ms);
-  });
-  return Promise.race([p.finally(() => clearTimeout(t)), timeout]);
 }
 
 export async function scanReceipt(

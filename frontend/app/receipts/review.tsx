@@ -1,6 +1,15 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { View, StyleSheet, Alert, FlatList, KeyboardAvoidingView, Platform, Text, Pressable } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  Pressable,
+} from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -46,11 +55,22 @@ function PrettyEmpty(props: { onAdd: () => void }) {
   );
 }
 
+function toIsoDateOnly(s?: string | null) {
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(+d)) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 export default function ReceiptReviewDetectedProductsScreen() {
   const { receipt } = useLocalSearchParams<{ receipt?: string }>();
 
   const receiptFromParam = useMemo(() => parseReceiptParam(receipt), [receipt]);
-  const receiptObj = useMemo(() => receiptFromParam ?? consumeLastScannedReceipt(), [receiptFromParam]);
+  const receiptObj = useMemo(
+    () => receiptFromParam ?? consumeLastScannedReceipt(),
+    [receiptFromParam]
+  );
 
   const [items, setItems] = useState<DetectedItem[]>([]);
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
@@ -65,25 +85,34 @@ export default function ReceiptReviewDetectedProductsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const drafts = consumeLastAddItemReturnDrafts(); 
-      if (!drafts.length) return;
+      const drafts = consumeLastAddItemReturnDrafts();
+      if (!drafts || !drafts.length) return;
 
       setItems((prev) => {
         const toAdd: DetectedItem[] = drafts.map((d) => ({
           id: uuid(),
           name: d.name,
+          nickname: d.nickname ?? undefined,
           quantity: Number.isFinite(d.quantity) && d.quantity > 0 ? d.quantity : 1,
-          location: d.location as any,
-          storage_location: d.location as any,
+          location: (d.location as any) ?? "other",
+          storage_location: (d.location as any) ?? "other",
           barcode: d.barcode ?? undefined,
+          expiration_date: d.expiration_date ?? undefined,
         }));
+
         return [...toAdd, ...prev];
       });
     }, [])
   );
 
   const locationCounts = useMemo(() => {
-    const c: Record<LocationKey, number> = { fridge: 0, freezer: 0, pantry: 0, cleaning: 0, other: 0 };
+    const c: Record<LocationKey, number> = {
+      fridge: 0,
+      freezer: 0,
+      pantry: 0,
+      cleaning: 0,
+      other: 0,
+    };
     for (const it of items) c[it.location ?? "other"]++;
     return c;
   }, [items]);
@@ -104,6 +133,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
     router.push({ pathname: "/inventory/add-item", params: { mode: "receipt-review" } });
   }, []);
 
+  // ✅ FIX: addProduct payload כולל nickname/barcode/expiration_date/location enum
   const onConfirmAddAll = useCallback(async () => {
     if (saving) return;
 
@@ -112,9 +142,12 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
-    const payload = items.map((x) => ({
-      name: x.name.trim(),
+    const payload = items.map((x: any) => ({
+      name: String(x.name ?? "").trim(),
       quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
+      barcode: x.barcode ? String(x.barcode) : null,
+      nickname: x.nickname ? String(x.nickname).trim() : null,
+      expiration_date: toIsoDateOnly(x.expiration_date ?? null),
       location: storagelocationToLocationType(x.location ?? x.storage_location ?? "other"),
     }));
 
@@ -126,6 +159,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
 
     setSaving(true);
     let homeId: string | null = null;
+
     try {
       homeId = await getSelectedHomeId();
       if (!homeId) {
@@ -133,23 +167,24 @@ export default function ReceiptReviewDetectedProductsScreen() {
         return;
       }
 
-      const results = await Promise.allSettled(payload.map((p) => addProduct(homeId!, p)));
-      const ok = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.length - ok;
+      // const results = await Promise.allSettled(payload.map((p) => addProduct(homeId!, p)));
 
-      if (failed === 0) {
-        Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.", [
-          {
-            text: "אישור",
-            onPress: () => {
-              router.replace({ pathname: "/home/[homeId]", params: { homeId: homeId! } });
-            },
-          },
-        ]);
-        return;
-      }
+      // const ok = results.filter((r) => r.status === "fulfilled").length;
+      // const failed = results.length - ok;
 
-      Alert.alert("נוספו חלקית", `נוספו ${ok} מוצרים, נכשלו ${failed}.`);
+      // if (failed === 0) {
+      //   Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.", [
+      //     {
+      //       text: "אישור",
+      //       onPress: () => {
+      //         router.replace({ pathname: "/home/[homeId]", params: { homeId: homeId! } });
+      //       },
+      //     },
+      //   ]);
+      //   return;
+      // }
+
+      // Alert.alert("נוספו חלקית", `נוספו ${ok} מוצרים, נכשלו ${failed}.`);
     } catch (e: any) {
       Alert.alert("נכשל", e?.message ?? "לא הצלחנו להוסיף למלאי. נסו שוב.");
     } finally {
@@ -161,7 +196,9 @@ export default function ReceiptReviewDetectedProductsScreen() {
   }, [items, saving]);
 
   const renderItem = useCallback(
-    ({ item }: { item: DetectedItem }) => <ReviewListItem item={item} onPress={() => setEditItem(item)} />,
+    ({ item }: { item: DetectedItem }) => (
+      <ReviewListItem item={item} onPress={() => setEditItem(item)} />
+    ),
     []
   );
 
@@ -169,8 +206,16 @@ export default function ReceiptReviewDetectedProductsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <LinearGradient colors={["#EEF6FF", BRAND.BG]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <LinearGradient
+          colors={["#EEF6FF", BRAND.BG]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
 
         <ReviewHeader
           totalCount={totalCount}
@@ -193,12 +238,16 @@ export default function ReceiptReviewDetectedProductsScreen() {
           ListEmptyComponent={<PrettyEmpty onAdd={onOpenAdd} />}
         />
 
-        <ReviewFooter saving={saving} disabled={items.length === 0 || saving} onConfirm={onConfirmAddAll} />
+        <ReviewFooter
+          saving={saving}
+          disabled={items.length === 0 || saving}
+          onConfirm={onConfirmAddAll}
+        />
 
         <EditItemModal
           item={editItem}
           onClose={() => setEditItem(null)}
-          onSave={(updated) => {
+          onSave={(updated: any) => {
             setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
             setEditItem(null);
           }}

@@ -1,3 +1,6 @@
+// src/components/add-item/types.ts
+import type { LocationType } from "@/src/api/stock";
+
 export type location = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
 
 export type DraftItem = {
@@ -10,12 +13,20 @@ export type DraftItem = {
   expiresAt?: Date;
 };
 
-export const locationMap: Record<location, string> = {
+export const locationMap: Record<location, LocationType> = {
   fridge: "FRIDGE",
   freezer: "FREEZER",
   pantry: "PANTRY",
-  "cleaning": "CLEANING_SUPPLIES",
+  cleaning: "CLEANING_SUPPLIES",
   other: "OTHER",
+};
+
+export const apiLocationToUi: Record<LocationType, location> = {
+  FRIDGE: "fridge",
+  FREEZER: "freezer",
+  PANTRY: "pantry",
+  CLEANING_SUPPLIES: "cleaning",
+  OTHER: "other",
 };
 
 export const location_OPTIONS: Array<{ key: location; label: string; icon: any }> = [

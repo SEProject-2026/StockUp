@@ -80,7 +80,7 @@ export function InventoryScreenBase({
             ) : (
               <>
                 <GroupedInventoryList
-                  groupedItems={inv.groupedItems as any}
+                  groupedItems={inv.groupedItems}
                   searchQuery={inv.search}
                   onChangeQty={inv.changeQty}
                   onEditItem={(it: any) => inv.setItemToEdit(it)}
@@ -102,7 +102,7 @@ export function InventoryScreenBase({
 
       <EditItemModal
         visible={!!inv.itemToEdit}
-        item={inv.itemToEdit as any}
+        item={inv.itemToEdit}
         onClose={() => inv.setItemToEdit(null)}
         onSave={inv.saveEdit}
       />
