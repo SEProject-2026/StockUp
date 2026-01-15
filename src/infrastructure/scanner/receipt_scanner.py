@@ -328,6 +328,9 @@ class ReceiptScanner:
             .replace("y", "ק")
             .replace("p", "ק")
         )
+        match = re.match(r'72\S0', text)
+        if match:
+            text = text.replace(text[2], '9')
         text = "פלפל" if text == "7979" else text
         return text
 
@@ -392,7 +395,7 @@ class ReceiptScanner:
                 aggregated_data[barcode] = (quantity, unit)
 
             # נשמור את השלושה מוצרים האחרונים כדי לבדוק חפיפה בין קבצים
-            last_products = [prod["barcode"] for prod in page_data["products"][-6:]] if len(page_data["products"]) >= 3 else [prod["barcode"] for prod in page_data["products"]]
+            last_products = [prod["barcode"] for prod in page_data["products"][-6:]] if len(page_data["products"]) >= 6 else [prod["barcode"] for prod in page_data["products"]]
 
             
                         
@@ -705,17 +708,12 @@ class ReceiptScanner:
                     # בדיקה ב': קוד קצר (3-6 ספרות) שהוא לא חלק ממשקל/מחיר
                     else:
                         # מוצאים מספרים שלמים
-                        short_matches = re.finditer(r"\b(\d{2,6})\b", full_line_text)
+                        short_matches = re.finditer(r"(?<!\.)\b(\d{2,6})\b(?!\.)", full_line_text)
                         for m in short_matches:
                             cand = m.group(1)
-                            # מוודאים שזה לא שבר עשרוני (למשל 0.716 -> ה-716 לא ייחשב)
-                            if not re.search(rf"\d\.\s*{cand}", full_line_text) and \
-                            not re.search(rf"{cand}\s*\.\d", full_line_text):
-                                is_new_product_start = True
-                                print(f"    Detected new product start by short code: {cand} in line: {full_line_text}")
-                                break
-                            else:
-                                print(f"    Ignored short code (part of decimal): {cand} in line: {full_line_text}")
+                            is_new_product_start = True
+                            print(f"    Detected new product start by short code: {cand} in line: {full_line_text}")
+                            break
 
                 if not is_new_product_start and is_discount_or_info:
                     print(f"    Skipping line (discount/info detected): {full_line_text}")
@@ -796,13 +794,47 @@ class ReceiptScanner:
                         extracted_barcode = short_bc.group(1)
 
                 # 2. חילוץ משקל/יחידה
-                # אם יש נקודה עשרונית עם 3 ספרות (0.716) זה בדרך כלל המשקל
-                weight_match = re.search(r"\b(\d+\.\d{3})\b", full_product_string)
-                if weight_match:
-                    extracted_qty = float(weight_match.group(1))
+                keywords_pattern = r"(?:יחידה|הדיחי)"
+                # The Pattern:
+                # (\S+)           -> Capture Group 1: Any text (number or word) that is NOT a space
+                # \s+             -> One or more spaces
+                # (?:יחידה|הדיחי) -> The specific words you are looking for
+
+                # הגדרת התבנית בצורה נקייה
+                # החלק הראשון תופס את כל הוריאציות של מספר ו-א'
+                # החלק השני מחפש את מילת המפתח
+                pattern = rf"""
+                (            
+                    \d+א        | # number צמוד ל-א
+                    א\d+        | # א צמוד למספר
+                    א\s+\d+     | # א רווח מספר
+                    \d+\s+א     | # number רווח א
+                    \d+x        | # number צמוד ל-x
+                    x\d+        | # x צמוד למספר
+                    x\s+\d+     | # x רווח מספר
+                    \d+\s+x      # number רווח x
+                )
+                \s+             # רווח חובה אחרי הצירוף
+                {keywords_pattern} # המילה (יחידה/הדיחי)
+                """
+                match = re.search(pattern, full_product_string, re.VERBOSE | re.IGNORECASE)
+
+                if match:
+                    # group(1) contains the word found BEFORE the keyword
+                    possible_unit = match.group(1).replace("א", "").replace("x", "").strip()
+                    if possible_unit.isdigit():
+                        extracted_qty = float(possible_unit)
+                    print(f"Found: {extracted_qty}")
+                    
+
+                if any(w in full_product_string for w in['ק"ג', 'ג"ק', "ג'ק", "ק'ג"]):
+                # elif "קג" in full_product_string or 'ק"ג' in full_product_string:
                     extracted_unit = "KG"
-                elif "קג" in full_product_string or 'ק"ג' in full_product_string:
-                     extracted_unit = "KG"
+                # אם יש נקודה עשרונית עם 3 ספרות (0.716) זה בדרך כלל המשקל
+                    weight_match = re.search(r"\b(\d+\.\d{3})\b", full_product_string)
+                    if weight_match:
+                        extracted_qty = float(weight_match.group(1))
+                        extracted_unit = "KG"
                      # אם יש יחידה אבל לא מצאנו 3 ספרות, נחפש מספר אחר
                      # ...
 
