@@ -5,9 +5,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
-import InfoBox from "@/src/ui/InfoBox";
+import InfoBox from "@/src/components/ui/InfoBox";
 import ScreenHeader from "@/src/layout/ScreenHeader";
-import PrimaryButton from "@/src/ui/PrimaryButton";
+import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 
 import { getSelectedHomeId } from "../home/selected-home";
 import { scanReceipt } from "@/src/api/stock";

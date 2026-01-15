@@ -5,15 +5,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
-import QuickActionButton from "@/src/ui/QuickActionButton";
-import CategoryAreaButton from "@/src/components/homes/CategoryAreaButton";
+import QuickActionButton from "@/src/components/ui/buttons/QuickActionButton";
+import LocationAreaButton from "@/src/components/homes/LocationAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStatusCard";
-import SideTitleCard from "@/src/ui/SideTitleCard";
+import SideTitleCard from "@/src/components/ui/cards/SideTitleCard";
 import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
 import { getAllStock, type ProductDTO } from "@/src/api/stock";
-import type { Category } from "@/src/context/inventory-context";
+import type { location } from "@/src/context/inventory-context";
 
 import { setSelectedHomeId } from "./selected-home";
 
@@ -22,12 +22,12 @@ const BRAND_BLUE_SOFT = "#F0FAFF";
 type HomeItem = {
   id: string;
   name: string;
-  category: Category;
+  location: location;
   quantity: number;
   expiresAt?: string;
 };
 
-function locationToCategory(location?: string | null): Category {
+function locationTolocation(location?: string | null): location {
   switch ((location ?? "").toUpperCase()) {
     case "FRIDGE":
       return "fridge";
@@ -46,13 +46,13 @@ function locationToCategory(location?: string | null): Category {
 
 function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
   const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
-  const category = locationToCategory(dto.location);
+  const location = locationTolocation(dto.location);
 
   if (dto.items?.length) {
     return dto.items.map((it) => ({
       id: `${dto.id}__${it.expiration_date ?? "none"}`,
       name: displayName,
-      category,
+      location,
       quantity: it.quantity,
       expiresAt: it.expiration_date ?? undefined,
     }));
@@ -62,7 +62,7 @@ function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
     {
       id: `${dto.id}__none`,
       name: displayName,
-      category,
+      location,
       quantity: dto.quantity ?? 0,
       expiresAt: undefined,
     },
@@ -118,11 +118,11 @@ export default function HomeDashboardScreen() {
       expiringSoon = 0;
 
     homeItems.forEach((item) => {
-      if (item.category === "fridge") fridge++;
-      if (item.category === "freezer") freezer++;
-      if (item.category === "pantry") pantry++;
-      if (item.category === "cleaning") cleaningSupplies++;
-      if (item.category === "other") other++;
+      if (item.location === "fridge") fridge++;
+      if (item.location === "freezer") freezer++;
+      if (item.location === "pantry") pantry++;
+      if (item.location === "cleaning") cleaningSupplies++;
+      if (item.location === "other") other++;
 
       if (item.expiresAt) {
         const exp = new Date(item.expiresAt);
@@ -151,6 +151,9 @@ export default function HomeDashboardScreen() {
       .slice(0, 3);
   }, [homeItems]);
 
+  const goInventory = (loc: string) => {
+    router.push(`/inventory/${loc}?homeId=${currentHomeId}`);
+  };
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.main}>
@@ -186,64 +189,39 @@ export default function HomeDashboardScreen() {
             >
               <SideTitleCard label={"אזורי\nהבית"} />
 
-              <CategoryAreaButton
+              <LocationAreaButton
                 label="מקרר"
                 value={stats.fridge}
                 icon="snow-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "fridge", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("fridge")}
               />
 
-              <CategoryAreaButton
+              <LocationAreaButton
                 label="מקפיא"
                 value={stats.freezer}
                 icon="cube-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "freezer", homeId: currentHomeId },
-                  })
-                }
-              />
+                onPress={() => goInventory("freezer")}
+              />     
 
-              <CategoryAreaButton
+              <LocationAreaButton
                 label="מזווה"
                 value={stats.pantry}
                 icon="restaurant-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "pantry", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("pantry")}
               />
 
-              <CategoryAreaButton
+              <LocationAreaButton
                 label="ציוד ניקוי"
                 value={stats.cleaningSupplies}
                 icon="water-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "cleaning-supplies", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("cleaning")}
               />
 
-              <CategoryAreaButton
+              <LocationAreaButton
                 label="אחר"
                 value={stats.other}
                 icon="ellipsis-horizontal-outline"
-                onPress={() =>
-                  router.push({
-                    pathname: "/inventory/[category]",
-                    params: { category: "other", homeId: currentHomeId },
-                  })
-                }
+                onPress={() => goInventory("other")}
               />
             </ScrollView>
           </View>

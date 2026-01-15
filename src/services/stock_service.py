@@ -87,7 +87,7 @@ class StockService:
 
             name = ci.name if ci else f"(לא נמצא בקטלוג) {barcode}"
             safe_unit = unit if unit else "יחידה" 
-            storage_category = getattr(ci, "storage_category", None) if ci else None
+            storage_location = getattr(ci, "storage_location", None) if ci else None
 
             receipt_items_dto.append(
                 ReceiptItemDTO(
@@ -95,7 +95,7 @@ class StockService:
                     name=name,
                     quantity=float(qty),
                     unit=safe_unit,
-                    storage_category=storage_category,
+                    storage_location=storage_location,
                 )
             )
 

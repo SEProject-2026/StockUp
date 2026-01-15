@@ -5,20 +5,22 @@ import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
-import PrimaryButton from "@/src/ui/PrimaryButton";
+import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 import { addProduct } from "@/src/api/stock";
 
-import { CATEGORY_OPTIONS, routeToCategory, locationMap } from "@/src/components/add-item/types";
-import type { Category, DraftItem } from "@/src/components/add-item/types";
+import { location_OPTIONS, routeTolocation, locationMap } from "@/src/components/add-item/types";
+import type { location, DraftItem } from "@/src/components/add-item/types";
 
 import ProductDraftCard from "@/src/components/add-item/ProductDraftCard";
 import PendingList from "@/src/components/add-item/PendingList";
-import CategoryPickerModal from "@/src/components/add-item/CategoryPickerModal";
+import LocationPickerModal from "@/src/components/add-item/LocationPickerModal";
 import BarcodeScannerModal from "@/src/components/add-item/BarcodeScannerModal";
 import DatePickerModal from "@/src/components/add-item/DatePickerModal";
 
 import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
 import { searchCatalog, getCatalogByBarcode, type CatalogItem } from "@/src/api/catalog";
+
+import { setLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
 
 const BRAND_BG = "#F4F4F4";
 
@@ -59,10 +61,16 @@ function normalizeCatalogOne(raw: any): CatalogItem | null {
 }
 
 export default function BatchAddItemsScreen() {
-  const { homeId, category: categoryParam } = useLocalSearchParams<{ homeId?: string; category?: string }>();
+  const { homeId, location: locationParam, mode } = useLocalSearchParams<{
+    homeId?: string;
+    location?: string;
+    mode?: string;
+  }>();
+
+  const isReceiptReviewMode = mode === "receipt-review";
   const currentHomeId = homeId ? String(homeId) : "";
 
-  const initialCategory = useMemo<Category>(() => routeToCategory(categoryParam), [categoryParam]);
+  const initiallocation = useMemo<location>(() => routeTolocation(locationParam), [locationParam]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -71,7 +79,7 @@ export default function BatchAddItemsScreen() {
   const [nickname, setNickname] = useState("");
 
   const [quantity, setQuantity] = useState("");
-  const [category, setCategory] = useState<Category>(initialCategory);
+  const [location, setlocation] = useState<location>(initiallocation);
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
 
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
@@ -155,13 +163,13 @@ export default function BatchAddItemsScreen() {
     };
   }, [debouncedName, editingId, selectedCatalogItem]);
 
-  function resetDraft(keepCategory = true) {
+  function resetDraft(keeplocation = true) {
     setEditingId(null);
     setBarcode("");
     setName("");
     setNickname("");
     setQuantity("");
-    if (!keepCategory) setCategory(initialCategory);
+    if (!keeplocation) setlocation(initiallocation);
     setExpiresAt(undefined);
 
     setSelectedCatalogItem(null);
@@ -176,7 +184,7 @@ export default function BatchAddItemsScreen() {
     setName(item.name);
     setNickname(item.nickname ?? "");
     setQuantity(String(item.quantity));
-    setCategory(item.category);
+    setlocation(item.location);
     setExpiresAt(item.expiresAt);
 
     setSuggestions([]);
@@ -200,7 +208,7 @@ export default function BatchAddItemsScreen() {
       name: finalName,
       nickname: nickname.trim() ? nickname.trim() : null,
       quantity: qty,
-      category,
+      location,
       expiresAt,
     };
 
@@ -218,7 +226,64 @@ export default function BatchAddItemsScreen() {
     if (editingId === id) resetDraft(true);
   }
 
+  // ✅ במצב receipt-review: מחזירים את הרשימה (pending) למסך זיהוי המוצרים – בלי שרת
+  function returnToReceiptReview() {
+    const drafts: {
+      name: string;
+      quantity: number;
+      barcode?: string | null;
+      nickname?: string | null;
+      expiration_date?: string | null;
+      location: any;
+    }[] = [];
+
+    // 1) pending קיים
+    for (const p of pending) {
+      drafts.push({
+        name: p.name.trim(),
+        quantity: Number.isFinite(p.quantity) && p.quantity > 0 ? p.quantity : 1,
+        barcode: p.barcode ?? null,
+        nickname: p.nickname ?? null,
+        expiration_date: p.expiresAt ? p.expiresAt.toISOString().slice(0, 10) : null,
+        location: p.location,
+      });
+    }
+
+    // 2) אם אין pending אבל הדראפט הנוכחי תקין – נחזיר גם אותו
+    // (כדי שלא תצטרכי ללחוץ "הוספה לרשימה" לפני)
+    if (drafts.length === 0) {
+      const finalName = (selectedCatalogItem?.name ?? name.trim()).trim();
+      const qty = parseInt(quantity, 10);
+
+      if (finalName && Number.isFinite(qty) && qty > 0) {
+        drafts.push({
+          name: finalName,
+          quantity: qty,
+          barcode: barcode.trim() ? barcode.trim() : null,
+          nickname: nickname.trim() ? nickname.trim() : null,
+          expiration_date: expiresAt ? expiresAt.toISOString().slice(0, 10) : null,
+          location,
+        });
+      }
+    }
+
+    if (drafts.length === 0) {
+      Alert.alert("אין מוצרים", "הוסיפי מוצר (או הוסיפי לרשימה) לפני חזרה למסך הקבלה.");
+      return;
+    }
+
+    setLastAddItemReturnDrafts(drafts as any);
+    router.back();
+  }
+
   async function onBulkAdd() {
+    // ✅ receipt-review mode: לא מוסיפים לשרת בכלל
+    if (isReceiptReviewMode) {
+      returnToReceiptReview();
+      return;
+    }
+
+    // ✅ מצב רגיל: הוספה למלאי באמת
     if (!currentHomeId) {
       Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
       return;
@@ -237,7 +302,7 @@ export default function BatchAddItemsScreen() {
           quantity: item.quantity,
           barcode: item.barcode ? item.barcode : null,
           expiration_date: formattedExpires,
-          location: locationMap[item.category],
+          location: locationMap[item.location],
           nickname: item.nickname ?? null,
         });
 
@@ -275,7 +340,7 @@ export default function BatchAddItemsScreen() {
           pointerEvents="none"
         />
 
-        <ScreenHeader title="הוספה מרובה" onBack={() => router.back()} />
+        <ScreenHeader title={isReceiptReviewMode ? "הוספת מוצר (לקבלה)" : "הוספה מרובה"} onBack={() => router.back()} />
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <ProductDraftCard
@@ -284,9 +349,9 @@ export default function BatchAddItemsScreen() {
             name={name}
             nickname={nickname}
             quantity={quantity}
-            category={category}
+            location={location}
             expiresAt={expiresAt}
-            categoryOptions={CATEGORY_OPTIONS}
+            locationOptions={location_OPTIONS}
             onChangeBarcode={setBarcode}
             onChangeName={(v) => {
               setName(v);
@@ -295,7 +360,7 @@ export default function BatchAddItemsScreen() {
             }}
             onChangeNickname={setNickname}
             onChangeQuantity={setQuantity}
-            onPressCategory={() => setCatOpen(true)}
+            onPresslocation={() => setCatOpen(true)}
             onPressScan={() => setScanOpen(true)}
             onPressDate={() => setDateOpen(true)}
             onClearDate={() => setExpiresAt(undefined)}
@@ -314,41 +379,39 @@ export default function BatchAddItemsScreen() {
             }}
           />
 
-          <PendingList
-            items={pending}
-            categoryOptions={CATEGORY_OPTIONS}
-            onEdit={loadItemToDraft}
-            onRemove={removeFromList}
-          />
+          <PendingList items={pending} locationOptions={location_OPTIONS} onEdit={loadItemToDraft} onRemove={removeFromList} />
 
           <View style={{ height: 90 }} />
         </ScrollView>
 
         <View style={styles.bottomBar}>
           <PrimaryButton
-            title={`הוספה למלאי (${pending.length})`}
+            title={
+              isReceiptReviewMode
+                ? `הוספה לרשימת הקבלה (${pending.length || (canAddToList ? 1 : 0)})`
+                : `הוספה למלאי (${pending.length})`
+            }
             onPress={onBulkAdd}
-            disabled={pending.length === 0}
-            style={[styles.saveButton, pending.length === 0 && { opacity: 0.55 }]}
+            disabled={isReceiptReviewMode ? pending.length === 0 && !canAddToList : pending.length === 0}
+            style={[
+              styles.saveButton,
+              (isReceiptReviewMode ? pending.length === 0 && !canAddToList : pending.length === 0) && { opacity: 0.55 },
+            ]}
           />
         </View>
 
-        <CategoryPickerModal
+        <LocationPickerModal
           open={catOpen}
-          selected={category}
-          options={CATEGORY_OPTIONS}
+          selected={location}
+          options={location_OPTIONS}
           onClose={() => setCatOpen(false)}
           onSelect={(c) => {
-            setCategory(c);
+            setlocation(c);
             setCatOpen(false);
           }}
         />
 
-        <BarcodeScannerModal
-          open={scanOpen}
-          onClose={() => setScanOpen(false)}
-          onScanned={(value) => setBarcode(value)}
-        />
+        <BarcodeScannerModal open={scanOpen} onClose={() => setScanOpen(false)} onScanned={(value) => setBarcode(value)} />
 
         <DatePickerModal
           open={dateOpen}

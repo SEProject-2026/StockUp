@@ -42,7 +42,7 @@ class CsvCatalogProvider(ICatalogProvider):
                     barcode = row.get("Barcode", "").strip()
                     name = row.get("ItemName", "").strip()
                     chain = row.get("Chain", "GLOBAL").strip()
-                    storage_category = row.get("SuggestedStorageCategory", "").strip()
+                    storage_location = row.get("SuggestedStoragelocation", "").strip()
                     if not barcode or not name:
                         continue
                         
@@ -51,7 +51,7 @@ class CsvCatalogProvider(ICatalogProvider):
                         name=name,
                         manufacturer=row.get("ManufacturerName", ""),
                         chain_source=chain,
-                        storage_category=storage_category
+                        storage_location=storage_location
                     )
                     
                     self._all_items.append(item)

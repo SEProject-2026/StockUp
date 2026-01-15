@@ -16,8 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
-import InfoBox from "@/src/ui/InfoBox";
-import AuthTextField from "@/src/ui/AuthTextField";
+import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
 import { register } from "@/src/api/auth";
 
 export default function SignupScreen() {

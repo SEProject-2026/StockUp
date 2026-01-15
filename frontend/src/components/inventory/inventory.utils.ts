@@ -1,4 +1,4 @@
-import { Category, InventoryItem } from "@/src/context/inventory-context";
+import { location, InventoryItem } from "@/src/context/inventory-context";
 import type { ProductDTO, LocationType, ExpirationType } from "@/src/api/stock";
 
 export type InventoryRow = InventoryItem & {
@@ -9,10 +9,10 @@ export type InventoryRow = InventoryItem & {
   status?: string;
 };
 
-export type CategoryKey = Category | "all";
+export type locationKey = location | "all";
 export type StatusFilter = "all" | "soon" | "expired";
 
-export function mapLocationToCategory(location?: string | null): Category {
+export function mapLocationTolocation(location?: string | null): location {
   switch ((location ?? "").toUpperCase()) {
     case "FRIDGE":
       return "fridge";
@@ -29,7 +29,7 @@ export function mapLocationToCategory(location?: string | null): Category {
   }
 }
 
-export function categoryToLocationType(cat: Category): LocationType {
+export function locationToLocationType(cat: location): LocationType {
   switch (cat) {
     case "fridge":
       return "FRIDGE";
@@ -73,7 +73,7 @@ export function dtoToRows(dto: ProductDTO): InventoryRow[] {
         id: `${dto.id}__${exp ?? "none"}`,
         name: displayName,
         quantity: it.quantity,
-        category: mapLocationToCategory(dto.location),
+        location: mapLocationTolocation(dto.location),
         expiresAt: exp ?? undefined,
         productId: String(dto.id),
         expirationDate: exp,
@@ -89,7 +89,7 @@ export function dtoToRows(dto: ProductDTO): InventoryRow[] {
       id: `${dto.id}__none`,
       name: displayName,
       quantity: dto.quantity ?? 0,
-      category: mapLocationToCategory(dto.location),
+      location: mapLocationTolocation(dto.location),
       expiresAt: undefined,
       productId: String(dto.id),
       expirationDate: null,
