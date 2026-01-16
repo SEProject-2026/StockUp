@@ -15,6 +15,7 @@ class CatalogItem(BaseModel):
     manufacturer: Optional[str] = None
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
     location: Optional[LocationType] = LocationType.OTHER
+    weight: Optional[float] = None  
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,4 +58,21 @@ class ICatalogProvider(ABC):
         """
         Performs a text-based search for products (e.g., for autocomplete).
         """
+        pass
+
+    @abstractmethod
+    def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
+        """
+        Updates the in-memory weighted average for a product's weight.
+        This does not persist changes to the underlying data source.
+
+        Args:
+            barcode: The barcode of the product to update.
+            chain_name: The retail chain context.
+            measured_weight: The new weight measurement to incorporate.
+        """
+        pass
+    @abstractmethod
+    def persist(self):
+        """Persists all changes made in memory/session to the underlying storage."""
         pass

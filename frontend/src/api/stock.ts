@@ -1,4 +1,5 @@
 import { authFetch } from "@/src/api/client";
+import { UnitType } from "../components/receipts/review/review.shared";
 
 export type GeneralResponse<T> = {
   status: "success" | "error";
@@ -14,7 +15,7 @@ export type LocationType =
   | "FRIDGE"
   | "FREEZER"
   | "PANTRY"
-  | "CLEANING_SUPPLIES"
+  | "CLEANING"
   | "OTHER";
 
 export type ExpirationType = "FRESH" | "GOING_TO_EXPIRE" | "EXPIRED";
@@ -218,7 +219,7 @@ export type DetectedReceiptItemDTO = {
   barcode: string;
   name: string;
   quantity: number;
-  unit: string;
+  unit: UnitType;
   storage_location?: Storagelocation | null;
 };
 
@@ -269,6 +270,7 @@ export type ReceiptItemRequestDTO = {
   expiration_date?: string | null; // "YYYY-MM-DD"
   location?: LocationType | null;
   nickname?: string | null;
+  unit?: UnitType;
 };
 
 export type AddReceiptRequest = {

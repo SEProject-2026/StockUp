@@ -1,5 +1,7 @@
 import csv
 import os
+import shutil
+from tempfile import NamedTemporaryFile
 from typing import List, Optional, Dict
 from src.repositories.catalog_provider import ICatalogProvider, CatalogItem
 
@@ -24,57 +26,51 @@ class CsvCatalogProvider(ICatalogProvider):
         self._load_data(csv_path)
 
     def _load_data(self, csv_path: str):
-        """
-        Parses the CSV, populates data structures, and sorts the list
-        to prioritize Global items and shorter names.
-        """
         if not os.path.exists(csv_path):
             print(f"[WARNING] Catalog CSV file not found at: {csv_path}")
             return
 
-        print(f"[INFO] Loading catalog data from {csv_path}...")
-        
+        self._global_map = {}
+        self._chain_map = {}
+        self._all_items = []
+
         try:
             with open(csv_path, 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
-                
                 for row in reader:
                     barcode = row.get("Barcode", "").strip()
                     name = row.get("ItemName", "").strip()
                     chain = row.get("Chain", "GLOBAL").strip()
-                    location = row.get("SuggestedStorageCategory", "OTHER").strip().upper()
-                    if location == "":
-                        location = "OTHER"
+                    
                     if not barcode or not name:
                         continue
-                                            
+
+                    # Load weights and sample size if they exist
+                    avg_w = row.get("AverageWeight", 0)
+                    samp_s = row.get("SampleSize", 0)
+
                     item = CatalogItem(
                         barcode=barcode,
                         name=name,
                         manufacturer=row.get("ManufacturerName", ""),
                         chain_source=chain,
-                        location=location
+                        location=row.get("SuggestedStorageCategory", "OTHER").strip().upper() or "OTHER",
+                        avg_weight=float(avg_w) if avg_w else 0.0,
+                        sample_size=int(samp_s) if samp_s else 0
                     )
-                    
-                    self._all_items.append(item)
 
+                    self._all_items.append(item)
                     if chain == "GLOBAL":
                         self._global_map[barcode] = item
                     else:
-                        key = f"{chain}_{barcode}"
-                        self._chain_map[key] = item
-            
-            # SORTING LOGIC:
-            # We sort the main list to prioritize better results during search.
-            # 1. Global items appear first.
-            # 2. Shortest names appear first (e.g., "Cucumber" is better than "Fresh Green Cucumber by Weight").
-            self._all_items.sort(key=lambda x: (x.chain_source != "GLOBAL", len(x.name)))
+                        self._chain_map[f"{chain}_{barcode}"] = item
 
-            print(f"[INFO] Catalog loaded and sorted. Total items: {len(self._all_items)}")
+            # Sort for better search results
+            self._all_items.sort(key=lambda x: (x.chain_source != "GLOBAL", len(x.name)))
+            print(f"[INFO] Catalog loaded. Total items: {len(self._all_items)}")
 
         except Exception as e:
-            print(f"[ERROR] Failed to load catalog CSV: {str(e)}")
-
+            print(f"[ERROR] Failed to load catalog: {e}")
     # =========================================================================
     # Interface Implementation
     # =========================================================================
@@ -164,4 +160,64 @@ class CsvCatalogProvider(ICatalogProvider):
             if len(results) >= 20:
                 break
                 
+        return results
+    
+
+    def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
+        """Updates internal memory object without touching the disk."""
+        # Note: Using the internal sync helper for speed
+        item = self._get_item_sync(barcode, chain_name or "GLOBAL")
+        if not item:
+            return
+        
+        old_total = item.avg_weight * item.sample_size
+        item.sample_size += 1
+        item.avg_weight = (old_total + measured_weight) / item.sample_size
+
+    def persist(self):
+        """Rewrites the entire CSV file (Once per receipt)."""
+        self._save_to_csv_full()
+
+    def _save_to_csv_full(self):
+        """Rewrites the entire master database with atomic replacement."""
+        fields = [
+            "Barcode", "ItemName", "ManufacturerName", 
+            "Chain", "SuggestedStorageCategory", 
+            "AverageWeight", "SampleSize"
+        ]
+        
+        temp_file = NamedTemporaryFile(mode='w', delete=False, encoding='utf-8-sig', newline='')
+        try:
+            with temp_file as f:
+                writer = csv.DictWriter(f, fieldnames=fields)
+                writer.writeheader()
+                for item in self._all_items:
+                    writer.writerow({
+                        "Barcode": item.barcode,
+                        "ItemName": item.name,
+                        "ManufacturerName": item.manufacturer,
+                        "Chain": item.chain_source,
+                        "SuggestedStorageCategory": item.location,
+                        "AverageWeight": round(item.avg_weight, 3),
+                        "SampleSize": item.sample_size
+                    })
+            
+            # Atomic move: avoids corrupted files if the process crashes
+            shutil.move(temp_file.name, self.csv_path)
+        except Exception as e:
+            if os.path.exists(temp_file.name):
+                os.remove(temp_file.name)
+            print(f"[ERROR] Failed to save catalog: {e}")
+
+    async def search_items_by_name(self, query: str) -> List[CatalogItem]:
+        if not query or len(query) < 2: return []
+        query = query.lower()
+        results, seen_names = [], set()
+        
+        for item in self._all_items:
+            if query in item.name.lower():
+                if item.name.strip() in seen_names: continue
+                results.append(item)
+                seen_names.add(item.name.strip())
+            if len(results) >= 20: break
         return results

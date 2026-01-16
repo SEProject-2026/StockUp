@@ -4,7 +4,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 import type { LocationType } from "@/src/api/stock";
 
-
 export const BRAND = {
   BG: "#F5F6F8",
   CARD: "#FFFFFF",
@@ -12,27 +11,38 @@ export const BRAND = {
   TEXT: "#111827",
   MUTED: "#6B7280",
 
-  PRIMARY: "#0284C7",       
-  PRIMARY_SOFT: "#EAF2FF",  
-  PRIMARY_LINE: "#CFE2FF",  
+  PRIMARY: "#0284C7",
+  PRIMARY_SOFT: "#EAF2FF",
+  PRIMARY_LINE: "#CFE2FF",
 
   BLUE_SOFT: "#F0FAFF",
   BLUE_LINE: "#DCEBFA",
 } as const;
 
+export enum UnitType {
+  UNIT = "UNIT",
+  KG = "KG",
+}
 
 export type LocationKey = "fridge" | "freezer" | "pantry" | "cleaning" | "other";
 export type Storagelocation = LocationKey;
 
 export type DetectedItem = {
   id: string;
-  barcode?: string;
   name: string;
-  quantity: number;
-  unit?: string;
+  barcode?: string | null;
+  nickname?: string | null;
+  expiration_date?: string | null;
+  location?: LocationKey;
+  storage_location?: LocationKey;
 
-  storage_location?: Storagelocation;
-  location: LocationKey;
+  quantity: number;         // final quantity (units) to be stored
+  unit: UnitType;           // UNIT | KG
+  weight?: number | null;   // for weighted items only (kg float)
+
+  // ✅ UI only
+  units_count?: number | null;
+  suggested_units?: number | null;
 };
 
 type IconProps = Omit<ComponentProps<typeof MaterialCommunityIcons>, "name">;
@@ -67,7 +77,7 @@ export function storagelocationToLocationType(cat?: string | null): LocationType
     case "pantry":
       return "PANTRY";
     case "cleaning":
-      return "CLEANING_SUPPLIES";
+      return "CLEANING";
     default:
       return "OTHER";
   }
@@ -97,7 +107,14 @@ export function parseReceiptParam(receiptParam?: string): any | null {
   return null;
 }
 
+export function normalizeUnitType(v: any): UnitType {
+  const s = String(v ?? "").trim().toUpperCase();
+  if (s === "KG" || s === "ק\"ג" || s === "ק״ג" || s === "קג") return UnitType.KG;
+  return UnitType.UNIT;
+}
+
 export function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
+  
   if (!receipt) return [];
 
   const inner = receipt?.data?.receipt ?? receipt?.data ?? receipt;
@@ -107,24 +124,48 @@ export function mapReceiptToDetectedItems(receipt: any | null): DetectedItem[] {
   return rawItems
     .map((it: any) => {
       const name = String(it.name ?? it.product_name ?? it.title ?? "").trim();
-      const qRaw = it.quantity ?? it.qty ?? 1;
-      const quantity = Number(String(qRaw).replace(",", "."));
-      const unit = it.unit ? String(it.unit) : undefined;
-
       if (!name) return null;
 
+      // raw quantity
+      const qRaw = it.quantity ?? it.qty ?? 1;
+      const quantityNum = Number(String(qRaw).replace(",", "."));
+
+      //  backend field: weight (kg float) if exists
+      const weightNum =
+        it.weight === null || it.weight === undefined
+          ? null
+          : Number(String(it.weight).replace(",", "."));
+      const weight = weightNum !== null && Number.isFinite(weightNum) && weightNum > 0 ? weightNum : null;
+      const unit = normalizeUnitType(it.unit);
+
+      // location
       const storage_location = it.storage_location ?? it.storagelocation ?? it.location;
       const normalizedCat = normalizelocation(storage_location);
       const location = locationToDefaultLocation(normalizedCat);
 
+      const initialQuantity =
+        Number.isFinite(quantityNum) && quantityNum > 0 ? Math.round(quantityNum) : 1;
+
       return {
         id: uuid(),
-        barcode: it.barcode ? String(it.barcode) : undefined,
+        barcode: it.barcode ? String(it.barcode) : null,
         name,
-        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-        unit,
+        nickname: it.nickname ? String(it.nickname) : null,
+        expiration_date: it.expiration_date ? String(it.expiration_date) : null,
+
+        quantity: initialQuantity,
+        unit: unit ?? UnitType.UNIT,
+        weight,
+
+        // UI-only if server provides them
+        suggested_units:
+          it.suggested_units && Number.isFinite(+it.suggested_units) ? Number(it.suggested_units) : null,
+        units_count:
+          it.units_count && Number.isFinite(+it.units_count) ? Number(it.units_count) : null,
+
         storage_location: normalizedCat,
         location,
+        
       } as DetectedItem;
     })
     .filter(Boolean) as DetectedItem[];
@@ -137,7 +178,6 @@ export function PrimaryButtonCompat(props: {
   disabled?: boolean;
 }) {
   const { title, onPress, leftIcon, disabled } = props;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Btn: any = PrimaryButton;
 
   return (
@@ -148,4 +188,23 @@ export function PrimaryButtonCompat(props: {
       </View>
     </Btn>
   );
+}
+
+export function hasWeight(item: DetectedItem) {
+  return typeof item.weight === "number" && item.weight > 0;
+}
+
+export function formatWeightKg(weight?: number | null) {
+  if (!weight || !Number.isFinite(weight)) return "";
+  return weight % 1 === 0 ? `${weight}` : `${weight.toFixed(2)}`.replace(/\.?0+$/, "");
+}
+
+export function needsAttention(item: DetectedItem) {
+  if (!String(item.name ?? "").trim()) return true;
+  if (!Number.isFinite(item.quantity) || item.quantity <= 0) return true;
+
+  if (hasWeight(item)) {
+    if (!item.units_count || item.units_count <= 0) return true;
+  }
+  return false;
 }

@@ -58,48 +58,54 @@ class StockService:
         
     
     async def scan_receipt(
-        self,
-        user_id: UUID,
-        home_id: UUID,
-        file_path: str,                 
-    ):
-        """Processes a receipt and returns detected items for verification.
-        If return_debug=True returns (ReceiptDTO, debug_dict)
-        """
+    self,
+    user_id: UUID,
+    home_id: UUID,
+    file_path: str,                 
+):
         await self._check_access(user_id, home_id)
 
         if not isinstance(file_path, (str, os.PathLike)):
             raise TypeError(f"file_path must be a path string, got: {type(file_path)}")
 
         scanner = ReceiptScanner()
-        chain_name, scanned_items = scanner.parse_receipt(str(file_path))  # dict[barcode] -> (qty, unit)
-
-        scanned_barcodes = list(scanned_items.keys())
+        chain_name, scanned_items = scanner.parse_receipt(str(file_path))
 
         receipt_items_dto: list[ReceiptItemDTO] = []
-        for barcode in scanned_barcodes:
-            qty, unit = scanned_items[barcode]
+        for barcode, (qty, unit_str) in scanned_items.items():
+            # Mapping scanner unit string to UnitType Enum
+            unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
             ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+            
             if ci:
+                # If item is weighted, we provide the historical average weight per unit
+                avg_unit_weight = 1
+                if unit==UnitType.KG:
+                    avg_unit_weight = ci.weight           
+                    new_qty=qty/avg_unit_weight if avg_unit_weight else 1
+                else:
+                    new_qty=qty
                 receipt_items_dto.append(
                     ReceiptItemDTO(
                         barcode=barcode,
                         name=ci.name,
-                        quantity=float(qty),
+                        quantity=new_qty,
                         unit=unit,
                         location=ci.location,
+                        weight=qty if unit==UnitType.KG else None,
+                    )
                 )
-            )
             else:
                 receipt_items_dto.append(
                     ReceiptItemDTO(
                         name="Unknown Product",
-                        quantity=float(qty),
+                        barcode=barcode,
+                        quantity=qty,
                         unit=unit,
+                    )
                 )
-            )
 
-        receipt_dto = ReceiptDTO(
+        return ReceiptDTO(
             id=uuid4(),
             home_id=home_id,
             user_id=user_id,
@@ -107,24 +113,36 @@ class StockService:
             items=receipt_items_dto,
         )
 
-        return receipt_dto
-
     async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
         """High-performance operation for full receipts."""
         await self._check_access(receipt_dto.user_id, receipt_dto.home_id)
 
-        # 1. Bulk Pre-fetch (Performance)
+        # 1. Bulk Pre-fetch to minimize DB roundtrips
         existing_products = await self._product_repository.list_all_by_home(receipt_dto.home_id)
         products_map = {p.original_name: p for p in existing_products}
         
         products_to_save = {}
+        catalog_updated = False
         count = 0
-
         for item in receipt_dto.items:
             if item.name == "Unknown Product":
                 continue
             
-            # 2. Logic in memory
+            # 2. Update Catalog Metrics (Learning weight averages)
+            # Updates only the Session (DB) or Memory (CSV), no IO yet
+            print(f"Processing item: {item.name} ({item.barcode}), unit: {item.unit}, qty: {item.quantity}, weight: {item.weight}")
+            if item.unit == UnitType.KG and item.quantity > 0:
+                print(f"Updating catalog weight for {item.name} ({item.barcode})")
+                current_measured_avg = item.weight / item.quantity
+                
+                self._catalog_provider.update_weighted_mem_only(
+                    barcode=item.barcode,
+                    chain_name=receipt_dto.chain,
+                    measured_weight=current_measured_avg
+                )
+                catalog_updated = True
+            
+            # 3. Domain Logic: Manage inventory items
             product = products_map.get(item.name)
             if not product:
                 product = Product(
@@ -134,21 +152,26 @@ class StockService:
                     barcode=item.barcode,
                     nickname=item.nickname
                 )
-                products_map[item.name] = product # Handle duplicates within the same receipt
+                products_map[item.name] = product
                 
             if item.nickname:
                 product.set_nickname(item.nickname)
                 
-            product.add_item(int(item.quantity), item.location, item.expiration_date)
-            print(f"Adding {item.quantity} of {item.name} to stock.")
+            product.add_item(item.quantity, item.location, item.expiration_date)
             
-            # Collect for bulk save
+            # Track products for bulk save
             products_to_save[product.id] = product
             count += 1
 
-        # 3. Batch Save (One commit for all)
+        # 4. Final Persistence: Occurs once per receipt for maximum performance
+        
+        # Save Inventory changes via the Product Repository
         if products_to_save:
             await self._product_repository.save_all(list(products_to_save.values()))
+        
+        # Save Catalog changes (Atomic commit for DB or Full rewrite for CSV)
+        if catalog_updated:
+            self._catalog_provider.persist()
 
         return count
         

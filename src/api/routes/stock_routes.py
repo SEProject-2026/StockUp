@@ -384,6 +384,7 @@ async def add_receipt(
                     quantity=float(item.quantity), # Receipt scanner returns floats
                     barcode=item.barcode,
                     expiration_date=item.expiration_date,
+                    unit=item.unit,
                     location=item.location,
                     nickname=item.nickname
                 ) for item in request.items

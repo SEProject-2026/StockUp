@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Date, ForeignKey, Table
+from sqlalchemy import Column, DateTime, Float, String, Integer, Date, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from src.infrastructure.db.database import Base
 # We import Enums just for reference, but usually store as String in SQL to avoid DB-specific enum issues
@@ -90,3 +90,19 @@ class ProductItemModel(Base):
     # REMOVED: expiration_type (Calculated at runtime)
 
     product = relationship("ProductModel", back_populates="items")
+
+
+
+class CatalogItemModel(Base):
+    __tablename__ = "catalog_items"
+
+    barcode = Column("Barcode", String, primary_key=True)
+    chain = Column("Chain", String, primary_key=True, default="GLOBAL")
+    name = Column("ItemName", String, nullable=False)
+    manufacturer = Column("ManufacturerName", String)
+    unit_of_measure = Column("UnitOfMeasure", String)
+    qty_in_package = Column("QtyInPackage", String)
+    last_update = Column("LastUpdate", DateTime)
+    location = Column("SuggestedStorageCategory", String, default="OTHER")
+    avg_weight = Column("AverageWeight", Float, default=0.0)
+    sample_size = Column("SampleSize", Integer, default=0)

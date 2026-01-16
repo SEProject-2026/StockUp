@@ -24,11 +24,13 @@ import ReviewHeader from "@/src/components/receipts/review/ReviewHeader";
 import ReviewListItem from "@/src/components/receipts/review/ReviewListItem";
 import ReviewFooter from "@/src/components/receipts/review/ReviewFooter";
 import EditItemModal from "@/src/components/receipts/review/modals/EditItemModal";
+import { UnitType } from "@/src/components/receipts/review/review.shared";
 
 import {
   BRAND,
   type DetectedItem,
   type LocationKey,
+  needsAttention,
   parseReceiptParam,
   mapReceiptToDetectedItems,
   storagelocationToLocationType,
@@ -94,6 +96,8 @@ export default function ReceiptReviewDetectedProductsScreen() {
           name: d.name,
           nickname: d.nickname ?? undefined,
           quantity: Number.isFinite(d.quantity) && d.quantity > 0 ? d.quantity : 1,
+          unit: d.unit ?? UnitType.UNIT, 
+          weight: null,            
           location: (d.location as any) ?? "other",
           storage_location: (d.location as any) ?? "other",
           barcode: d.barcode ?? undefined,
@@ -133,7 +137,14 @@ export default function ReceiptReviewDetectedProductsScreen() {
     router.push({ pathname: "/inventory/add-item", params: { mode: "receipt-review" } });
   }, []);
 
+  const hasBlocking = useMemo(() => items.some(needsAttention), [items]);
+
   const onConfirmAddAll = useCallback(async () => {
+    if (hasBlocking) {
+      Alert.alert("חסרים פרטים", "יש שורות אדומות שדורשות השלמה/אישור לפני הוספה למלאי.");
+      return;
+    }
+
     if (saving) return;
 
     if (items.length === 0) {
@@ -143,12 +154,16 @@ export default function ReceiptReviewDetectedProductsScreen() {
 
     const receiptItems = items.map((x: any) => ({
       name: String(x.name ?? "").trim(),
-      quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
       barcode: x.barcode ? String(x.barcode) : null,
       nickname: x.nickname ? String(x.nickname).trim() : null,
       expiration_date: toIsoDateOnly(x.expiration_date ?? null),
       location: storagelocationToLocationType(x.location ?? x.storage_location ?? "other"),
+
+      quantity: Number.isFinite(x.quantity) ? Math.round(x.quantity) : 1,
+      unit: x.unit ?? "UNIT",
+      weight: typeof x.weight === "number" && x.weight > 0 ? x.weight : null,
     }));
+
 
     const bad = receiptItems.find((p) => !p.name || p.quantity <= 0);
     if (bad) {
@@ -190,7 +205,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [items, saving]);
+  },[items, saving, hasBlocking]);
 
   const renderItem = useCallback(
     ({ item }: { item: DetectedItem }) => (
@@ -237,7 +252,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
 
         <ReviewFooter
           saving={saving}
-          disabled={items.length === 0 || saving}
+          disabled={items.length === 0 || saving || hasBlocking}
           onConfirm={onConfirmAddAll}
         />
 
