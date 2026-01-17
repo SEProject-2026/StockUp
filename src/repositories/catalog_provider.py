@@ -16,6 +16,7 @@ class CatalogItem(BaseModel):
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
     location: Optional[LocationType] = LocationType.OTHER
     weight: Optional[float] = None  
+    sample_size: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

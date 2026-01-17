@@ -74,6 +74,13 @@ export default function ReceiptReviewDetectedProductsScreen() {
     [receiptFromParam]
   );
 
+  const receiptChain = useMemo(() => {
+  const inner = (receiptObj as any)?.data?.receipt ?? (receiptObj as any)?.data ?? receiptObj;
+  const chain = inner?.chain ?? null;
+  return chain ? String(chain) : null;
+  }, [receiptObj]);
+
+
   const [items, setItems] = useState<DetectedItem[]>([]);
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -97,7 +104,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
           nickname: d.nickname ?? undefined,
           quantity: Number.isFinite(d.quantity) && d.quantity > 0 ? d.quantity : 1,
           unit: d.unit ?? UnitType.UNIT, 
-          weight: null,            
+          weight: null,           
           location: (d.location as any) ?? "other",
           storage_location: (d.location as any) ?? "other",
           barcode: d.barcode ?? undefined,
@@ -158,10 +165,9 @@ export default function ReceiptReviewDetectedProductsScreen() {
       nickname: x.nickname ? String(x.nickname).trim() : null,
       expiration_date: toIsoDateOnly(x.expiration_date ?? null),
       location: storagelocationToLocationType(x.location ?? x.storage_location ?? "other"),
-
-      quantity: Number.isFinite(x.quantity) ? Math.round(x.quantity) : 1,
+      quantity: x.quantity,
       unit: x.unit ?? "UNIT",
-      weight: typeof x.weight === "number" && x.weight > 0 ? x.weight : null,
+      weight: x.weight ?? null,
     }));
 
 
@@ -180,8 +186,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
         Alert.alert("שגיאה", "לא נבחר בית פעיל. חזרו ובחרו בית.");
         return;
       }
-
-      const res = await addReceipt(homeId, { items: receiptItems });
+      const res = await addReceipt(homeId, {chain: receiptChain, items: receiptItems,});
 
       if (res.status === "success") {
         const added = res.data?.added_count ?? receiptItems.length;

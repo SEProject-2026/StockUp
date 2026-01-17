@@ -378,15 +378,17 @@ async def add_receipt(
             id=uuid4(),
             home_id=home_id,
             user_id=user_id,
+            chain=request.chain,
             items=[
                 ReceiptItemDTO(
                     name=item.name,
-                    quantity=float(item.quantity), # Receipt scanner returns floats
+                    quantity=item.quantity, # Receipt scanner returns floats
                     barcode=item.barcode,
                     expiration_date=item.expiration_date,
                     unit=item.unit,
                     location=item.location,
-                    nickname=item.nickname
+                    nickname=item.nickname,
+                    weight=item.weight
                 ) for item in request.items
             ]
         )

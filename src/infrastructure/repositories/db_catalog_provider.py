@@ -16,7 +16,7 @@ class DbCatalogProvider(ICatalogProvider):
             manufacturer=db_item.manufacturer,
             chain_source=db_item.chain,
             location=db_item.location,
-            avg_weight=db_item.avg_weight,
+            weight=db_item.avg_weight,
             sample_size=db_item.sample_size
         )
 
@@ -112,45 +112,40 @@ class DbCatalogProvider(ICatalogProvider):
         return [self._map_to_domain(item) for item in db_items]
 
     def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
+        """Updates the object and flushes changes to the DB buffer."""
         padded_barcode = "729" + "0" * (10 - len(barcode)) + barcode
         search_barcodes = [barcode, padded_barcode]
 
+        # 1. Fetch the item
         db_item = self.db.query(CatalogItemModel).filter(
             CatalogItemModel.barcode.in_(search_barcodes),
             CatalogItemModel.chain == (chain_name or "GLOBAL")
         ).first()
-
         if not db_item:
-            # Fallback to GLOBAL if chain-specific not found
             db_item = self.db.query(CatalogItemModel).filter(
                 CatalogItemModel.barcode.in_(search_barcodes),
                 CatalogItemModel.chain == "GLOBAL"
             ).first()
-
         if db_item:
-            # Calculate new metrics
-            old_total = db_item.avg_weight * db_item.sample_size
+            # 2. Perform calculation
+            old_total = db_item.weight * db_item.sample_size
             db_item.sample_size += 1
-            db_item.avg_weight = (old_total + measured_weight) / db_item.sample_size
+            db_item.weight = (old_total + measured_weight) / db_item.sample_size
             
-            # Force SQLAlchemy to recognize the change
-            from sqlalchemy.orm import attributes
-            attributes.flag_modified(db_item, "avg_weight")
-            attributes.flag_modified(db_item, "sample_size")
+            # 3. Force synchronization
+            # Ensure the item is attached to the current session
+            self.db.add(db_item)
             
-            print(f"[DEBUG] Updated {db_item.name} in session. New avg: {db_item.avg_weight}")
+            # Push changes to the database transaction (but don't commit yet)
+            self.db.flush()
+            
 
     def persist(self):
         """Finalizes the database transaction."""
         try:
-            # Check if there are actually changes to commit
-            if self.db.dirty or self.db.new or self.db.deleted:
-                print(f"[DEBUG] Persisting changes to DB... Dirty items: {len(self.db.dirty)}")
-                self.db.commit()
-                print("[DEBUG] DB Commit successful.")
-            else:
-                print("[DEBUG] No changes detected in session, nothing to commit.")
+            # We don't check for 'dirty' here because flush() might have already 
+            # moved objects from 'dirty' to the database buffer.
+            self.db.commit()
         except Exception as e:
             self.db.rollback()
-            print(f"[ERROR] Database commit failed: {e}")
             raise

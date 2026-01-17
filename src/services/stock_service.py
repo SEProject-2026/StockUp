@@ -89,7 +89,7 @@ class StockService:
                     ReceiptItemDTO(
                         barcode=barcode,
                         name=ci.name,
-                        quantity=new_qty,
+                        quantity=int(new_qty),
                         unit=unit,
                         location=ci.location,
                         weight=qty if unit==UnitType.KG else None,
@@ -130,9 +130,7 @@ class StockService:
             
             # 2. Update Catalog Metrics (Learning weight averages)
             # Updates only the Session (DB) or Memory (CSV), no IO yet
-            print(f"Processing item: {item.name} ({item.barcode}), unit: {item.unit}, qty: {item.quantity}, weight: {item.weight}")
             if item.unit == UnitType.KG and item.quantity > 0:
-                print(f"Updating catalog weight for {item.name} ({item.barcode})")
                 current_measured_avg = item.weight / item.quantity
                 
                 self._catalog_provider.update_weighted_mem_only(

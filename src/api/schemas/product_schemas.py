@@ -125,6 +125,9 @@ class ReceiptItem(BaseModel):
     location: LocationType = LocationType.OTHER
     unit:UnitType = UnitType.UNIT
     nickname: Optional[str] = None
+    weight: Optional[float] = None
+    
 
 class AddReceiptRequest(BaseModel):
+    chain:str
     items: List[ReceiptItem]

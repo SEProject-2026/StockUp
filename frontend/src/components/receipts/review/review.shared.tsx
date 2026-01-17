@@ -35,7 +35,7 @@ export type DetectedItem = {
   expiration_date?: string | null;
   location?: LocationKey;
   storage_location?: LocationKey;
-
+  chain?: string | null;
   quantity: number;         // final quantity (units) to be stored
   unit: UnitType;           // UNIT | KG
   weight?: number | null;   // for weighted items only (kg float)

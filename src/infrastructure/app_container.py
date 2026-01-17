@@ -50,12 +50,14 @@ class AppContainer:
         - If 'db' is provided: Returns DbCatalogProvider (Production/System).
         - If 'db' is None: Returns CsvCatalogProvider (Testing/Local).
         """
+        if AppContainer._catalog_provider_instance is not None:
+            return AppContainer._catalog_provider_instance
         # 1. Production (Database)
-        if db:
-            return DbCatalogProvider(db)
+        #if db:
+         #   _catalog_provider_instance= DbCatalogProvider(db)
 
         # 2. Testing/Fallback (CSV)
-        if AppContainer._csv_catalog_instance is None:
+        if AppContainer._catalog_provider_instance is None:
             project_root = Path(__file__).resolve().parents[2]
             csv_path = project_root / "src" / "data" / "master_db.csv"
 
@@ -64,9 +66,9 @@ class AppContainer:
                 if alt.exists():
                     csv_path = alt
 
-            AppContainer._csv_catalog_instance = CsvCatalogProvider(str(csv_path))
+            AppContainer._catalog_provider_instance = CsvCatalogProvider(str(csv_path))
 
-        return AppContainer._csv_catalog_instance
+        return AppContainer._catalog_provider_instance
 
     @staticmethod
     def get_user_service(db: Optional[Session] = None) -> UserService:
