@@ -47,20 +47,47 @@ async function parseError(res: Response): Promise<{ message: string; rawText: st
   }
 }
 
+function isFormDataBody(body: any) {
+  if (!body) return false;
+
+  // works in most environments
+  if (typeof FormData !== "undefined" && body instanceof FormData) return true;
+
+  // React-Native FormData polyfill duck-typing
+  // RN FormData usually has a private _parts array
+  if (typeof body === "object" && Array.isArray(body._parts)) return true;
+
+  // fallback: constructor name
+  if (body?.constructor?.name === "FormData") return true;
+
+  return false;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
+
+  const isFormData = isFormDataBody(options.body);
+
+  const headers: Record<string, string> = {
+    ...(options.headers as any),
+  };
+
+  const hasContentType = Object.keys(headers).some(
+    (k) => k.toLowerCase() === "content-type"
+  );
+
+  // ✅ לא להוסיף Content-Type כשזה FormData
+  if (!isFormData && !hasContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-    },
+    headers,
   });
 
   if (!res.ok) {
     const { message, rawText, rawJson } = await parseError(res);
-
-    // ✅ פה למקם: לוג מרכזי לכל הבעיות (422/401/500 וכו')
     console.error("❌ API ERROR", {
       url,
       status: res.status,
@@ -69,12 +96,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       requestBody: options.body,
       responseText: rawText,
       responseJson: rawJson,
+      isFormData,
+      sentHeaders: headers,
     });
-
     throw new Error(message);
   }
 
-  // אם יש endpoints שמחזירים 204 / גוף ריק
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     return (await res.text()) as unknown as T;
@@ -82,6 +109,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   return (await res.json()) as T;
 }
+
+
 
 export async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const [token, homeId] = await Promise.all([getAccessToken(), getSelectedHomeId()]);

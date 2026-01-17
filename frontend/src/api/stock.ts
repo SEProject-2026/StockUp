@@ -240,27 +240,46 @@ function isProbablyImage(mimeType?: string | null) {
   return !!mimeType && mimeType.startsWith("image/");
 }
 
+function getExtFromUri(uri?: string | null) {
+  const u = String(uri ?? "").split("?")[0].split("#")[0];
+  const m = u.match(/\.([a-zA-Z0-9]+)$/);
+  return m ? m[1].toLowerCase() : null;
+}
+
+function inferMimeFromExt(ext?: string | null) {
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "pdf":
+      return "application/pdf";
+    default:
+      return null;
+  }
+}
+
 export async function scanReceipt(
   homeId: string,
-  params: {
-    fileUri: string;
-    fileName?: string | null;
-    mimeType?: string | null;
-  }
+  params: { fileUri: string; fileName?: string | null; mimeType?: string | null }
 ) {
-  const fileName =
-    params.fileName ??
-    (isProbablyImage(params.mimeType) ? "receipt.jpg" : "receipt.pdf");
+  const uriExt = getExtFromUri(params.fileUri);
+  const nameExt = params.fileName ? getExtFromUri(params.fileName) : null;
 
-  const mimeType =
-    params.mimeType ??
-    (fileName.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+  const resolvedExt = nameExt ?? uriExt ?? "jpg";
+  const resolvedMimeType =
+    params.mimeType ?? inferMimeFromExt(resolvedExt) ?? "image/jpeg";
+
+  const resolvedFileName =
+    params.fileName ??
+    (resolvedMimeType === "application/pdf" ? "receipt.pdf" : `receipt.${resolvedExt}`);
 
   const form = new FormData();
   form.append("file", {
     uri: params.fileUri,
-    name: fileName,
-    type: mimeType,
+    name: resolvedFileName,
+    type: resolvedMimeType,
   } as any);
 
   return stockFetch<GeneralResponse<ReceiptDTO>>(homeId, "/stock/scan", {
@@ -268,6 +287,7 @@ export async function scanReceipt(
     body: form,
   });
 }
+
 
 // ----------------------
 // ✅ Add from receipt (UPDATED RESPONSE TYPES)

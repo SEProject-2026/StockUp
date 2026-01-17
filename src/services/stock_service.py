@@ -100,7 +100,7 @@ class StockService:
                     ReceiptItemDTO(
                         name="Unknown Product",
                         barcode=barcode,
-                        quantity=qty,
+                        quantity=int(qty) if unit==UnitType.UNIT else 1,
                         unit=unit,
                     )
                 )

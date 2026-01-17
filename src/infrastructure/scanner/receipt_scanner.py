@@ -230,7 +230,6 @@ class ReceiptScanner:
         temp_in = os.path.abspath("page_temp_in.png")
         temp_out = os.path.abspath("page_temp_out.png")
         cv2.imwrite(temp_in, img)
-
         script_dir = os.path.dirname(os.path.abspath(__file__))
         ps_script = os.path.join(script_dir, "textcleaner.ps1")
         if not os.path.exists(ps_script):
@@ -248,7 +247,6 @@ class ReceiptScanner:
                     if "ImageMagick" in d:
                         im_dir = os.path.join(tools_dir, d)
                         break
-
         my_env = os.environ.copy()
         my_env["PATH"] = im_dir + os.pathsep + my_env["PATH"]
         my_env["MAGICK_HOME"] = im_dir
@@ -272,7 +270,7 @@ class ReceiptScanner:
             "-Offset", "10",
             "-Sharpen", "1",
         ]
-
+        
         try:
             sp.run(cmd, check=True, env=my_env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
 
@@ -910,7 +908,7 @@ class ReceiptScanner:
             "פרשמרקט": "Freshmarket",
             "משנת יוסף": "Mishnat Yosef",
             "קשת טעמים": "keshet",
-            "רמי לוי": "ramilevi",
+            "רמי לוי שיווק השקמה": "ramilevi",
             "סופר קופיקס": "Super Cofix",
             "שופרסל": "shufersal",
             "Be": "Be",
@@ -918,8 +916,10 @@ class ReceiptScanner:
             "שפע ברכת השם": "Shefa Birkat Hashem",
         }
         for chain in retail_chains_map.keys():
-            if chain in line:
-                return retail_chains_map[chain]
+            words=chain.split(' ')
+            for word in words:
+                if word in line:
+                    return retail_chains_map[chain]
         return "unidentified chain"
 
     def validate_ean13(self, barcode: str) -> bool:

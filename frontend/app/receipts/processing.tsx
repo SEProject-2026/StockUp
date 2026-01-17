@@ -13,6 +13,8 @@ import { getSelectedHomeId } from "../home/selected-home";
 import { scanReceipt } from "@/src/api/stock";
 import { setLastScannedReceipt } from "@/src/context/receipt-scan-store";
 
+import * as FileSystem from "expo-file-system";
+
 export default function ReceiptProcessingScreen() {
   const router = useRouter();
 
@@ -26,13 +28,40 @@ export default function ReceiptProcessingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
 
+async function ensureFileUri(uri: string): Promise<string> {
+  if (!uri) return uri;
+
+  if (uri.startsWith("file://")) return uri;
+
+  if (uri.startsWith("content://")) {
+    const clean = uri.split("?")[0].split("#")[0];
+    const extMatch = clean.match(/\.([a-zA-Z0-9]+)$/);
+    const ext = (extMatch?.[1] ?? "jpg").toLowerCase();
+
+    const baseDir =
+      ((FileSystem as any).cacheDirectory as string | null) ??
+      ((FileSystem as any).documentDirectory as string | null) ??
+      null;
+
+    if (!baseDir) {
+      throw new Error("No writable directory (cache/document) available");
+    }
+
+    const dest = `${baseDir}upload_${Date.now()}.${ext}`;
+
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return dest; 
+  }
+
+  return uri;
+}
+
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       try {
         const id = await getSelectedHomeId();
-
         if (!id) throw new Error("לא נבחר בית פעיל. חזרי למסך הבית ובחרי בית.");
         if (mounted) setHomeId(id);
       } catch (e: any) {
@@ -52,8 +81,10 @@ export default function ReceiptProcessingScreen() {
 
     (async () => {
       try {
+        const safeUri = await ensureFileUri(imageUri);
+
         const res = await scanReceipt(homeId, {
-          fileUri: imageUri,
+          fileUri: safeUri,
           fileName: fileName ?? null,
           mimeType: mimeType ?? null,
         });
@@ -61,13 +92,10 @@ export default function ReceiptProcessingScreen() {
         if (!isMounted) return;
 
         const payload = res?.data;
-        if (!payload) {
-          throw new Error("scanReceipt returned empty payload");
-        }
+        if (!payload) throw new Error("scanReceipt returned empty payload");
+
         setLastScannedReceipt(payload);
-
         router.replace("/receipts/review");
-
       } catch (e: any) {
         if (!isMounted) return;
         setError(e?.message ?? "Scanning failed");
@@ -132,7 +160,12 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F9FAFB" },
   gradient: { ...StyleSheet.absoluteFillObject },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  loadingRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8, marginBottom: 16 },
+  loadingRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
   loadingText: { fontSize: 13, color: "#4B5563", textAlign: "right" },
   previewBox: {
     marginTop: 8,
@@ -144,6 +177,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  previewTitle: { fontSize: 12, fontWeight: "600", color: "#111827", textAlign: "right", marginBottom: 8 },
-  previewImage: { width: "100%", height: 500, borderRadius: 12, backgroundColor: "#E5E7EB" },
+  previewTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#111827",
+    textAlign: "right",
+    marginBottom: 8,
+  },
+  previewImage: {
+    width: "100%",
+    height: 500,
+    borderRadius: 12,
+    backgroundColor: "#E5E7EB",
+  },
 });
