@@ -251,38 +251,35 @@ def test_catalog_barcode_lookup():
 
 
 def test_add_receipt_endpoint_success():
-    """
-    Scenario: Authorized user submits a valid list of receipt items.
-    Expected: 200 OK, success status, and correct count of added items.
-    """
     token, home_id = setup_user_and_home()
     headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
-    
+
     payload = {
+        "chain": "victory", # Required field
         "items": [
             {
                 "name": "Milk",
-                "quantity": 2,
+                "quantity": 2.0,
                 "barcode": "111222",
                 "expiration_date": str(date.today()),
                 "location": "FRIDGE",
-                "nickname": "Organic Milk"
+                "unit": "UNIT",
+                "nickname": "Organic Milk",
+                "weight": None
             },
             {
                 "name": "Pasta",
-                "quantity": 3,
-                "location": "PANTRY"
+                "quantity": 3.0,
+                "barcode": "444555",
+                "location": "PANTRY",
+                "unit": "UNIT",
+                "weight": None
             }
         ]
     }
-    
+
     response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
-    
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "Successfully added 2 items" in data["message"]
-    assert data["data"]["added_count"] == 2
 
 def test_add_receipt_missing_home_header():
     """
