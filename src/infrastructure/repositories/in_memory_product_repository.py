@@ -12,6 +12,10 @@ class InMemoryProductRepository(IProductRepository):
     
     async def save(self, product: Product) -> None:
         self._products_db[product.id] = product
+
+    async def save_all(self, products: List[Product]) -> None:
+        for product in products:
+            self._products_db[product.id] = product
     
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[Product]: 
         return self._products_db.get(product_id)

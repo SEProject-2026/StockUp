@@ -45,7 +45,7 @@ export function mapLocationTolocation(loc?: string | null): location {
       return "freezer";
     case "PANTRY":
       return "pantry";
-    case "CLEANING_SUPPLIES":
+    case "CLEANING":
       return "cleaning";
     case "OTHER":
     default:
@@ -63,7 +63,7 @@ export function locationToLocationType(cat: location): LocationType {
     case "pantry":
       return "PANTRY";
     case "cleaning":
-      return "CLEANING_SUPPLIES";
+      return "CLEANING";
     case "other":
     default:
       return "OTHER";

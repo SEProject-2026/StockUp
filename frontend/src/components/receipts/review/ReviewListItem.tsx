@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { BRAND, LOCATION_LABEL } from "./review.shared";
+import { BRAND, LOCATION_LABEL, needsAttention, hasWeight, formatWeightKg } from "./review.shared";
 import type { DetectedItem, LocationKey } from "./review.shared";
 
 const SHADOW = Platform.select({
@@ -10,19 +10,18 @@ const SHADOW = Platform.select({
   default: {},
 });
 
-// ✅ צבע עדין לכל מיקום (לא צורח)
 function locTone(loc: LocationKey) {
   switch (loc) {
     case "fridge":
       return { bar: "#f65a3b", soft: "#EAF2FF", line: "#CFE2FF" };
     case "freezer":
-      return { bar: "#06B6D4", soft: "#E6FBFF", line: "#BEEAF2" }; 
+      return { bar: "#06B6D4", soft: "#E6FBFF", line: "#BEEAF2" };
     case "pantry":
-      return { bar: "#F59E0B", soft: "#FFF4DE", line: "#FFE1A6" }; 
+      return { bar: "#F59E0B", soft: "#FFF4DE", line: "#FFE1A6" };
     case "cleaning":
-      return { bar: "#8B5CF6", soft: "#F1E9FF", line: "#DCCBFF" }; 
+      return { bar: "#8B5CF6", soft: "#F1E9FF", line: "#DCCBFF" };
     default:
-      return { bar: "#64748B", soft: "#EEF2F7", line: "#D9E0EA" }; 
+      return { bar: "#64748B", soft: "#EEF2F7", line: "#D9E0EA" };
   }
 }
 
@@ -39,12 +38,22 @@ export default function ReviewListItem(props: { item: DetectedItem; onPress: () 
   const { item, onPress } = props;
 
   const t = useMemo(() => locTone(item.location ?? "other"), [item.location]);
-  const unitText = item.unit ? ` ${item.unit}` : "";
-  const qtyText = `${item.quantity}${unitText}`;
+
+  const isWeighted = hasWeight(item);
+  const kgText = isWeighted ? formatWeightKg(item.weight) : null;
+
+  const attention = needsAttention(item);
+
+  // ✅ ההצעה לשקילים מגיעה מ-quantity (לפי מה שאמרת)
+  const suggestedFromQty =
+    isWeighted && Number.isFinite(item.quantity) && item.quantity > 0 ? Math.round(item.quantity) : null;
+
+  // badge ימני עליון:
+  const rightBadgeText = isWeighted ? "מוצר שקיל" : `${item.quantity}${item.unit ? ` ${item.unit}` : ""}`;
 
   return (
-    <Pressable onPress={onPress} style={styles.card}>
-      <View style={[styles.accentBar, { backgroundColor: t.bar }]} />
+    <Pressable onPress={onPress} style={[styles.card, attention && styles.cardAttention]}>
+      <View style={[styles.accentBar, { backgroundColor: attention ? "#EF4444" : t.bar }]} />
 
       <View style={styles.content}>
         <View style={styles.topRow}>
@@ -52,20 +61,39 @@ export default function ReviewListItem(props: { item: DetectedItem; onPress: () 
             {item.name}
           </Text>
 
-          <View style={styles.qtyBadge}>
-            <Text style={styles.qtyText}>{qtyText}</Text>
+          <View style={[styles.qtyBadge, attention && styles.qtyBadgeAttention]}>
+            <Text style={[styles.qtyText, attention && styles.qtyTextAttention]}>{rightBadgeText}</Text>
           </View>
         </View>
+
+        {isWeighted && (
+          <View style={styles.weightRow}>
+            <Text style={styles.weightText}>זוהה {kgText} ק״ג</Text>
+
+            <View style={{ flex: 1 }} />
+
+            <View style={[styles.unitsBadge, attention && styles.unitsBadgeAttention]}>
+              <Text style={[styles.unitsText, attention && styles.unitsTextAttention]}>
+                {item.units_count && item.units_count > 0
+                  ? `יח׳: ${item.units_count}`
+                  : suggestedFromQty
+                  ? `הצעה: ${suggestedFromQty}`
+                  : "חסרות יחידות"}
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.bottomRow}>
           <LocationPill loc={item.location ?? "other"} />
           <View style={{ flex: 1 }} />
-          <Text style={styles.hint}>לחץ לעריכה</Text>
+
+          {attention ? <Text style={styles.hintAttention}>צריך להשלים פרטים</Text> : <Text style={styles.hint}>לחץ לעריכה</Text>}
         </View>
       </View>
 
-      <View style={styles.chev}>
-        <Ionicons name="chevron-back" size={18} color={BRAND.MUTED} />
+      <View style={[styles.chev, attention && styles.chevAttention]}>
+        <Ionicons name="chevron-back" size={18} color={attention ? "#991B1B" : BRAND.MUTED} />
       </View>
     </Pressable>
   );
@@ -83,6 +111,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     ...SHADOW,
+  },
+
+  cardAttention: {
+    borderColor: "#FCA5A5",
+    backgroundColor: "#FEF2F2",
   },
 
   accentBar: {
@@ -110,19 +143,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
   },
+  qtyBadgeAttention: { backgroundColor: "#FEE2E2", borderColor: "#FCA5A5" },
   qtyText: { fontSize: 12, fontWeight: "900", color: BRAND.TEXT },
+  qtyTextAttention: { color: "#991B1B" },
 
-  bottomRow: { marginTop: 10, flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  weightRow: {
+    marginTop: 8,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+  },
+  weightText: { fontSize: 12, fontWeight: "900", color: BRAND.TEXT, textAlign: "right" },
 
-  locPill: {
+  unitsBadge: {
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
+    backgroundColor: "#F3F4F6",
+    borderColor: "#E5E7EB",
   },
+  unitsBadgeAttention: { backgroundColor: "#FEE2E2", borderColor: "#FCA5A5" },
+  unitsText: { fontSize: 12, fontWeight: "900", color: BRAND.TEXT },
+  unitsTextAttention: { color: "#991B1B" },
+
+  bottomRow: { marginTop: 10, flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+
+  locPill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1 },
   locPillText: { fontSize: 12, fontWeight: "800", color: BRAND.TEXT, textAlign: "right" },
 
   hint: { fontSize: 12, fontWeight: "700", color: BRAND.MUTED, textAlign: "right" },
+  hintAttention: { fontSize: 12, fontWeight: "900", color: "#B91C1C", textAlign: "right" },
 
   chev: {
     width: 30,
@@ -134,4 +185,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  chevAttention: { backgroundColor: "#FEE2E2", borderColor: "#FCA5A5" },
 });

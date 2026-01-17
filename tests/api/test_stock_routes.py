@@ -245,3 +245,66 @@ def test_catalog_barcode_lookup():
         
         assert data["name"] == "Scanned Bamba"
         assert data["manufacturer"] == "Osem"
+
+
+
+
+
+def test_add_receipt_endpoint_success():
+    token, home_id = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}", "X-Home-ID": home_id}
+
+    payload = {
+        "chain": "victory", # Required field
+        "items": [
+            {
+                "name": "Milk",
+                "quantity": 2.0,
+                "barcode": "111222",
+                "expiration_date": str(date.today()),
+                "location": "FRIDGE",
+                "unit": "UNIT",
+                "nickname": "Organic Milk",
+                "weight": None
+            },
+            {
+                "name": "Pasta",
+                "quantity": 3.0,
+                "barcode": "444555",
+                "location": "PANTRY",
+                "unit": "UNIT",
+                "weight": None
+            }
+        ]
+    }
+
+    response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
+    assert response.status_code == 200
+
+def test_add_receipt_missing_home_header():
+    """
+    Scenario: User is authenticated but forgets the X-Home-ID header.
+    Expected: 422 Unprocessable Entity (FastAPI header validation).
+    """
+    token, _ = setup_user_and_home()
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    payload = {"items": [{"name": "Milk", "quantity": 1}]}
+    
+    response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
+    
+    assert response.status_code == 422
+
+def test_add_receipt_unauthorized():
+    """
+    Scenario: Request without a valid Bearer token.
+    Expected: 401 Unauthorized.
+    """
+    _, home_id = setup_user_and_home()
+    headers = {"X-Home-ID": home_id}
+    
+    payload = {"items": [{"name": "Milk", "quantity": 1}]}
+    
+    response = testing_container.client.post("/stock/add-receipt", json=payload, headers=headers)
+    
+    assert response.status_code == 401

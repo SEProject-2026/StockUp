@@ -1,12 +1,14 @@
 from typing import List, Optional, Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query, File
 from sqlalchemy.orm import Session
 
+from src.domain.receipt import ReceiptDTO, ReceiptItemDTO
 from src.infrastructure.db.database import get_db
 from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
+    AddReceiptRequest,
     ProductDTO, 
     AddProductRequest,
     UpdateItemLocationRequest, 
@@ -357,4 +359,54 @@ async def scan_receipt(
         raise HTTPException(
             status_code=500,
             detail=f"Scanning failed: {str(e)}",
+        )
+    
+
+@router.post("/add-receipt", response_model=GeneralResponse)
+async def add_receipt(
+    request: AddReceiptRequest,
+    service: StockServiceDep,
+    home_id: UUID = Header(..., alias="X-Home-ID"),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Accepts confirmed receipt items from the client and adds them to inventory.
+    """
+    try:
+        # Assemble the internal ReceiptDTO from Request and Auth data
+        receipt_dto = ReceiptDTO(
+            id=uuid4(),
+            home_id=home_id,
+            user_id=user_id,
+            chain=request.chain,
+            items=[
+                ReceiptItemDTO(
+                    name=item.name,
+                    quantity=item.quantity, # Receipt scanner returns floats
+                    barcode=item.barcode,
+                    expiration_date=item.expiration_date,
+                    unit=item.unit,
+                    location=item.location,
+                    nickname=item.nickname,
+                    weight=item.weight
+                ) for item in request.items
+            ]
+        )
+        
+
+        # Process via service which delegates to add_product for upsert logic
+        processed_count = await service.add_receipt(receipt_dto)
+        
+        return GeneralResponse(
+            status="success",
+            message=f"Successfully added {processed_count} items from receipt",
+            data={"added_count": processed_count}
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"An error occurred while processing the receipt: {str(e)}"
         )

@@ -1,4 +1,5 @@
 import { authFetch } from "@/src/api/client";
+import { UnitType } from "../components/receipts/review/review.shared";
 
 export type GeneralResponse<T> = {
   status: "success" | "error";
@@ -14,7 +15,7 @@ export type LocationType =
   | "FRIDGE"
   | "FREEZER"
   | "PANTRY"
-  | "CLEANING_SUPPLIES"
+  | "CLEANING"
   | "OTHER";
 
 export type ExpirationType = "FRESH" | "GOING_TO_EXPIRE" | "EXPIRED";
@@ -24,16 +25,19 @@ export type ExpirationType = "FRESH" | "GOING_TO_EXPIRE" | "EXPIRED";
 // ----------------------
 
 export type ProductItemDTO = {
-  id: string; 
+  id: string;
   quantity: number;
-  expiration_date: string | null; // date => "YYYY-MM-DD"
+  expiration_date: string | null; // "YYYY-MM-DD"
   location: LocationType;
   status: ExpirationType;
+
+  // (Optional future improvement)
+  // unit?: UnitType;
 };
 
 export type ProductDTO = {
   id: string;
-  home_id: string; 
+  home_id: string;
   original_name: string;
   nickname?: string | null;
   barcode?: string | null;
@@ -53,8 +57,9 @@ function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) 
   };
 
   const bodyIsString = typeof options.body === "string";
-  const hasContentType =
-    Object.keys(headers).some((k) => k.toLowerCase() === "content-type");
+  const hasContentType = Object.keys(headers).some(
+    (k) => k.toLowerCase() === "content-type"
+  );
 
   if (bodyIsString && !hasContentType) {
     headers["Content-Type"] = "application/json";
@@ -72,7 +77,7 @@ export type AddProductPayload = {
   quantity: number;
   expiration_date?: string | null; // "YYYY-MM-DD"
   barcode?: string | null;
-  location?: LocationType; 
+  location?: LocationType;
   nickname?: string | null;
 };
 
@@ -90,14 +95,14 @@ export async function getAllStock(homeId: string) {
 }
 
 // ----------------------
-// Item-level updates (match backend routes)
+// Item-level updates
 // ----------------------
 
 export async function updateItemQuantity(
   homeId: string,
   productId: string,
   itemId: string,
-  payload: { new_quantity: number } 
+  payload: { new_quantity: number }
 ) {
   return stockFetch<GeneralResponse<ProductDTO | null>>(
     homeId,
@@ -113,7 +118,7 @@ export async function updateItemExpiration(
   homeId: string,
   productId: string,
   itemId: string,
-  payload: { new_date: string | null } 
+  payload: { new_date: string | null }
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,
@@ -129,7 +134,7 @@ export async function updateItemLocation(
   homeId: string,
   productId: string,
   itemId: string,
-  payload: { location: LocationType } 
+  payload: { location: LocationType }
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,
@@ -142,13 +147,13 @@ export async function updateItemLocation(
 }
 
 // ----------------------
-// ✅ Product-level nickname (match backend)
+// Product-level nickname
 // ----------------------
 
 export async function updateProductNickname(
   homeId: string,
   productId: string,
-  payload: { nickname: string } 
+  payload: { nickname: string }
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,
@@ -161,7 +166,7 @@ export async function updateProductNickname(
 }
 
 // ----------------------
-// ✅ Remove item (match backend)
+// Remove item
 // ----------------------
 
 export async function removeItem(homeId: string, productId: string, itemId: string) {
@@ -173,7 +178,7 @@ export async function removeItem(homeId: string, productId: string, itemId: stri
 }
 
 // ----------------------
-// Search & Filter (GET) - match backend
+// Search & Filter (GET)
 // ----------------------
 
 export async function searchStock(homeId: string, query: string) {
@@ -218,8 +223,9 @@ export type DetectedReceiptItemDTO = {
   barcode: string;
   name: string;
   quantity: number;
-  unit: string;
+  unit: UnitType;
   storage_location?: Storagelocation | null;
+
 };
 
 export type ReceiptDTO = {
@@ -247,7 +253,8 @@ export async function scanReceipt(
     (isProbablyImage(params.mimeType) ? "receipt.jpg" : "receipt.pdf");
 
   const mimeType =
-    params.mimeType ?? (fileName.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+    params.mimeType ??
+    (fileName.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
 
   const form = new FormData();
   form.append("file", {
@@ -259,5 +266,57 @@ export async function scanReceipt(
   return stockFetch<GeneralResponse<ReceiptDTO>>(homeId, "/stock/scan", {
     method: "POST",
     body: form,
+  });
+}
+
+// ----------------------
+// ✅ Add from receipt (UPDATED RESPONSE TYPES)
+// ----------------------
+
+export type ReceiptItemRequestDTO = {
+  name: string;
+  quantity: number; // float
+  barcode?: string | null;
+  expiration_date?: string | null; // "YYYY-MM-DD"
+  location?: LocationType | null;
+  nickname?: string | null;
+  unit?: UnitType; // KG / GR / UNIT / ...
+  weight?: number | null; 
+};
+
+export type AddReceiptRequest = {
+  items: ReceiptItemRequestDTO[];
+  chain?: string | null;
+};
+
+export type AddedReceiptItemDTO = {
+  index: number; // index in request.items
+  name: string;
+  barcode?: string | null;
+
+  detected_quantity: number;
+  detected_unit: UnitType;
+
+  product_id: string;
+  item_id: string;
+
+  stored_quantity: number;
+  stored_unit: UnitType;
+  
+};
+
+export type AddReceiptResponseData = {
+  added_count: number;
+  items: AddedReceiptItemDTO[]; 
+};
+
+export async function addReceipt(homeId: string, payload: AddReceiptRequest) {
+  return authFetch<GeneralResponse<AddReceiptResponseData>>("/stock/add-receipt", {
+    method: "POST",
+    headers: {
+      "X-Home-ID": homeId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 }

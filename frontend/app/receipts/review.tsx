@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 import { getSelectedHomeId } from "../home/selected-home";
-import { addProduct } from "@/src/api/stock";
+import { addReceipt } from "@/src/api/stock";
 import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";
 import { consumeLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
 
@@ -24,11 +24,13 @@ import ReviewHeader from "@/src/components/receipts/review/ReviewHeader";
 import ReviewListItem from "@/src/components/receipts/review/ReviewListItem";
 import ReviewFooter from "@/src/components/receipts/review/ReviewFooter";
 import EditItemModal from "@/src/components/receipts/review/modals/EditItemModal";
+import { UnitType } from "@/src/components/receipts/review/review.shared";
 
 import {
   BRAND,
   type DetectedItem,
   type LocationKey,
+  needsAttention,
   parseReceiptParam,
   mapReceiptToDetectedItems,
   storagelocationToLocationType,
@@ -72,6 +74,13 @@ export default function ReceiptReviewDetectedProductsScreen() {
     [receiptFromParam]
   );
 
+  const receiptChain = useMemo(() => {
+  const inner = (receiptObj as any)?.data?.receipt ?? (receiptObj as any)?.data ?? receiptObj;
+  const chain = inner?.chain ?? null;
+  return chain ? String(chain) : null;
+  }, [receiptObj]);
+
+
   const [items, setItems] = useState<DetectedItem[]>([]);
   const [editItem, setEditItem] = useState<DetectedItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -94,6 +103,8 @@ export default function ReceiptReviewDetectedProductsScreen() {
           name: d.name,
           nickname: d.nickname ?? undefined,
           quantity: Number.isFinite(d.quantity) && d.quantity > 0 ? d.quantity : 1,
+          unit: d.unit ?? UnitType.UNIT, 
+          weight: null,           
           location: (d.location as any) ?? "other",
           storage_location: (d.location as any) ?? "other",
           barcode: d.barcode ?? undefined,
@@ -133,8 +144,14 @@ export default function ReceiptReviewDetectedProductsScreen() {
     router.push({ pathname: "/inventory/add-item", params: { mode: "receipt-review" } });
   }, []);
 
-  // ✅ FIX: addProduct payload כולל nickname/barcode/expiration_date/location enum
+  const hasBlocking = useMemo(() => items.some(needsAttention), [items]);
+
   const onConfirmAddAll = useCallback(async () => {
+    if (hasBlocking) {
+      Alert.alert("חסרים פרטים", "יש שורות אדומות שדורשות השלמה/אישור לפני הוספה למלאי.");
+      return;
+    }
+
     if (saving) return;
 
     if (items.length === 0) {
@@ -142,16 +159,19 @@ export default function ReceiptReviewDetectedProductsScreen() {
       return;
     }
 
-    const payload = items.map((x: any) => ({
+    const receiptItems = items.map((x: any) => ({
       name: String(x.name ?? "").trim(),
-      quantity: Number.isFinite(x.quantity) ? x.quantity : 1,
       barcode: x.barcode ? String(x.barcode) : null,
       nickname: x.nickname ? String(x.nickname).trim() : null,
       expiration_date: toIsoDateOnly(x.expiration_date ?? null),
       location: storagelocationToLocationType(x.location ?? x.storage_location ?? "other"),
+      quantity: x.quantity,
+      unit: x.unit ?? "UNIT",
+      weight: x.weight ?? null,
     }));
 
-    const bad = payload.find((p) => !p.name || p.quantity <= 0);
+
+    const bad = receiptItems.find((p) => !p.name || p.quantity <= 0);
     if (bad) {
       Alert.alert("שגיאה", "ודאו שלכל מוצר יש שם וכמות תקינה.");
       return;
@@ -166,34 +186,31 @@ export default function ReceiptReviewDetectedProductsScreen() {
         Alert.alert("שגיאה", "לא נבחר בית פעיל. חזרו ובחרו בית.");
         return;
       }
+      const res = await addReceipt(homeId, {chain: receiptChain, items: receiptItems,});
 
-      // const results = await Promise.allSettled(payload.map((p) => addProduct(homeId!, p)));
+      if (res.status === "success") {
+        const added = res.data?.added_count ?? receiptItems.length;
 
-      // const ok = results.filter((r) => r.status === "fulfilled").length;
-      // const failed = results.length - ok;
+        Alert.alert("התווסף!", `נוספו ${added} פריטים למלאי המרכזי.`, [
+          {
+            text: "אישור",
+            onPress: () => {
+              if (homeId) {
+                router.replace({ pathname: "/home/[homeId]", params: { homeId } });
+              }
+            },
+          },
+        ]);
+        return;
+      }
 
-      // if (failed === 0) {
-      //   Alert.alert("התווסף!", "כל המוצרים הוכנסו למלאי המרכזי.", [
-      //     {
-      //       text: "אישור",
-      //       onPress: () => {
-      //         router.replace({ pathname: "/home/[homeId]", params: { homeId: homeId! } });
-      //       },
-      //     },
-      //   ]);
-      //   return;
-      // }
-
-      // Alert.alert("נוספו חלקית", `נוספו ${ok} מוצרים, נכשלו ${failed}.`);
+      Alert.alert("נכשל", res.message ?? "לא הצלחנו להוסיף למלאי. נסו שוב.");
     } catch (e: any) {
       Alert.alert("נכשל", e?.message ?? "לא הצלחנו להוסיף למלאי. נסו שוב.");
     } finally {
       setSaving(false);
-      if (homeId) {
-        router.replace({ pathname: "/home/[homeId]", params: { homeId } });
-      }
     }
-  }, [items, saving]);
+  },[items, saving, hasBlocking]);
 
   const renderItem = useCallback(
     ({ item }: { item: DetectedItem }) => (
@@ -240,7 +257,7 @@ export default function ReceiptReviewDetectedProductsScreen() {
 
         <ReviewFooter
           saving={saving}
-          disabled={items.length === 0 || saving}
+          disabled={items.length === 0 || saving || hasBlocking}
           onConfirm={onConfirmAddAll}
         />
 

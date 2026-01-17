@@ -22,6 +22,7 @@ from src.infrastructure.repositories.in_memory_product_repository import InMemor
 
 # --- Catalog ---
 from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
+from src.infrastructure.repositories.db_catalog_provider import DbCatalogProvider
 
 class AppContainer:
     """
@@ -43,13 +44,24 @@ class AppContainer:
         return AppContainer._auth_provider_instance
 
     @staticmethod
-    def get_catalog_provider():
+    def get_catalog_provider(db: Optional[Session] = None):
+        """
+        Returns a Catalog Provider.
+        - If 'db' is provided: Returns DbCatalogProvider (Production/System).
+        - If 'db' is None: Returns CsvCatalogProvider (Testing/Local).
+        """
+        if AppContainer._catalog_provider_instance is not None:
+            return AppContainer._catalog_provider_instance
+        # 1. Production (Database)
+        #if db:
+         #   _catalog_provider_instance= DbCatalogProvider(db)
+
+        # 2. Testing/Fallback (CSV)
         if AppContainer._catalog_provider_instance is None:
             project_root = Path(__file__).resolve().parents[2]
             csv_path = project_root / "src" / "data" / "master_db.csv"
 
             if not csv_path.exists():
-                # Fallback if running from a different directory
                 alt = project_root / "data" / "master_db.csv"
                 if alt.exists():
                     csv_path = alt
@@ -81,7 +93,7 @@ class AppContainer:
 
     @staticmethod
     def get_stock_service(db: Optional[Session] = None) -> StockService:
-        catalog = AppContainer.get_catalog_provider()
+        catalog = AppContainer.get_catalog_provider(db)
 
         # Production (DB)
         if db:

@@ -10,7 +10,7 @@ class LocationType(str, Enum):
     FRIDGE = "FRIDGE"         
     FREEZER = "FREEZER"
     PANTRY = "PANTRY"
-    CLEANING_SUPPLIES = "CLEANING_SUPPLIES"
+    CLEANING = "CLEANING"
     OTHER = "OTHER"
 
 class UnitType(str, Enum):

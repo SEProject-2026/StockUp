@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
+from src.domain.smart_home.enums import LocationType
+
 # === DTO (Data Transfer Object) ===
 class CatalogItem(BaseModel):
     """
@@ -12,7 +14,9 @@ class CatalogItem(BaseModel):
     name: str
     manufacturer: Optional[str] = None
     chain_source: str = "GLOBAL"  # Used for internal logic/debugging
-    storage_location: Optional[str] = None
+    location: Optional[LocationType] = LocationType.OTHER
+    weight: Optional[float] = None  
+    sample_size: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,4 +59,21 @@ class ICatalogProvider(ABC):
         """
         Performs a text-based search for products (e.g., for autocomplete).
         """
+        pass
+
+    @abstractmethod
+    def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
+        """
+        Updates the in-memory weighted average for a product's weight.
+        This does not persist changes to the underlying data source.
+
+        Args:
+            barcode: The barcode of the product to update.
+            chain_name: The retail chain context.
+            measured_weight: The new weight measurement to incorporate.
+        """
+        pass
+    @abstractmethod
+    def persist(self):
+        """Persists all changes made in memory/session to the underlying storage."""
         pass

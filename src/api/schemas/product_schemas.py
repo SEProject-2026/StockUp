@@ -2,7 +2,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 from typing import List, Optional, Any
 from datetime import date
-from src.domain.smart_home.enums import LocationType, ExpirationType
+from src.domain.receipt import ReceiptItemDTO
+from src.domain.smart_home.enums import LocationType, ExpirationType, UnitType
 
 # ==========================================
 # Response Models (DTOs)
@@ -10,7 +11,7 @@ from src.domain.smart_home.enums import LocationType, ExpirationType
 
 class ProductItemDTO(BaseModel):
     id: UUID
-    quantity: int
+    quantity: float
     expiration_date: Optional[date]
     location: LocationType        
     status: ExpirationType        
@@ -24,7 +25,7 @@ class ProductDTO(BaseModel):
     nickname: Optional[str] = None
     barcode: Optional[str] = None
     
-    total_quantity: int           
+    total_quantity: float           
     items: List[ProductItemDTO] = []
     
     model_config = ConfigDict(from_attributes=True)
@@ -105,7 +106,6 @@ class UpdateProductNicknameRequest(BaseModel):
         ..., 
         min_length=2, 
         max_length=50, 
-        strip_whitespace=True, 
         description="New nickname cannot be empty"
     )
 
@@ -114,3 +114,20 @@ class UpdateItemLocationRequest(BaseModel):
         ..., 
         description="New location from the allowed enum values"
     )
+
+
+
+class ReceiptItem(BaseModel):
+    name: str = Field(..., min_length=2)
+    quantity: float = Field(..., gt=0)
+    barcode: Optional[str] = None
+    expiration_date: Optional[date] = None
+    location: LocationType = LocationType.OTHER
+    unit:UnitType = UnitType.UNIT
+    nickname: Optional[str] = None
+    weight: Optional[float] = None
+    
+
+class AddReceiptRequest(BaseModel):
+    chain:str
+    items: List[ReceiptItem]

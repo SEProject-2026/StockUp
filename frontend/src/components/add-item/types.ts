@@ -17,7 +17,7 @@ export const locationMap: Record<location, LocationType> = {
   fridge: "FRIDGE",
   freezer: "FREEZER",
   pantry: "PANTRY",
-  cleaning: "CLEANING_SUPPLIES",
+  cleaning: "CLEANING",
   other: "OTHER",
 };
 
@@ -25,7 +25,7 @@ export const apiLocationToUi: Record<LocationType, location> = {
   FRIDGE: "fridge",
   FREEZER: "freezer",
   PANTRY: "pantry",
-  CLEANING_SUPPLIES: "cleaning",
+  CLEANING: "cleaning",
   OTHER: "other",
 };
 
@@ -42,7 +42,7 @@ export function routeTolocation(locationParam?: string): location {
   if (c === "fridge") return "fridge";
   if (c === "freezer") return "freezer";
   if (c === "pantry") return "pantry";
-  if (c === "cleaning" || c === "cleaning_supplies") return "cleaning";
+  if (c === "cleaning") return "cleaning";
   if (c === "other") return "other";
   return "fridge";
 }

@@ -37,7 +37,7 @@ function locationTolocation(loc?: string | null): location {
       return "freezer";
     case "PANTRY":
       return "pantry";
-    case "CLEANING_SUPPLIES":
+    case "CLEANING":
       return "cleaning";
     case "OTHER":
     default:
