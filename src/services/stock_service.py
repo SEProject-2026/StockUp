@@ -67,10 +67,11 @@ class StockService:
 
         if not isinstance(file_path, (str, os.PathLike)):
             raise TypeError(f"file_path must be a path string, got: {type(file_path)}")
-
+        print(f"Scanning receipt from file: {file_path}")
         scanner = ReceiptScanner()
         chain_name, scanned_items = scanner.parse_receipt(str(file_path))
-
+        print(f"Scanned items: {scanned_items}")
+        print(f"Chain name: {chain_name}")
         receipt_items_dto: list[ReceiptItemDTO] = []
         for barcode, (qty, unit_str) in scanned_items.items():
             # Mapping scanner unit string to UnitType Enum

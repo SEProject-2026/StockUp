@@ -324,18 +324,40 @@ async def get_global_product_by_barcode(
 
 @router.post("/scan", response_model=GeneralResponse)
 async def scan_receipt(
-    service: StockServiceDep, # <--- Injected Service
+    service: StockServiceDep,
     file: UploadFile = File(...),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
         import tempfile, shutil, os
+        from datetime import datetime
+        from pathlib import Path
+
+        # 1. Define an absolute path for the debug directory
+        # This points to the folder where this script is located
+        base_path = Path(__file__).resolve().parent.parent.parent # Adjust levels to reach project root
+        upload_dir = base_path / "debug_uploads"
+        
+        # 2. Create directory if it doesn't exist
+        if not upload_dir.exists():
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Created debug directory at: {upload_dir}")
 
         suffix = os.path.splitext(file.filename or "")[1] or ".bin"
+        
+        # 3. Handle the temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp_path = tmp.name
             shutil.copyfileobj(file.file, tmp)
+
+        # 4. Create the permanent copy using absolute path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        permanent_file_name = f"{timestamp}_{file.filename}"
+        permanent_path = upload_dir / permanent_file_name
+        
+        shutil.copy2(tmp_path, str(permanent_path))
+        print(f"FILE SAVED PERMANENTLY AT: {permanent_path}")
 
         try:
             result = await service.scan_receipt(
@@ -350,17 +372,19 @@ async def scan_receipt(
             )
 
         finally:
+            # Cleanup only the system temp file
             try:
-                os.remove(tmp_path)
-            except:
-                pass
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception as e:
+                print(f"Cleanup error: {e}")
 
     except Exception as e:
+        print(f"CRITICAL ERROR: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Scanning failed: {str(e)}",
         )
-    
 
 @router.post("/add-receipt", response_model=GeneralResponse)
 async def add_receipt(

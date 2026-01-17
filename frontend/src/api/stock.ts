@@ -1,3 +1,5 @@
+// ✅ src/api/stock.ts (UPDATED: fixes image/pdf inference + removes all scanReceipt logs)
+
 import { authFetch } from "@/src/api/client";
 import { UnitType } from "../components/receipts/review/review.shared";
 
@@ -30,9 +32,6 @@ export type ProductItemDTO = {
   expiration_date: string | null; // "YYYY-MM-DD"
   location: LocationType;
   status: ExpirationType;
-
-  // (Optional future improvement)
-  // unit?: UnitType;
 };
 
 export type ProductDTO = {
@@ -61,6 +60,7 @@ function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) 
     (k) => k.toLowerCase() === "content-type"
   );
 
+  // ✅ Only set JSON content-type for string bodies (FormData must NOT be forced)
   if (bodyIsString && !hasContentType) {
     headers["Content-Type"] = "application/json";
   }
@@ -209,7 +209,7 @@ export async function filterStockByExpiration(homeId: string, type: ExpirationTy
 }
 
 // ----------------------
-// Receipt scan (unchanged)
+// Receipt scan (FIXED: infer type/name from URI when null)
 // ----------------------
 
 export type Storagelocation =
@@ -225,7 +225,6 @@ export type DetectedReceiptItemDTO = {
   quantity: number;
   unit: UnitType;
   storage_location?: Storagelocation | null;
-
 };
 
 export type ReceiptDTO = {
@@ -236,8 +235,23 @@ export type ReceiptDTO = {
   items: DetectedReceiptItemDTO[];
 };
 
-function isProbablyImage(mimeType?: string | null) {
-  return !!mimeType && mimeType.startsWith("image/");
+function cleanUri(uri: string) {
+  return uri.split("?")[0].split("#")[0];
+}
+
+function inferMimeFromUri(uri: string): string | null {
+  const u = cleanUri(uri).toLowerCase();
+  if (u.endsWith(".pdf")) return "application/pdf";
+  if (u.endsWith(".jpg") || u.endsWith(".jpeg")) return "image/jpeg";
+  if (u.endsWith(".png")) return "image/png";
+  if (u.endsWith(".heic")) return "image/heic";
+  return null;
+}
+
+function inferNameFromUri(uri: string): string | null {
+  const clean = cleanUri(uri);
+  const last = clean.split("/").pop();
+  return last && last.length > 0 ? last : null;
 }
 
 function getExtFromUri(uri?: string | null) {
@@ -290,7 +304,7 @@ export async function scanReceipt(
 
 
 // ----------------------
-// ✅ Add from receipt (UPDATED RESPONSE TYPES)
+// ✅ Add from receipt
 // ----------------------
 
 export type ReceiptItemRequestDTO = {
@@ -301,7 +315,7 @@ export type ReceiptItemRequestDTO = {
   location?: LocationType | null;
   nickname?: string | null;
   unit?: UnitType; // KG / GR / UNIT / ...
-  weight?: number | null; 
+  weight?: number | null;
 };
 
 export type AddReceiptRequest = {
@@ -310,7 +324,7 @@ export type AddReceiptRequest = {
 };
 
 export type AddedReceiptItemDTO = {
-  index: number; // index in request.items
+  index: number;
   name: string;
   barcode?: string | null;
 
@@ -322,12 +336,11 @@ export type AddedReceiptItemDTO = {
 
   stored_quantity: number;
   stored_unit: UnitType;
-  
 };
 
 export type AddReceiptResponseData = {
   added_count: number;
-  items: AddedReceiptItemDTO[]; 
+  items: AddedReceiptItemDTO[];
 };
 
 export async function addReceipt(homeId: string, payload: AddReceiptRequest) {
