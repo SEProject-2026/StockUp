@@ -45,3 +45,8 @@ class ChainType(Enum):
     MAAYAN_2000 = 24
     KING_STORE = 25
     OTHER = 99
+
+class OCRMode(str, Enum):
+    DIGITAL_PDF = "DIGITAL_PDF"
+    SCANNED_PDF = "SCANNED_PDF"
+    IMAGE = "IMAGE"
