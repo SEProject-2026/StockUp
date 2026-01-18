@@ -6,10 +6,10 @@ from uuid import uuid4
 scanner = ReceiptScanner()
 
 # file_path1 = r'tests\unit\8306975.pdf'
-file_path1 = r'tests\unit\receipt5_pic1.jpeg'
-file_path2 = r'tests\unit\receipt5_pic2.jpeg'
+file_path1 = r'tests\unit\victory_receipt.jpeg'
+# file_path2 = r'tests\unit\receipt5_pic2.jpeg'
 
-chain_name, products = scanner.parse_receipt(file_path1, file_path2)
+chain_name, products = scanner.parse_receipt(file_path1)
 
 print(f"--- RECEIPT: {chain_name} ---")
 print(f"{'Barcode':<20} | {'Qty':<5} | {'Unit':<5}")

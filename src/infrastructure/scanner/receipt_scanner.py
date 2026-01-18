@@ -538,7 +538,7 @@ class ReceiptScanner:
         products = []
         header_lines = []
 
-        header_keywords = ["שם פריט", "ברקוד", "כמות", "מחיר", "ש. פריט", "מידה", "תיאור", "הנחה", "ריחמ", "פריט", "תאור", "קוד"]
+        header_keywords = ["שם פריט", "ברקוד", "כמות", "מחיר", "ש. פריט", "מידה", "תיאור", "הנחה", "ריחמ", "פריט", "תאור", "קוד", "קבלה"]
         global_skip_keywords = [
             "רשת חנויות", "עוסק מורשה", "טלפון", "פקס", "דואר אלקטרוני",
             "חשבונית", "העתק", "לכבוד", "בגין הזמנה", "תאריך", "שעה",
@@ -695,7 +695,7 @@ class ReceiptScanner:
                 full_line_text = " ".join(reversed_row_list)
 
                 # הדפסה לדיבוג (כדי שתראה מה נכנס)
-                # print(f"DEBUG RAW: {full_line_text}")
+                print(f"DEBUG RAW: {full_line_text}")
 
                 if not chain_name_found:
                     ch = self._chain_name_in_line(full_line_text)
@@ -799,12 +799,13 @@ class ReceiptScanner:
                 for match in long_bc_iterator:
                     candidate = match.group(1)
                     # בדיקה שהברקוד תקין (EAN13)
+                    leni = len(candidate)
                     if len(candidate) < 13:
                         candidate = '729' + '0' * (10 - len(candidate)) + candidate
                     if len(candidate) > 13:
                         continue
                     if candidate.isdigit() and self.validate_ean13(candidate):
-                        extracted_barcode = candidate
+                        extracted_barcode = candidate[-leni:]  # מחזירים את הברקוד המקורי (בלי התוספות)
                         break  # מצאנו ברקוד תקין! עוצרים את החיפוש
 
                 # --- שלב 2: חיפוש ברקוד קצר (רק אם לא נמצא ארוך) ---
@@ -821,7 +822,7 @@ class ReceiptScanner:
 
                 
                 # 2. חילוץ משקל/יחידה
-                keywords_pattern = r"(?:יחידה|הדיחי)"
+                keywords_pattern = r"(?:יחידה|הדיחי|ליחידה)"
         
                 pattern = rf"""
                 (            
@@ -847,7 +848,7 @@ class ReceiptScanner:
                     # print(f"Found: {extracted_qty}")
                     
 
-                if any(w in full_product_string for w in['ק"ג', 'ג"ק', "ג'ק", "ק'ג"]):
+                if any(w in full_product_string for w in['ק"ג', 'ג"ק', "ג'ק", "ק'ג", 'לק"ג']):
                 # elif "קג" in full_product_string or 'ק"ג' in full_product_string:
                     extracted_unit = "KG"
                 # אם יש נקודה עשרונית עם 3 ספרות (0.716) זה בדרך כלל המשקל
@@ -916,7 +917,6 @@ class ReceiptScanner:
             "סופר קופיקס": "Super Cofix",
             "שופרסל": "shufersal",
             "Be": "Be",
-            "שוק העיר": "Shouk HaIr",
             "שפע ברכת השם": "Shefa Birkat Hashem",
         }
         for chain in retail_chains_map.keys():
