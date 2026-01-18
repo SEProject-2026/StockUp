@@ -695,7 +695,7 @@ class ReceiptScanner:
                 full_line_text = " ".join(reversed_row_list)
 
                 # הדפסה לדיבוג (כדי שתראה מה נכנס)
-                print(f"DEBUG RAW: {full_line_text}")
+                # print(f"DEBUG RAW: {full_line_text}")
 
                 if not chain_name_found:
                     ch = self._chain_name_in_line(full_line_text)
