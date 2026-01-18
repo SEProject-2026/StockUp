@@ -58,34 +58,50 @@ class StockService:
         
     
     async def scan_receipt(
-    self,
-    user_id: UUID,
-    home_id: UUID,
-    file_path: str,                 
-):
+        self,
+        user_id: UUID,
+        home_id: UUID,
+        files_paths: List[str],  
+    ):
         await self._check_access(user_id, home_id)
 
-        if not isinstance(file_path, (str, os.PathLike)):
-            raise TypeError(f"file_path must be a path string, got: {type(file_path)}")
-        print(f"Scanning receipt from file: {file_path}")
+        if not isinstance(files_paths, list) or not files_paths:
+            raise ValueError("files_paths must be a non-empty list of file paths")
+
+        if not all(isinstance(fp, (str, os.PathLike)) for fp in files_paths):
+            raise TypeError("files_paths must contain only path strings")
+
+        valid_paths = [str(fp) for fp in files_paths if fp and os.path.exists(str(fp))]
+        if not valid_paths:
+            raise ValueError("No valid files found in files_paths")
+
+        print(f"Scanning receipt from files: {valid_paths}")
+
         scanner = ReceiptScanner()
-        chain_name, scanned_items = scanner.parse_receipt(str(file_path))
+
+        # IMPORTANT: parse_receipt expects (first_path, *other_paths)
+        first = valid_paths[0]
+        rest = valid_paths[1:]
+        chain_name, scanned_items = scanner.parse_receipt(first, *rest)
+
         print(f"Scanned items: {scanned_items}")
         print(f"Chain name: {chain_name}")
+
         receipt_items_dto: list[ReceiptItemDTO] = []
+
         for barcode, (qty, unit_str) in scanned_items.items():
             # Mapping scanner unit string to UnitType Enum
             unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
             ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
-            
+
             if ci:
-                # If item is weighted, we provide the historical average weight per unit
                 avg_unit_weight = 1
-                if unit==UnitType.KG:
-                    avg_unit_weight = ci.weight           
-                    new_qty=qty/avg_unit_weight if avg_unit_weight else 1
+                if unit == UnitType.KG:
+                    avg_unit_weight = ci.weight
+                    new_qty = qty / avg_unit_weight if avg_unit_weight else 1
                 else:
-                    new_qty=qty
+                    new_qty = qty
+
                 receipt_items_dto.append(
                     ReceiptItemDTO(
                         barcode=barcode,
@@ -93,7 +109,7 @@ class StockService:
                         quantity=int(new_qty),
                         unit=unit,
                         location=ci.location,
-                        weight=qty if unit==UnitType.KG else None,
+                        weight=qty if unit == UnitType.KG else None,
                     )
                 )
             else:
@@ -101,7 +117,7 @@ class StockService:
                     ReceiptItemDTO(
                         name="Unknown Product",
                         barcode=barcode,
-                        quantity=int(qty) if unit==UnitType.UNIT else 1,
+                        quantity=int(qty) if unit == UnitType.UNIT else 1,
                         unit=unit,
                     )
                 )

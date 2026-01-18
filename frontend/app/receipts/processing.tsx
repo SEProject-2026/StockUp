@@ -1,5 +1,5 @@
 // frontend/app/processing.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Image, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -10,23 +10,10 @@ import ScreenHeader from "@/src/layout/ScreenHeader";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 
 import { getSelectedHomeId } from "../home/selected-home";
-import { scanReceipt } from "@/src/api/stock";
+import { scanReceiptMulti } from "@/src/api/stock";
 import { setLastScannedReceipt } from "@/src/context/receipt-scan-store";
 
 import * as FileSystem from "expo-file-system";
-
-export default function ReceiptProcessingScreen() {
-  const router = useRouter();
-
-  const { imageUri, fileName, mimeType } = useLocalSearchParams<{
-    imageUri?: string;
-    fileName?: string;
-    mimeType?: string;
-  }>();
-
-  const [homeId, setHomeId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [started, setStarted] = useState(false);
 
 async function ensureFileUri(uri: string): Promise<string> {
   if (!uri) return uri;
@@ -43,18 +30,50 @@ async function ensureFileUri(uri: string): Promise<string> {
       ((FileSystem as any).documentDirectory as string | null) ??
       null;
 
-    if (!baseDir) {
-      throw new Error("No writable directory (cache/document) available");
-    }
+    if (!baseDir) throw new Error("No writable directory (cache/document) available");
 
     const dest = `${baseDir}upload_${Date.now()}.${ext}`;
-
     await FileSystem.copyAsync({ from: uri, to: dest });
-    return dest; 
+    return dest;
   }
 
   return uri;
 }
+
+function safeJsonParseArray(maybeJson?: string): string[] | null {
+  if (!maybeJson) return null;
+  try {
+    const parsed = JSON.parse(maybeJson);
+    if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export default function ReceiptProcessingScreen() {
+  const router = useRouter();
+
+  const params = useLocalSearchParams<{
+    imageUris?: string; // JSON string array
+    imageUri?: string;  // legacy fallback
+  }>();
+
+  const [homeId, setHomeId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [currentPreviewUri, setCurrentPreviewUri] = useState<string | null>(null);
+
+  const [runKey, setRunKey] = useState(0);
+
+  const imageUris: string[] = useMemo(() => {
+    const parsed = safeJsonParseArray(params.imageUris);
+    if (parsed && parsed.length) return parsed;
+    if (params.imageUri) return [params.imageUri];
+    return [];
+  }, [params.imageUris, params.imageUri]);
 
   useEffect(() => {
     let mounted = true;
@@ -75,42 +94,54 @@ async function ensureFileUri(uri: string): Promise<string> {
   }, []);
 
   useEffect(() => {
-    if (!homeId || !imageUri) return;
+    if (!homeId) return;
+    if (imageUris.length === 0) return;
 
     let isMounted = true;
 
     (async () => {
+      setError(null);
+      setIsRunning(true);
+      setTotal(imageUris.length);
+      setCurrentPreviewUri(imageUris[0] ?? null);
+
       try {
-        const safeUri = await ensureFileUri(imageUri);
+        const safeUris: string[] = [];
+        for (const uri of imageUris) {
+          safeUris.push(await ensureFileUri(uri));
+        }
+        if (!isMounted) return;
 
-        const res = await scanReceipt(homeId, {
-          fileUri: safeUri,
-          fileName: fileName ?? null,
-          mimeType: mimeType ?? null,
-        });
-
+        const res = await scanReceiptMulti(homeId, { fileUris: safeUris });
         if (!isMounted) return;
 
         const payload = res?.data;
-        if (!payload) throw new Error("scanReceipt returned empty payload");
+        if (!payload) throw new Error("scanReceiptMulti returned empty payload");
+
+        (payload as any)._sourceImages = imageUris;
 
         setLastScannedReceipt(payload);
         router.replace("/receipts/review");
       } catch (e: any) {
         if (!isMounted) return;
         setError(e?.message ?? "Scanning failed");
+      } finally {
+        if (isMounted) setIsRunning(false);
       }
     })();
 
     return () => {
       isMounted = false;
     };
-  }, [homeId, imageUri]);
+  }, [homeId, runKey, imageUris.join("|")]);
 
   const onRetry = () => {
     setError(null);
-    setStarted(false);
+    setRunKey((k) => k + 1);
   };
+
+  const progressText =
+    total > 0 ? `מעלה ומעבד ${total} תמונות...` : "מעבד...";
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -128,13 +159,15 @@ async function ensureFileUri(uri: string): Promise<string> {
           <>
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color="#0284C7" />
-              <Text style={styles.loadingText}>קורא את הקבלה ומזהה את הפריטים...</Text>
+              <Text style={styles.loadingText}>
+                {progressText} קורא ומזהה את הפריטים...
+              </Text>
             </View>
 
-            {imageUri && (
+            {currentPreviewUri && (
               <View style={styles.previewBox}>
-                <Text style={styles.previewTitle}>תמונה שעובדה:</Text>
-                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                <Text style={styles.previewTitle}>דוגמה לתמונה שנשלחה:</Text>
+                <Image source={{ uri: currentPreviewUri }} style={styles.previewImage} />
               </View>
             )}
 
@@ -147,7 +180,11 @@ async function ensureFileUri(uri: string): Promise<string> {
           <>
             <InfoBox icon="warning-outline" text={`שגיאה בסריקה: ${error}`} />
             <View style={{ marginTop: 16 }}>
-              <PrimaryButton title="נסה שוב" onPress={onRetry} />
+              <PrimaryButton
+                title={isRunning ? "מנסה שוב..." : "נסה שוב"}
+                onPress={onRetry}
+                disabled={isRunning}
+              />
             </View>
           </>
         )}
