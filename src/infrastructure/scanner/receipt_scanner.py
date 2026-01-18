@@ -487,6 +487,7 @@ class ReceiptScanner:
                     row_list.append(cleaned_word)
             
             full_line_text = " ".join(row_list)
+            # print(f"DEBUG RAW (ENG): {full_line_text}")
             # see if a '-' is near to a number (to skip hyphenated lines)
             if re.match(r'.*\d+\s*-\s*\d+.*', full_line_text):
                 # print(f"    Skipping hyphenated line: {full_line_text}")
@@ -688,17 +689,20 @@ class ReceiptScanner:
                 if not reversed_row_list:
                     continue
 
+                # to_print = [f"[{i}] '{w}'" for i, w in enumerate(reversed_row_list)]
+                # print(f"DEBUG WORDS: {' | '.join(to_print)}")
+
                 full_line_text = " ".join(reversed_row_list)
 
                 # הדפסה לדיבוג (כדי שתראה מה נכנס)
-                # print(f"DEBUG RAW: {full_line_text}")
+                print(f"DEBUG RAW: {full_line_text}")
 
-                # --- 1. סינון רעש אגרסיבי (Skip Logic) ---
                 if not chain_name_found:
                     ch = self._chain_name_in_line(full_line_text)
                     if ch != "unidentified chain":
                         chain_name_found = True
 
+                # --- 1. סינון רעש אגרסיבי (Skip Logic) ---
                 # א. בדיקת מילים אסורות
                 if any(skip_word in full_line_text for skip_word in line_skip_keywords):
                     # print(f"    Skipping line (noise detected): {full_line_text}")
@@ -916,7 +920,7 @@ class ReceiptScanner:
             "שפע ברכת השם": "Shefa Birkat Hashem",
         }
         for chain in retail_chains_map.keys():
-            words=chain.split(' ')
+            words = chain.split(' ')
             for word in words:
                 if word in line:
                     return retail_chains_map[chain]
