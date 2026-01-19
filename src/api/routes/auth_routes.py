@@ -16,29 +16,24 @@ from src.api.schemas.common import GeneralResponse
 
 from src.infrastructure.app_container import AppContainer
 from src.api.security import get_current_user_id
-# Assuming UserService is the class returned by get_user_service
 from src.services.user_service import UserService 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# --- CHANGED: Removed global 'user_service = ...' ---
-# Global variables cannot hold a database session because the session must be 
-# created and closed for *every* request individually.
 
 # --- ADDED: Dependency Helper ---
 # This function gets a fresh DB session from FastAPI and passes it to the Container.
 def get_user_service(db: Session = Depends(get_db)) -> UserService:
     return AppContainer.get_user_service(db)
 
-# --- ADDED: Type Alias ---
-# This allows us to use 'UserServiceDep' in routes without writing 'Depends(...)' every time.
+
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 
 @router.post("/register", response_model=GeneralResponse)
 async def register(
     request: RegisterRequest,
-    user_service: UserServiceDep # <--- CHANGED: Injected the service here
+    user_service: UserServiceDep 
 ):
     """
     Register a new user.
@@ -64,7 +59,7 @@ async def register(
 @router.post("/login", response_model=LoginResponse)
 async def login(
     request: LoginRequest,
-    user_service: UserServiceDep # <--- CHANGED: Injected the service here
+    user_service: UserServiceDep 
 ):
     """
     Login and retrieve an access token.
@@ -87,7 +82,7 @@ async def login(
 @router.put("/update_name", response_model=GeneralResponse)
 async def update_name(
     request: UpdateNameRequest,
-    user_service: UserServiceDep, # <--- CHANGED: Injected the service here
+    user_service: UserServiceDep, 
     user_id: UUID = Depends(get_current_user_id)
 ):
     """
@@ -107,7 +102,7 @@ async def update_name(
 @router.put("/password", response_model=GeneralResponse)
 async def change_password(
     request: ChangePasswordRequest,
-        user_service: UserServiceDep, # <--- CHANGED: Injected the service here
+        user_service: UserServiceDep, 
     user_id: UUID = Depends(get_current_user_id)
 
 ):
@@ -128,5 +123,4 @@ async def change_password(
         )
         
     except ValueError as e:
-        # This catches "Incorrect current password" or other validation errors
         raise HTTPException(status_code=400, detail=str(e))
