@@ -256,38 +256,49 @@ export function useInventoryData(params: {
       };
     });
 
-    // sort by title (he)
     return groups.sort((a, b) => a.title.localeCompare(b.title, "he"));
   }, [rows]);
 
-  // ✅ item-level qty update
   const changeQty = useCallback(
-    async (itemId: string, delta: number) => {
-      if (!homeId) return;
+  async (itemId: string, delta: number) => {
+    if (!homeId) return;
 
-      const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
-      if (!current) return;
+    const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
+    if (!current) return;
 
-      const next = current.quantity + delta;
-      if (next < 0) return;
+    const next = current.quantity + delta;
+    if (next < 0) return;
 
-      const optimistic = rows.map((r) => (r.itemId === current.itemId ? { ...r, quantity: next } : r));
+    if (next === 0) {
+      const optimistic = rows.filter((r) => r.itemId !== current.itemId);
       setRows(optimistic);
       prevSigRef.current = rowsSignature(optimistic);
 
       try {
-        await updateItemQuantity(homeId, current.productId, current.itemId, {
-          new_quantity: next,
-        });
+        await removeItem(homeId, current.productId, current.itemId);
       } catch (e: any) {
-        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לעדכן כמות");
+        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי למחוק פריט");
         await loadInventory("soft");
       }
-    },
-    [homeId, rows, loadInventory]
-  );
+      return;
+    }
 
-  // ✅ item-level delete
+    const optimistic = rows.map((r) => (r.itemId === current.itemId ? { ...r, quantity: next } : r));
+    setRows(optimistic);
+    prevSigRef.current = rowsSignature(optimistic);
+
+    try {
+      await updateItemQuantity(homeId, current.productId, current.itemId, {
+        new_quantity: next,
+      });
+    } catch (e: any) {
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לעדכן כמות");
+      await loadInventory("soft");
+    }
+  },
+  [homeId, rows, loadInventory]
+);
+
   const deleteRow = useCallback(
     (itemId: string) => {
       if (!homeId) return;
@@ -318,7 +329,6 @@ export function useInventoryData(params: {
     [homeId, rows, loadInventory]
   );
 
-  // ✅ save edit: nickname is product-level, exp/qty are item-level
   const saveEdit = useCallback(
     async (itemId: string, values: { name: string; quantity: number; expiresAt?: string }) => {
       if (!homeId) return;
@@ -331,20 +341,33 @@ export function useInventoryData(params: {
       const newExp = toIsoDateOnly(values.expiresAt ?? null);
 
       try {
-        // rename display name -> nickname on PRODUCT
-        // (if they type the original name, we still set nickname; you can decide policy later)
         if (newDisplayName && newDisplayName !== current.name) {
           await updateProductNickname(homeId, current.productId, { nickname: newDisplayName });
         }
 
-        // expiration -> item-level
         if (newExp !== current.expirationDate) {
           await updateItemExpiration(homeId, current.productId, current.itemId, {
             new_date: newExp,
           });
         }
 
-        // quantity -> item-level
+        if (newQty !== current.quantity) {
+          if (newQty === 0) {
+            await removeItem(homeId, current.productId, current.itemId);
+
+            const nextRows = rows.filter((r) => r.itemId !== current.itemId);
+            setRows(nextRows);
+            prevSigRef.current = rowsSignature(nextRows);
+
+            setItemToEdit(null);
+            return;
+          }
+
+          await updateItemQuantity(homeId, current.productId, current.itemId, {
+            new_quantity: newQty,
+          });
+        }
+
         if (newQty !== current.quantity) {
           await updateItemQuantity(homeId, current.productId, current.itemId, {
             new_quantity: newQty,
