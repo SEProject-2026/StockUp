@@ -571,7 +571,7 @@ class ReceiptScanner:
                             reversed_row_list.append(cleaned_word)
 
                 full_line_text = " ".join(reversed_row_list)
-                # print(f"DEBUG RAW: {full_line_text}")
+                #print(f"DEBUG RAW: {full_line_text}")
 
                 if not chain_name_found:
                     ch = self._chain_name_in_line(full_line_text)
@@ -895,6 +895,7 @@ class ReceiptScanner:
             "ח. כהן": "H. Cohen",
             "טיב טעם": "tivtaam",
             "מחסני השוק": "mck",
+            "מתסני השוק": "mck",
             "חצי חינם": "hazi-hinam",
             "יוחננוף": "yohananof",
             "אושר עד": "osherad",
