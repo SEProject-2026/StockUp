@@ -695,7 +695,7 @@ class ReceiptScanner:
                 full_line_text = " ".join(reversed_row_list)
 
                 # הדפסה לדיבוג (כדי שתראה מה נכנס)
-                print(f"DEBUG RAW: {full_line_text}")
+                # print(f"DEBUG RAW: {full_line_text}")
 
                 if not chain_name_found:
                     ch = self._chain_name_in_line(full_line_text)
@@ -887,7 +887,6 @@ class ReceiptScanner:
             "קוויק": "Quik",
             "ביתן אונליין": "Bitan Online",
             "יינות ביתן": "Yeinot Bitan",
-            "מגה": "Mega",
             "דור אלון": "Dor Alon",
             "אלונית": "Alonit",
             "וולט": "Wolt",
@@ -915,6 +914,7 @@ class ReceiptScanner:
             "קשת טעמים": "keshet",
             "רמי לוי ": "ramilevi",
             "שיווק השקמה": "ramilevi",
+            "רמי לול": "ramilevi",
             "סופר קופיקס": "Super Cofix",
             "שופרסל": "shufersal",
             "Be": "Be",

@@ -263,10 +263,7 @@ async def search_global_catalog_by_name(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
-    """
-    Search for products in the global master catalog (CSV) by name.
-    Useful for autocomplete suggestions when adding a new product.
-    """
+
     try:
         results = await service.search_product_by_name_external_db(
             user_id=user_id, 
@@ -290,7 +287,6 @@ async def search_global_catalog_by_name(
 async def get_global_product_by_barcode(
     barcode: str,
     service: StockServiceDep, # <--- Injected Service (Must come before Query/Header/Depends)
-    chain: Optional[str] = Query(None, description="Optional chain context (e.g., 'rami_levi')"),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
@@ -303,7 +299,6 @@ async def get_global_product_by_barcode(
             user_id=user_id, 
             home_id=home_id, 
             barcode=barcode,
-            chain_name=chain
         )
         
         if not item:

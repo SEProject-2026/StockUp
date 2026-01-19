@@ -22,7 +22,6 @@ class CsvCatalogProvider(ICatalogProvider):
     def _load_data(self, csv_path: str):
         """Loads the entire CSV into memory maps."""
         if not os.path.exists(csv_path):
-            print(f"[WARNING] Catalog CSV file not found at: {csv_path}")
             return
 
         self._global_map = {}
@@ -58,10 +57,8 @@ class CsvCatalogProvider(ICatalogProvider):
 
             # Sort: Prioritize GLOBAL items and shorter names for search relevance
             self._all_items.sort(key=lambda x: (x.chain_source != "GLOBAL", len(x.name)))
-            print(f"[INFO] Catalog loaded. Total items: {len(self._all_items)}")
 
-        except Exception as e:
-            print(f"[ERROR] Failed to load catalog: {e}")
+        except Exception as e:{}
 
     def _get_padded_barcode(self, barcode: str) -> str:
         """Helper to pad barcodes to standard 13-digit format (729...)"""
@@ -118,7 +115,6 @@ class CsvCatalogProvider(ICatalogProvider):
         old_total = item.weight * item.sample_size
         item.sample_size += 1
         item.weight = (old_total + measured_weight) / item.sample_size
-        print(f"[DEBUG] CSV Mem-Update: {item.name} new avg: {round(item.weight, 3)}")
 
     def persist(self):
         """Finalizes changes by rewriting the CSV file."""
@@ -145,8 +141,6 @@ class CsvCatalogProvider(ICatalogProvider):
                     })
             
             shutil.move(temp_file.name, self.csv_path)
-            print("[INFO] Catalog CSV persisted successfully.")
         except Exception as e:
             if os.path.exists(temp_file.name):
                 os.remove(temp_file.name)
-            print(f"[ERROR] Failed to persist CSV: {e}")

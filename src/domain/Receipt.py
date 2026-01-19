@@ -10,9 +10,7 @@ class ReceiptItemDTO(BaseModel):
     """
     Represents a single line item extracted from a receipt.
     """
-    # Change from str to Optional[str] to allow None in tests/scans
     name: str = Field(..., min_length=2, description="The product name")
-    # Change to Optional if you want to allow None, or keep str if using ""
     barcode: Optional[str] = Field(None, description="The barcode of the product")
     quantity: int = Field(..., gt=0, description="Quantity amount (must be positive)")
     unit: UnitType = Field(default=UnitType.UNIT, description="Unit of measurement")

@@ -10,7 +10,7 @@ from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
-from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType, UnitType
+from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
 
@@ -413,10 +413,10 @@ class StockService:
         search_results = await self._catalog_provider.search_items_by_name(query)
         return search_results
     
-    async def search_product_by_barcode_external_db(self, user_id: UUID, home_id: UUID, barcode: str, chain_name: Optional[ChainType] = None) -> Optional[CatalogItem]:
+    async def search_product_by_barcode_external_db(self, user_id: UUID, home_id: UUID, barcode: str) -> Optional[CatalogItem]:
 
         await self._check_access(user_id, home_id)
-        item = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+        item = await self._catalog_provider.get_item_by_barcode(barcode)
         return item
     
     async def get_home_products(self, user_id: UUID, home_id: UUID) -> List[Product]:
