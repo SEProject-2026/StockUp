@@ -81,7 +81,7 @@ export default function ReceiptProcessingScreen() {
     (async () => {
       try {
         const id = await getSelectedHomeId();
-        if (!id) throw new Error("לא נבחר בית פעיל. חזרי למסך הבית ובחרי בית.");
+        if (!id) throw new Error("לא נבחר בית פעיל. חזרי למסך הבית ובחר בית.");
         if (mounted) setHomeId(id);
       } catch (e: any) {
         if (mounted) setError(e?.message ?? "שגיאה בטעינת בית נבחר");
