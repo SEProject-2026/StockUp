@@ -275,7 +275,7 @@ function returnToReceiptReview() {
 
     // ✅ מצב רגיל: הוספה למלאי באמת
     if (!currentHomeId) {
-      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
+      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחר בית מחדש.");
       return;
     }
     if (pending.length === 0) {

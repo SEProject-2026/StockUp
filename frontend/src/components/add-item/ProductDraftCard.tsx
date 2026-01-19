@@ -13,7 +13,7 @@ const BRAND_MUTED = "#6B7280";
 const BRAND_BORDER = "#E5E7EB";
 
 function formatDateLabel(d?: Date) {
-  if (!d) return "בחרי תאריך";
+  if (!d) return "בחר תאריך";
   return d.toISOString().slice(0, 10);
 }
 

@@ -131,7 +131,7 @@ export default function ReviewHeader(props: {
         />
         <FilterChip
           icon="sparkles-outline"
-          label="וטואלטיקה ניקיון"
+          label="טואלטיקה וניקיון"
           count={locationCounts.cleaning}
           active={activeLocation === "cleaning"}
           onPress={() => onChangeActiveLocation(activeLocation === "cleaning" ? "all" : "cleaning")}

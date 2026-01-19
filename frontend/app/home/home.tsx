@@ -5,12 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Modal,
-  TextInput,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
@@ -21,13 +16,18 @@ import { router } from "expo-router";
 import HomeCard from "@/src/components/homes/HomeCard";
 import AddHomeCard from "@/src/components/homes/AddHomeCard";
 import SpacerCard from "@/src/components/homes/SpacerCard";
-import { createHome, getMyHomes } from "@/src/api/homes";
+
+import HomesHeader from "@/src/components/home-selector/HomesHeader";
+import HomesEmptyState from "@/src/components/home-selector/HomesEmptyState";
+import CreateOrJoinHomeModal from "@/src/components/home-selector/CreateOrJoinHomeModal";
+
+import { createHome, getMyHomes, joinHomeByCode } from "@/src/api/homes";
 
 type Home = {
   id: string;
   name: string;
   membersCount: number;
-  updatedAt: string; // ISO
+  updatedAt: string;
 };
 
 type GridItem =
@@ -35,24 +35,33 @@ type GridItem =
   | { kind: "add"; id: "add-home" }
   | { kind: "spacer"; id: "spacer" };
 
+type ModalMode = "create" | "join";
+
 const BRAND_PRIMARY = "#0284C7";
 const BRAND_BG = "#F6FAFF";
 const TEXT = "#111827";
 const MUTED = "#6B7280";
-const BORDER = "#E5E7EB";
 
 function isAuthErrorMessage(msg?: string) {
   if (!msg) return false;
   const s = msg.toLowerCase();
-  return s.includes("401") || s.includes("not authenticated") || s.includes("unauthorized") || s.includes("token");
+  return (
+    s.includes("401") ||
+    s.includes("not authenticated") ||
+    s.includes("unauthorized") ||
+    s.includes("token")
+  );
 }
 
 export default function HomesScreen() {
   const [homes, setHomes] = useState<Home[]>([]);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>("create");
 
+  const [newName, setNewName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -67,7 +76,6 @@ export default function HomesScreen() {
       ...sortedHomes.map((h) => ({ kind: "home", home: h } as const)),
       { kind: "add", id: "add-home" } as const,
     ];
-
     if (data.length % 2 === 1) data.push({ kind: "spacer", id: "spacer" } as const);
     return data;
   }, [sortedHomes]);
@@ -85,37 +93,51 @@ export default function HomesScreen() {
     };
   }, []);
 
+  const loadHomes = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      try {
+        if (mode === "initial") setLoading(true);
+        else setRefreshing(true);
 
-  const loadHomes = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    try {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      const res = await getMyHomes();
-
-      console.log("getMyHomes() raw:", res);
-      ///
-      const list = (res.data ?? []).map(mapDtoToHome);
-      setHomes(list);
-    } catch (e: any) {
-      const msg = e?.message ?? "לא הצלחתי לטעון בתים";
-      if (isAuthErrorMessage(msg)) {
-        Alert.alert("צריך להתחבר", "כדי לראות/ליצור בתים צריך להתחבר.", [
-          { text: "להתחברות", onPress: () => router.replace("/login") },
-          { text: "ביטול", style: "cancel" },
-        ]);
-        return;
+        const res = await getMyHomes();
+        const list = (res.data ?? []).map(mapDtoToHome);
+        setHomes(list);
+      } catch (e: any) {
+        const msg = e?.message ?? "לא הצלחתי לטעון בתים";
+        if (isAuthErrorMessage(msg)) {
+          Alert.alert("צריך להתחבר", "כדי לראות/ליצור/להצטרף לבתים צריך להתחבר.", [
+            { text: "להתחברות", onPress: () => router.replace("/login") },
+            { text: "ביטול", style: "cancel" },
+          ]);
+          return;
+        }
+        Alert.alert("שגיאה", msg);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-      Alert.alert("שגיאה", msg);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [mapDtoToHome]);
+    },
+    [mapDtoToHome]
+  );
 
   useEffect(() => {
     loadHomes("initial");
   }, [loadHomes]);
+
+  const openCreate = useCallback(() => {
+    setModalMode("create");
+    setModalOpen(true);
+  }, []);
+
+  const openJoin = useCallback(() => {
+    setModalMode("join");
+    setModalOpen(true);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    if (saving) return;
+    setModalOpen(false);
+  }, [saving]);
 
   const onCreateHome = useCallback(async () => {
     const name = newName.trim();
@@ -124,17 +146,17 @@ export default function HomesScreen() {
 
     try {
       setSaving(true);
-
       const res = await createHome({ name });
       const dto = res.data;
 
       if (!dto?.id) throw new Error(res.message || "Create home failed");
 
-      const created: Home = mapDtoToHome(dto);
-
+      const created = mapDtoToHome(dto);
       setHomes((prev) => [created, ...prev]);
+
       setNewName("");
-      setCreateOpen(false);
+      setJoinCode("");
+      setModalOpen(false);
       openHome(created.id);
     } catch (e: any) {
       const msg = e?.message ?? "לא הצלחתי ליצור בית כרגע.";
@@ -151,31 +173,59 @@ export default function HomesScreen() {
     }
   }, [newName, openHome, mapDtoToHome]);
 
+  const onJoinHome = useCallback(async () => {
+    const code = joinCode.trim();
+    if (!code) return Alert.alert("חסר קוד", "הכניסי קוד הזמנה כדי להצטרף לבית.");
+    if (code.length < 4) return Alert.alert("קוד קצר מדי", "בדקי את הקוד ונסה שוב.");
+
+    try {
+      setSaving(true);
+      const res = await joinHomeByCode({ code });
+      const dto = res.data;
+
+      const joined = mapDtoToHome(dto);
+
+      setHomes((prev) => {
+        const exists = prev.some((h) => h.id === joined.id);
+        return exists ? prev : [joined, ...prev];
+      });
+
+      setNewName("");
+      setJoinCode("");
+      setModalOpen(false);
+      openHome(joined.id);
+    } catch (e: any) {
+      const msg = e?.message ?? "לא הצלחתי להצטרף לבית כרגע.";
+      if (isAuthErrorMessage(msg)) {
+        Alert.alert("צריך להתחבר", "כדי להצטרף לבית צריך להתחבר.", [
+          { text: "להתחברות", onPress: () => router.replace("/login") },
+          { text: "ביטול", style: "cancel" },
+        ]);
+        return;
+      }
+      Alert.alert("שגיאה", msg);
+    } finally {
+      setSaving(false);
+    }
+  }, [joinCode, openHome, mapDtoToHome]);
+
   const renderItem = useCallback(
     ({ item }: { item: GridItem }) => {
       if (item.kind === "spacer") return <SpacerCard />;
-
-      if (item.kind === "add") {
-        return <AddHomeCard onPress={() => setCreateOpen(true)} />;
-      }
-
+      if (item.kind === "add") return <AddHomeCard onPress={openCreate} />;
       return <HomeCard home={item.home} onPress={() => openHome(item.home.id)} />;
     },
-    [openHome]
+    [openHome, openCreate]
   );
 
-  const isValid = newName.trim().length >= 2;
+  const isValid = modalMode === "create"
+    ? newName.trim().length >= 2
+    : joinCode.trim().length >= 4;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ width: 40 }} />
-        <Text style={styles.headerTitle}>הבתים שלי</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <HomesHeader title="הבתים שלי" />
 
-      {/* Body */}
       <View style={styles.body}>
         {loading ? (
           <View style={styles.centerLoader}>
@@ -183,27 +233,17 @@ export default function HomesScreen() {
             <Text style={styles.loaderText}>טוען בתים…</Text>
           </View>
         ) : sortedHomes.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="home" size={22} color={BRAND_PRIMARY} />
-            </View>
-            <Text style={styles.emptyTitle}>אין לך עדיין בתים</Text>
-            <Text style={styles.emptySubtitle}>
-              הוסף בית חדש כדי להתחיל לנהל מלאי משותף.
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => setCreateOpen(true)}
-              style={styles.primaryBtn}
-              activeOpacity={0.9}
-            >
-              <Ionicons name="add" size={18} color="white" />
-              <Text style={styles.primaryBtnText}>הוסף בית חדש</Text>
-            </TouchableOpacity>
-          </View>
+          <HomesEmptyState onCreate={openCreate} onJoin={openJoin} />
         ) : (
           <>
-            <Text style={styles.sectionTitle}>בחר בית</Text>
+            <View style={styles.topRow}>
+              <Text style={styles.sectionTitle}>בחר בית</Text>
+
+              <TouchableOpacity onPress={openJoin} style={styles.joinPill} activeOpacity={0.9}>
+                <Ionicons name="key-outline" size={14} color={BRAND_PRIMARY} />
+                <Text style={styles.joinPillText}>הצטרפות עם קוד</Text>
+              </TouchableOpacity>
+            </View>
 
             <FlatList
               data={gridData}
@@ -214,87 +254,32 @@ export default function HomesScreen() {
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 24, gap: 12 }}
               showsVerticalScrollIndicator={false}
               refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={() => loadHomes("refresh")}
-                />
+                <RefreshControl refreshing={refreshing} onRefresh={() => loadHomes("refresh")} />
               }
             />
           </>
         )}
       </View>
 
-      {/* Create Home Modal */}
-      <Modal
-        visible={createOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCreateOpen(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => !saving && setCreateOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-              <Text style={styles.modalTitle}>בית חדש</Text>
-              <Text style={styles.modalSubtitle}>תקבע לבית שם כדי שכולם יזהו אותו.</Text>
-
-              <View style={styles.inputWrap}>
-                <Ionicons name="pricetag-outline" size={18} color={MUTED} />
-                <TextInput
-                  value={newName}
-                  onChangeText={setNewName}
-                  style={styles.input}
-                  textAlign="right"
-                  autoFocus
-                />
-              </View>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  onPress={() => setCreateOpen(false)}
-                  style={styles.secondaryBtn}
-                  activeOpacity={0.85}
-                  disabled={saving}
-                >
-                  <Text style={styles.secondaryBtnText}>ביטול</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={onCreateHome}
-                  style={[
-                    styles.primaryBtn,
-                    (!isValid || saving) && { opacity: 0.5 },
-                  ]}
-                  activeOpacity={0.9}
-                  disabled={!isValid || saving}
-                >
-                  <Text style={styles.primaryBtnText}>{saving ? "יוצר..." : "יצירה"}</Text>
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <CreateOrJoinHomeModal
+        visible={modalOpen}
+        saving={saving}
+        mode={modalMode}
+        onChangeMode={setModalMode}
+        newName={newName}
+        onChangeName={setNewName}
+        joinCode={joinCode}
+        onChangeCode={setJoinCode}
+        onClose={closeModal}
+        onPrimary={modalMode === "create" ? onCreateHome : onJoinHome}
+        primaryDisabled={!isValid}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BRAND_BG },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "800",
-    color: TEXT,
-  },
 
   body: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
 
@@ -306,105 +291,29 @@ const styles = StyleSheet.create({
   },
   loaderText: { color: MUTED, fontWeight: "700" },
 
+  topRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: "700",
     color: MUTED,
     textAlign: "right",
-    marginBottom: 6,
   },
 
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 18,
-    gap: 10,
-  },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: "rgba(2,132,199,0.10)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(2,132,199,0.16)",
-  },
-  emptyTitle: { fontSize: 18, fontWeight: "900", color: TEXT },
-  emptySubtitle: {
-    fontSize: 13,
-    color: MUTED,
-    textAlign: "center",
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-
-  primaryBtn: {
-    backgroundColor: BRAND_PRIMARY,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
+  joinPill: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 8,
-    minWidth: 180,
-    justifyContent: "center",
-  },
-  primaryBtnText: { color: "white", fontWeight: "800", fontSize: 14 },
-
-  secondaryBtn: {
-    backgroundColor: "white",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: BORDER,
-    minWidth: 120,
-    alignItems: "center",
-    justifyContent: "center",
+    borderColor: "rgba(2,132,199,0.25)",
+    backgroundColor: "rgba(2,132,199,0.08)",
   },
-  secondaryBtnText: { color: TEXT, fontWeight: "800", fontSize: 14 },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(17,24,39,0.35)",
-    padding: 16,
-    justifyContent: "center",
-  },
-  modalCard: {
-    backgroundColor: "white",
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: TEXT,
-    textAlign: "right",
-  },
-  modalSubtitle: { marginTop: 6, fontSize: 12, color: MUTED, textAlign: "right" },
-
-  inputWrap: {
-    marginTop: 14,
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  input: { flex: 1, fontSize: 14, color: TEXT, padding: 0 },
-
-  modalActions: {
-    marginTop: 14,
-    flexDirection: "row-reverse",
-    gap: 10,
-    justifyContent: "flex-start",
-  },
+  joinPillText: { color: BRAND_PRIMARY, fontWeight: "900", fontSize: 12 },
 });
