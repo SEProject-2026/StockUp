@@ -904,7 +904,7 @@ async def test_search_product_by_barcode_external_db_success():
     assert result.name == "Milk"
     assert result.barcode == "123456"
     
-    testing_container.stock_service._catalog_provider.get_item_by_barcode.assert_called_once_with("123456", None)
+    testing_container.stock_service._catalog_provider.get_item_by_barcode.assert_called_once_with("123456")
 
 
 @pytest.mark.asyncio

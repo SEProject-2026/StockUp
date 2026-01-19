@@ -10,7 +10,7 @@ from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
-from src.domain.smart_home.enums import ChainType, ExpirationType, LocationType, UnitType
+from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
 
