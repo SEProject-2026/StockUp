@@ -176,7 +176,7 @@ export default function HomesScreen() {
   const onJoinHome = useCallback(async () => {
     const code = joinCode.trim();
     if (!code) return Alert.alert("חסר קוד", "הכניסי קוד הזמנה כדי להצטרף לבית.");
-    if (code.length < 4) return Alert.alert("קוד קצר מדי", "בדקי את הקוד ונסה שוב.");
+    if (code.length < 4) return Alert.alert("קוד קצר מדי", "בדוק את הקוד ונסה שוב.");
 
     try {
       setSaving(true);

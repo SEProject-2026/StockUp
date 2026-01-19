@@ -32,6 +32,13 @@ export function InventoryScreenBase({
     hideTabs,
   });
 
+    useFocusEffect(
+    useCallback(() => {
+      if (!currentHomeId) return;
+      inv.loadInventory("soft");
+    }, [currentHomeId, inv.loadInventory])
+  );
+
   const handleBack = () => {
     if (currentHomeId) {
       router.replace({
