@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-#settings will be moved to config file later
+
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = os.getenv("JWT_ALGORITHM")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_IN")) 

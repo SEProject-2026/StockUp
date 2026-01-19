@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -61,6 +61,8 @@ function normalizeCatalogOne(raw: any): CatalogItem | null {
 }
 
 export default function BatchAddItemsScreen() {
+  const insets = useSafeAreaInsets(); 
+
   const { homeId, location: locationParam, mode } = useLocalSearchParams<{
     homeId?: string;
     location?: string;
@@ -226,56 +228,53 @@ export default function BatchAddItemsScreen() {
     if (editingId === id) resetDraft(true);
   }
 
-  // ✅ receipt-review: מחזירים drafts למסך הקבלה – בלי שרת
-function returnToReceiptReview() {
-  const drafts: AddItemReturnDraft[] = [];
+  function returnToReceiptReview() {
+    const drafts: AddItemReturnDraft[] = [];
 
-  for (const p of pending) {
-    drafts.push({
-      name: p.name.trim(),
-      quantity: Number.isFinite(p.quantity) && p.quantity > 0 ? p.quantity : 1,
-      barcode: p.barcode ?? null,
-      nickname: p.nickname ?? null,
-      expiration_date: p.expiresAt ? p.expiresAt.toISOString().slice(0, 10) : null,
-      location: p.location, 
-    });
-  }
-
-  if (drafts.length === 0) {
-    const finalName = (selectedCatalogItem?.name ?? name.trim()).trim();
-    const qty = parseInt(quantity, 10);
-
-    if (finalName && Number.isFinite(qty) && qty > 0) {
+    for (const p of pending) {
       drafts.push({
-        name: finalName,
-        quantity: qty,
-        barcode: barcode.trim() ? barcode.trim() : null,
-        nickname: nickname.trim() ? nickname.trim() : null,
-        expiration_date: expiresAt ? expiresAt.toISOString().slice(0, 10) : null,
-        location: location, 
+        name: p.name.trim(),
+        quantity: Number.isFinite(p.quantity) && p.quantity > 0 ? p.quantity : 1,
+        barcode: p.barcode ?? null,
+        nickname: p.nickname ?? null,
+        expiration_date: p.expiresAt ? p.expiresAt.toISOString().slice(0, 10) : null,
+        location: p.location,
       });
     }
-  }
 
-  if (drafts.length === 0) {
-    Alert.alert("אין מוצרים", "הוסיפי מוצר (או הוסיפי לרשימה) לפני חזרה למסך הקבלה.");
-    return;
-  }
+    if (drafts.length === 0) {
+      const finalName = (selectedCatalogItem?.name ?? name.trim()).trim();
+      const qty = parseInt(quantity, 10);
 
-  setLastAddItemReturnDrafts(drafts); // ✅ עכשיו אין שגיאה
-  router.back();
-}
+      if (finalName && Number.isFinite(qty) && qty > 0) {
+        drafts.push({
+          name: finalName,
+          quantity: qty,
+          barcode: barcode.trim() ? barcode.trim() : null,
+          nickname: nickname.trim() ? nickname.trim() : null,
+          expiration_date: expiresAt ? expiresAt.toISOString().slice(0, 10) : null,
+          location: location,
+        });
+      }
+    }
+
+    if (drafts.length === 0) {
+      Alert.alert("אין מוצרים", "הוסיפי מוצר (או הוסיפי לרשימה) לפני חזרה למסך הקבלה.");
+      return;
+    }
+
+    setLastAddItemReturnDrafts(drafts);
+    router.back();
+  }
 
   async function onBulkAdd() {
-    // ✅ receipt-review mode: לא מוסיפים לשרת בכלל
     if (isReceiptReviewMode) {
       returnToReceiptReview();
       return;
     }
 
-    // ✅ מצב רגיל: הוספה למלאי באמת
     if (!currentHomeId) {
-      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחרי בית מחדש.");
+      Alert.alert("שגיאה", "חסר בית פעיל. חזרי למסך הבתים ובחר בית מחדש.");
       return;
     }
     if (pending.length === 0) {
@@ -292,7 +291,7 @@ function returnToReceiptReview() {
           quantity: item.quantity,
           barcode: item.barcode ? item.barcode : null,
           expiration_date: formattedExpires,
-          location: locationMap[item.location], // ✅ enum
+          location: locationMap[item.location],
           nickname: item.nickname ?? null,
         });
 
@@ -319,6 +318,9 @@ function returnToReceiptReview() {
     Alert.alert("בוצע חלקית", `נוספו ${successCount} מוצרים.\nנכשלו ${failCount} — השארתי אותם ברשימה לנסות שוב.`);
   }
 
+  const bottomPad = 16 + insets.bottom; 
+  const contentBottomPad = 140 + insets.bottom; 
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <SafeAreaView style={styles.safeArea}>
@@ -332,7 +334,11 @@ function returnToReceiptReview() {
 
         <ScreenHeader title={isReceiptReviewMode ? "הוספת מוצר (לקבלה)" : "הוספה מרובה"} onBack={() => router.back()} />
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: contentBottomPad }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <ProductDraftCard
             editing={!!editingId}
             barcode={barcode}
@@ -374,7 +380,7 @@ function returnToReceiptReview() {
           <View style={{ height: 90 }} />
         </ScrollView>
 
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, { paddingBottom: bottomPad }]} /* ✅ UPDATED */>
           <PrimaryButton
             title={
               isReceiptReviewMode
@@ -417,6 +423,7 @@ function returnToReceiptReview() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BRAND_BG },
+
   content: { padding: 16, paddingBottom: 140, gap: 12 },
 
   bottomBar: {

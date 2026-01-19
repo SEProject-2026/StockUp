@@ -887,7 +887,6 @@ class ReceiptScanner:
             "קוויק": "Quik",
             "ביתן אונליין": "Bitan Online",
             "יינות ביתן": "Yeinot Bitan",
-            "מגה": "Mega",
             "דור אלון": "Dor Alon",
             "אלונית": "Alonit",
             "וולט": "Wolt",
@@ -913,17 +912,17 @@ class ReceiptScanner:
             "פרשמרקט": "Freshmarket",
             "משנת יוסף": "Mishnat Yosef",
             "קשת טעמים": "keshet",
-            "רמי לוי שיווק השקמה": "ramilevi",
+            "רמי לוי ": "ramilevi",
+            "שיווק השקמה": "ramilevi",
+            "רמי לול": "ramilevi",
             "סופר קופיקס": "Super Cofix",
             "שופרסל": "shufersal",
             "Be": "Be",
             "שפע ברכת השם": "Shefa Birkat Hashem",
         }
         for chain in retail_chains_map.keys():
-            words = chain.split(' ')
-            for word in words:
-                if word in line:
-                    return retail_chains_map[chain]
+            if chain in line:
+                return retail_chains_map[chain]
         return "unidentified chain"
 
     def validate_ean13(self, barcode: str) -> bool:

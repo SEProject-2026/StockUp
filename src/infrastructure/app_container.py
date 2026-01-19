@@ -47,8 +47,8 @@ class AppContainer:
     def get_catalog_provider(db: Optional[Session] = None):
         """
         Returns a Catalog Provider.
-        - If 'db' is provided: Returns DbCatalogProvider (Production/System).
-        - If 'db' is None: Returns CsvCatalogProvider (Testing/Local).
+        - If 'db' is provided: Returns DbCatalogProvider.
+        - If 'db' is None: Returns CsvCatalogProvider.
         """
         if AppContainer._catalog_provider_instance is not None:
             return AppContainer._catalog_provider_instance

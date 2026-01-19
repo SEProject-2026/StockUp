@@ -302,6 +302,69 @@ export async function scanReceipt(
   });
 }
 
+import * as FileSystem from "expo-file-system";
+
+async function ensureFileUri(uri: string): Promise<string> {
+  if (!uri) return uri;
+
+  if (uri.startsWith("file://")) return uri;
+
+  if (uri.startsWith("content://")) {
+    const clean = uri.split("?")[0].split("#")[0];
+    const extMatch = clean.match(/\.([a-zA-Z0-9]+)$/);
+    const ext = (extMatch?.[1] ?? "jpg").toLowerCase();
+
+    const baseDir =
+      ((FileSystem as any).cacheDirectory as string | null) ??
+      ((FileSystem as any).documentDirectory as string | null) ??
+      null;
+
+    if (!baseDir) throw new Error("No writable directory (cache/document) available");
+
+    const dest = `${baseDir}upload_${Date.now()}.${ext}`;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return dest;
+  }
+
+  return uri;
+}
+
+export async function scanReceiptMulti(
+  homeId: string,
+  params: { fileUris: string[] }
+) {
+  if (!params.fileUris?.length) {
+    throw new Error("scanReceiptMulti: fileUris is empty");
+  }
+
+  const form = new FormData();
+
+  for (let idx = 0; idx < params.fileUris.length; idx++) {
+    const originalUri = params.fileUris[idx];
+    const uri = await ensureFileUri(originalUri); 
+
+    const uriExt = getExtFromUri(uri);
+    const resolvedExt = uriExt ?? "jpg";
+    const resolvedMimeType = inferMimeFromExt(resolvedExt) ?? "image/jpeg";
+    const resolvedFileName =
+      resolvedMimeType === "application/pdf"
+        ? `receipt_${idx + 1}.pdf`
+        : `receipt_${idx + 1}.${resolvedExt}`;
+
+    form.append("files", {
+      uri,
+      name: resolvedFileName,
+      type: resolvedMimeType,
+    } as any);
+  }
+
+  return stockFetch<GeneralResponse<ReceiptDTO>>(homeId, "/stock/scan", {
+    method: "POST",
+    body: form,
+  });
+}
+
+
 
 // ----------------------
 // ✅ Add from receipt

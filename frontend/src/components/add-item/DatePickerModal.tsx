@@ -75,7 +75,7 @@ export default function DatePickerModal(props: {
           <View style={{ gap: 10 }}>
             <View style={styles.note}>
               <Ionicons name="information-circle-outline" size={16} color={BRAND_MUTED} />
-              <Text style={styles.noteText}>בחרי תאריך (native)</Text>
+              <Text style={styles.noteText}>בחר תאריך (native)</Text>
             </View>
 
             <View style={styles.nativeWrap}>

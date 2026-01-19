@@ -29,7 +29,7 @@ export default function ReceiptUploadScreen() {
 
         {/* Subtitle */}
         <Text style={styles.subtitle}>
-         בחרי האם לצלם קבלה חדשה או להעלות קובץ קבלה דיגיטלי מהמכשיר.
+         בחר האם לצלם קבלה חדשה או להעלות קובץ קבלה דיגיטלי מהמכשיר.
         </Text>
 
         {/* Main Actions */}

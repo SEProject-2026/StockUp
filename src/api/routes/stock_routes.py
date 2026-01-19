@@ -263,10 +263,7 @@ async def search_global_catalog_by_name(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
-    """
-    Search for products in the global master catalog (CSV) by name.
-    Useful for autocomplete suggestions when adding a new product.
-    """
+
     try:
         results = await service.search_product_by_name_external_db(
             user_id=user_id, 
@@ -290,7 +287,6 @@ async def search_global_catalog_by_name(
 async def get_global_product_by_barcode(
     barcode: str,
     service: StockServiceDep, # <--- Injected Service (Must come before Query/Header/Depends)
-    chain: Optional[str] = Query(None, description="Optional chain context (e.g., 'rami_levi')"),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
@@ -303,7 +299,6 @@ async def get_global_product_by_barcode(
             user_id=user_id, 
             home_id=home_id, 
             barcode=barcode,
-            chain_name=chain
         )
         
         if not item:
@@ -325,45 +320,35 @@ async def get_global_product_by_barcode(
 @router.post("/scan", response_model=GeneralResponse)
 async def scan_receipt(
     service: StockServiceDep,
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),  
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
         import tempfile, shutil, os
-        from datetime import datetime
-        from pathlib import Path
+        from typing import List
 
-        # 1. Define an absolute path for the debug directory
-        # This points to the folder where this script is located
-        base_path = Path(__file__).resolve().parent.parent.parent # Adjust levels to reach project root
-        upload_dir = base_path / "debug_uploads"
-        
-        # 2. Create directory if it doesn't exist
-        if not upload_dir.exists():
-            upload_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Created debug directory at: {upload_dir}")
-
-        suffix = os.path.splitext(file.filename or "")[1] or ".bin"
-        
-        # 3. Handle the temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp_path = tmp.name
-            shutil.copyfileobj(file.file, tmp)
-
-        # 4. Create the permanent copy using absolute path
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        permanent_file_name = f"{timestamp}_{file.filename}"
-        permanent_path = upload_dir / permanent_file_name
-        
-        shutil.copy2(tmp_path, str(permanent_path))
-        print(f"FILE SAVED PERMANENTLY AT: {permanent_path}")
+        tmp_paths: List[str] = []
 
         try:
+            # 1) save each uploaded file to a temp path
+            for f in files:
+                suffix = os.path.splitext(f.filename or "")[1] or ".bin"
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp_path = tmp.name
+                    shutil.copyfileobj(f.file, tmp)
+                try:
+                    await f.close()
+                except Exception:
+                    pass
+                tmp_paths.append(tmp_path)
+
+            # 2) run scan on all files in ONE logical receipt
             result = await service.scan_receipt(
                 user_id=user_id,
                 home_id=home_id,
-                file_path=tmp_path,    
+                files_paths=tmp_paths,
             )
 
             return GeneralResponse(
@@ -372,12 +357,13 @@ async def scan_receipt(
             )
 
         finally:
-            # Cleanup only the system temp file
-            try:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-            except Exception as e:
-                print(f"Cleanup error: {e}")
+            # 3) cleanup temp files
+            for p in tmp_paths:
+                try:
+                    if p and os.path.exists(p):
+                        os.remove(p)
+                except Exception as e:
+                    print(f"Cleanup error: {e}")
 
     except Exception as e:
         print(f"CRITICAL ERROR: {str(e)}")
