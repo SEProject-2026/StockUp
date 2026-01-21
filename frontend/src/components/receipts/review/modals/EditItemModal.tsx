@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Modal, TextInput, Alert, Platform } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Modal,
+  TextInput,
+  Alert,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
+  ScrollView,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   BRAND,
@@ -25,6 +37,7 @@ function Field(props: {
   onChangeText: (v: string) => void;
   placeholder?: string;
   keyboardType?: any;
+  onBlur?: () => void;
 }) {
   return (
     <View style={{ marginTop: 12 }}>
@@ -34,6 +47,7 @@ function Field(props: {
         onChangeText={props.onChangeText}
         placeholder={props.placeholder}
         keyboardType={props.keyboardType}
+        onBlur={props.onBlur}
         style={styles.input}
         placeholderTextColor="#9CA3AF"
         textAlign="right"
@@ -51,7 +65,14 @@ function LocationSelector(props: { value: LocationKey; onChange: (v: LocationKey
         {options.map((opt) => {
           const active = props.value === opt;
           return (
-            <Pressable key={opt} onPress={() => props.onChange(opt)} style={[styles.locChip, active && styles.locChipActive]}>
+            <Pressable
+              key={opt}
+              onPress={() => {
+                Keyboard.dismiss();
+                props.onChange(opt);
+              }}
+              style={[styles.locChip, active && styles.locChipActive]}
+            >
               {LOCATION_ICON[opt]({ size: 16, color: active ? BRAND.BLUE_SOFT : BRAND.TEXT })}
               <Text style={styles.locChipText}>{LOCATION_LABEL[opt]}</Text>
             </Pressable>
@@ -72,9 +93,7 @@ export default function EditItemModal(props: {
 
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
-
   const [unitText, setUnitText] = useState("UNIT");
-
   const [location, setLocation] = useState<LocationKey>("other");
   const [unitsCount, setUnitsCount] = useState("");
 
@@ -101,8 +120,7 @@ export default function EditItemModal(props: {
       );
 
       setQuantity("1");
-      setUnitText("KG"); 
-
+      setUnitText("KG");
     } else {
       setUnitsCount("");
       setQuantity(String(item.quantity ?? 1));
@@ -110,132 +128,158 @@ export default function EditItemModal(props: {
     }
   }, [item]);
 
-
   if (!item) return null;
 
+  const closeModal = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={closeModal}>
+      {/* לחיצה מחוץ לכרטיס => סגירת מודל */}
+      <Pressable style={styles.modalOverlay} onPress={closeModal}>
+        {/* מונעים סגירת מודל בלחיצה בתוך הכרטיס */}
         <Pressable style={styles.modalCard} onPress={() => {}}>
-          <View style={styles.modalHeaderRow}>
-            <View style={styles.modalTitleWrap}>
-              <Text style={styles.modalTitle}>עריכת מוצר</Text>
-              <Text style={styles.modalSubtitle}>{hasWeight ? "עדכן שם / יחידות / מיקום" : "עדכן שם / כמות / יחידה / מיקום"}</Text>
-            </View>
-            <Pressable onPress={onClose} style={styles.modalCloseBtn}>
-              <Ionicons name="close" size={18} color={BRAND.TEXT} />
-            </Pressable>
-          </View>
-
-          <Field label="שם מוצר" value={name} onChangeText={setName} placeholder="למשל: ביצים L" />
-
-          {hasWeight ? (
-            <>
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.fieldLabel}>משקל שזוהה</Text>
-                <View style={styles.readOnlyRow}>
-                  <Ionicons name="scale-outline" size={16} color={BRAND.MUTED} />
-                  <Text style={styles.readOnlyText}>זוהה {formatWeightKg(item.weight)} ק״ג</Text>
+          {/* לחיצה על שטח ריק בתוך הכרטיס => סגירת מקלדת */}
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            {/* ScrollView כדי שלא “ייחסם” אזור ריק, וגם עוזר אם הכפתור מוסתר */}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 4 }}
+            >
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalTitleWrap}>
+                  <Text style={styles.modalTitle}>עריכת מוצר</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {hasWeight ? "עדכן שם / יחידות / מיקום" : "עדכן שם / כמות / יחידה / מיקום"}
+                  </Text>
                 </View>
+                <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={18} color={BRAND.TEXT} />
+                </Pressable>
               </View>
 
-              <Field
-                label="כמה יחידות זה?"
-                value={unitsCount}
-                onChangeText={setUnitsCount}
-                keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
-                placeholder={
-                  Number.isFinite(item.quantity) && item.quantity > 0
-                    ? `הצעה מהסריקה: ${Math.round(item.quantity)}`
-                    : item.suggested_units
-                    ? `הצעה: ${item.suggested_units}`
-                    : "למשל: 6"
-                }
-              />
+              <Field label="שם מוצר" value={name} onChangeText={setName} placeholder="למשל: ביצים L" />
 
-            </>
-          ) : (
-            <>
-              <Field
-                label="כמות"
-                value={quantity}
-                onChangeText={setQuantity}
-                keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
-                placeholder="למשל: 2"
-              />
+              {hasWeight ? (
+                <>
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={styles.fieldLabel}>משקל שזוהה</Text>
+                    <View style={styles.readOnlyRow}>
+                      <Ionicons name="scale-outline" size={16} color={BRAND.MUTED} />
+                      <Text style={styles.readOnlyText}>זוהה {formatWeightKg(item.weight)} ק״ג</Text>
+                    </View>
+                  </View>
 
-              <Field
-                label="יחידה (UNIT / KG)"
-                value={unitText}
-                onChangeText={setUnitText}
-                placeholder="UNIT"
-              />
-            </>
-          )}
+                  <Field
+                    label="כמה יחידות זה?"
+                    value={unitsCount}
+                    onChangeText={setUnitsCount}
+                    keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+                    placeholder={
+                      Number.isFinite(item.quantity) && item.quantity > 0
+                        ? `הצעה מהסריקה: ${Math.round(item.quantity)}`
+                        : item.suggested_units
+                        ? `הצעה: ${item.suggested_units}`
+                        : "למשל: 6"
+                    }
+                    onBlur={() => Keyboard.dismiss()}
+                  />
+                </>
+              ) : (
+                <>
+                  <Field
+                    label="כמות"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+                    placeholder="למשל: 2"
+                    onBlur={() => Keyboard.dismiss()}
+                  />
 
-          <LocationSelector value={location} onChange={setLocation} />
+                  <Field
+                    label="יחידה (UNIT / KG)"
+                    value={unitText}
+                    onChangeText={setUnitText}
+                    placeholder="UNIT"
+                  />
+                </>
+              )}
 
-          <View style={styles.modalActionsRow}>
-            <Pressable style={styles.dangerBtn} onPress={() => onDelete(item.id)}>
-              <Ionicons name="trash-outline" size={18} color={BRAND.TEXT} />
-              <Text style={styles.modalBtnText}>מחק</Text>
-            </Pressable>
+              <LocationSelector value={location} onChange={setLocation} />
 
-            <View style={{ flex: 1 }} />
+              <View style={styles.modalActionsRow}>
+                <Pressable
+                  style={styles.dangerBtn}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    onDelete(item.id);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={BRAND.TEXT} />
+                  <Text style={styles.modalBtnText}>מחק</Text>
+                </Pressable>
 
-            <Pressable style={styles.secondaryBtn} onPress={onClose}>
-              <Text style={styles.modalBtnText}>ביטול</Text>
-            </Pressable>
-          </View>
+                <View style={{ flex: 1 }} />
 
-          <View style={{ marginTop: 12 }}>
-            <PrimaryButtonCompat
-              title="שמור"
-              onPress={() => {
-                const nameOk = name.trim();
-                if (!nameOk) {
-                  Alert.alert("שגיאה", "ודאי שהשם לא ריק.");
-                  return;
-                }
+                <Pressable style={styles.secondaryBtn} onPress={closeModal}>
+                  <Text style={styles.modalBtnText}>ביטול</Text>
+                </Pressable>
+              </View>
 
-                if (hasWeight) {
-                  const u = Number(String(unitsCount).replace(",", "."));
-                  if (!Number.isFinite(u) || u <= 0) {
-                    Alert.alert("שגיאה", "במוצר שקיל חייבים להזין כמה יחידות זה.");
-                    return;
-                  }
+              <View style={{ marginTop: 12 }}>
+                <PrimaryButtonCompat
+                  title="שמור"
+                  onPress={() => {
+                    Keyboard.dismiss();
 
-                  onSave({
-                    ...item,
-                    name: nameOk,
-                    location,
-                    units_count: Math.round(u),
-                    quantity: Math.round(u),     //  final units
-                    unit: UnitType.KG,         //  backend expects UNIT/KG
-                    // weight stays as is
-                  });
-                  return;
-                }
+                    const nameOk = name.trim();
+                    if (!nameOk) {
+                      Alert.alert("שגיאה", "ודאי שהשם לא ריק.");
+                      return;
+                    }
 
-                const q = Number(String(quantity).replace(",", "."));
-                if (!Number.isFinite(q) || q <= 0) {
-                  Alert.alert("שגיאה", "ודא שכמות חיובית.");
-                  return;
-                }
+                    if (hasWeight) {
+                      const u = Number(String(unitsCount).replace(",", "."));
+                      if (!Number.isFinite(u) || u <= 0) {
+                        Alert.alert("שגיאה", "במוצר שקיל חייבים להזין כמה יחידות זה.");
+                        return;
+                      }
 
-                const normalizedUnit = normalizeUnitType(unitText);
+                      onSave({
+                        ...item,
+                        name: nameOk,
+                        location,
+                        units_count: Math.round(u),
+                        quantity: Math.round(u),
+                        unit: UnitType.KG,
+                      });
+                      return;
+                    }
 
-                onSave({
-                  ...item,
-                  name: nameOk,
-                  quantity: Math.round(q),
-                  unit: normalizedUnit,
-                  location,
-                });
-              }}
-              leftIcon={<Ionicons name="save-outline" size={18} color={BRAND.TEXT} />}
-            />
-          </View>
+                    const q = Number(String(quantity).replace(",", "."));
+                    if (!Number.isFinite(q) || q <= 0) {
+                      Alert.alert("שגיאה", "ודא שכמות חיובית.");
+                      return;
+                    }
+
+                    const normalizedUnit = normalizeUnitType(unitText);
+
+                    onSave({
+                      ...item,
+                      name: nameOk,
+                      quantity: Math.round(q),
+                      unit: normalizedUnit,
+                      location,
+                    });
+                  }}
+                  leftIcon={<Ionicons name="save-outline" size={18} color={BRAND.TEXT} />}
+                />
+              </View>
+            </ScrollView>
+          </TouchableWithoutFeedback>
         </Pressable>
       </Pressable>
     </Modal>
@@ -244,7 +288,17 @@ export default function EditItemModal(props: {
 
 const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 16 },
-  modalCard: { backgroundColor: BRAND.CARD, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: BRAND.BORDER, ...SHADOW },
+
+  // טיפ קטן: אם יש מצב שהמקלדת מסתירה תחתית, maxHeight יעזור ל-scroll
+  modalCard: {
+    backgroundColor: BRAND.CARD,
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: BRAND.BORDER,
+    ...SHADOW,
+    maxHeight: "85%",
+  },
 
   modalHeaderRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   modalTitleWrap: { flex: 1 },

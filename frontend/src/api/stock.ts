@@ -1,3 +1,5 @@
+// ✅ src/api/stock.ts (UPDATED: fixes image/pdf inference + removes all scanReceipt logs)
+
 import { authFetch } from "@/src/api/client";
 import { UnitType } from "../components/receipts/review/review.shared";
 
@@ -30,9 +32,6 @@ export type ProductItemDTO = {
   expiration_date: string | null; // "YYYY-MM-DD"
   location: LocationType;
   status: ExpirationType;
-
-  // (Optional future improvement)
-  // unit?: UnitType;
 };
 
 export type ProductDTO = {
@@ -61,6 +60,7 @@ function stockFetch<T>(homeId: string, path: string, options: RequestInit = {}) 
     (k) => k.toLowerCase() === "content-type"
   );
 
+  // ✅ Only set JSON content-type for string bodies (FormData must NOT be forced)
   if (bodyIsString && !hasContentType) {
     headers["Content-Type"] = "application/json";
   }
@@ -209,7 +209,7 @@ export async function filterStockByExpiration(homeId: string, type: ExpirationTy
 }
 
 // ----------------------
-// Receipt scan (unchanged)
+// Receipt scan (FIXED: infer type/name from URI when null)
 // ----------------------
 
 export type Storagelocation =
@@ -225,7 +225,6 @@ export type DetectedReceiptItemDTO = {
   quantity: number;
   unit: UnitType;
   storage_location?: Storagelocation | null;
-
 };
 
 export type ReceiptDTO = {
@@ -236,31 +235,65 @@ export type ReceiptDTO = {
   items: DetectedReceiptItemDTO[];
 };
 
-function isProbablyImage(mimeType?: string | null) {
-  return !!mimeType && mimeType.startsWith("image/");
+function cleanUri(uri: string) {
+  return uri.split("?")[0].split("#")[0];
+}
+
+function inferMimeFromUri(uri: string): string | null {
+  const u = cleanUri(uri).toLowerCase();
+  if (u.endsWith(".pdf")) return "application/pdf";
+  if (u.endsWith(".jpg") || u.endsWith(".jpeg")) return "image/jpeg";
+  if (u.endsWith(".png")) return "image/png";
+  if (u.endsWith(".heic")) return "image/heic";
+  return null;
+}
+
+function inferNameFromUri(uri: string): string | null {
+  const clean = cleanUri(uri);
+  const last = clean.split("/").pop();
+  return last && last.length > 0 ? last : null;
+}
+
+function getExtFromUri(uri?: string | null) {
+  const u = String(uri ?? "").split("?")[0].split("#")[0];
+  const m = u.match(/\.([a-zA-Z0-9]+)$/);
+  return m ? m[1].toLowerCase() : null;
+}
+
+function inferMimeFromExt(ext?: string | null) {
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "pdf":
+      return "application/pdf";
+    default:
+      return null;
+  }
 }
 
 export async function scanReceipt(
   homeId: string,
-  params: {
-    fileUri: string;
-    fileName?: string | null;
-    mimeType?: string | null;
-  }
+  params: { fileUri: string; fileName?: string | null; mimeType?: string | null }
 ) {
-  const fileName =
-    params.fileName ??
-    (isProbablyImage(params.mimeType) ? "receipt.jpg" : "receipt.pdf");
+  const uriExt = getExtFromUri(params.fileUri);
+  const nameExt = params.fileName ? getExtFromUri(params.fileName) : null;
 
-  const mimeType =
-    params.mimeType ??
-    (fileName.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+  const resolvedExt = nameExt ?? uriExt ?? "jpg";
+  const resolvedMimeType =
+    params.mimeType ?? inferMimeFromExt(resolvedExt) ?? "image/jpeg";
+
+  const resolvedFileName =
+    params.fileName ??
+    (resolvedMimeType === "application/pdf" ? "receipt.pdf" : `receipt.${resolvedExt}`);
 
   const form = new FormData();
   form.append("file", {
     uri: params.fileUri,
-    name: fileName,
-    type: mimeType,
+    name: resolvedFileName,
+    type: resolvedMimeType,
   } as any);
 
   return stockFetch<GeneralResponse<ReceiptDTO>>(homeId, "/stock/scan", {
@@ -269,8 +302,72 @@ export async function scanReceipt(
   });
 }
 
+import * as FileSystem from "expo-file-system";
+
+async function ensureFileUri(uri: string): Promise<string> {
+  if (!uri) return uri;
+
+  if (uri.startsWith("file://")) return uri;
+
+  if (uri.startsWith("content://")) {
+    const clean = uri.split("?")[0].split("#")[0];
+    const extMatch = clean.match(/\.([a-zA-Z0-9]+)$/);
+    const ext = (extMatch?.[1] ?? "jpg").toLowerCase();
+
+    const baseDir =
+      ((FileSystem as any).cacheDirectory as string | null) ??
+      ((FileSystem as any).documentDirectory as string | null) ??
+      null;
+
+    if (!baseDir) throw new Error("No writable directory (cache/document) available");
+
+    const dest = `${baseDir}upload_${Date.now()}.${ext}`;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return dest;
+  }
+
+  return uri;
+}
+
+export async function scanReceiptMulti(
+  homeId: string,
+  params: { fileUris: string[] }
+) {
+  if (!params.fileUris?.length) {
+    throw new Error("scanReceiptMulti: fileUris is empty");
+  }
+
+  const form = new FormData();
+
+  for (let idx = 0; idx < params.fileUris.length; idx++) {
+    const originalUri = params.fileUris[idx];
+    const uri = await ensureFileUri(originalUri); 
+
+    const uriExt = getExtFromUri(uri);
+    const resolvedExt = uriExt ?? "jpg";
+    const resolvedMimeType = inferMimeFromExt(resolvedExt) ?? "image/jpeg";
+    const resolvedFileName =
+      resolvedMimeType === "application/pdf"
+        ? `receipt_${idx + 1}.pdf`
+        : `receipt_${idx + 1}.${resolvedExt}`;
+
+    form.append("files", {
+      uri,
+      name: resolvedFileName,
+      type: resolvedMimeType,
+    } as any);
+  }
+
+  return stockFetch<GeneralResponse<ReceiptDTO>>(homeId, "/stock/scan", {
+    method: "POST",
+    body: form,
+  });
+}
+
+
+
 // ----------------------
-// ✅ Add from receipt (UPDATED RESPONSE TYPES)
+// ✅ Add from receipt
 // ----------------------
 
 export type ReceiptItemRequestDTO = {
@@ -281,7 +378,7 @@ export type ReceiptItemRequestDTO = {
   location?: LocationType | null;
   nickname?: string | null;
   unit?: UnitType; // KG / GR / UNIT / ...
-  weight?: number | null; 
+  weight?: number | null;
 };
 
 export type AddReceiptRequest = {
@@ -290,7 +387,7 @@ export type AddReceiptRequest = {
 };
 
 export type AddedReceiptItemDTO = {
-  index: number; // index in request.items
+  index: number;
   name: string;
   barcode?: string | null;
 
@@ -302,12 +399,11 @@ export type AddedReceiptItemDTO = {
 
   stored_quantity: number;
   stored_unit: UnitType;
-  
 };
 
 export type AddReceiptResponseData = {
   added_count: number;
-  items: AddedReceiptItemDTO[]; 
+  items: AddedReceiptItemDTO[];
 };
 
 export async function addReceipt(homeId: string, payload: AddReceiptRequest) {

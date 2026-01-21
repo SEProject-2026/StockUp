@@ -25,3 +25,10 @@ export async function getMyHomes() {
     method: "GET",
   });
 }
+
+export async function joinHomeByCode(payload: { code: string }) {
+  return authFetch<GeneralResponse<HomeDTO>>("/homes/join", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

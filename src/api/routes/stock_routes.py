@@ -263,10 +263,7 @@ async def search_global_catalog_by_name(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
-    """
-    Search for products in the global master catalog (CSV) by name.
-    Useful for autocomplete suggestions when adding a new product.
-    """
+
     try:
         results = await service.search_product_by_name_external_db(
             user_id=user_id, 
@@ -290,7 +287,6 @@ async def search_global_catalog_by_name(
 async def get_global_product_by_barcode(
     barcode: str,
     service: StockServiceDep, # <--- Injected Service (Must come before Query/Header/Depends)
-    chain: Optional[str] = Query(None, description="Optional chain context (e.g., 'rami_levi')"),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
@@ -303,7 +299,6 @@ async def get_global_product_by_barcode(
             user_id=user_id, 
             home_id=home_id, 
             barcode=barcode,
-            chain_name=chain
         )
         
         if not item:
@@ -324,24 +319,36 @@ async def get_global_product_by_barcode(
 
 @router.post("/scan", response_model=GeneralResponse)
 async def scan_receipt(
-    service: StockServiceDep, # <--- Injected Service
-    file: UploadFile = File(...),
+    service: StockServiceDep,
+    files: List[UploadFile] = File(...),  
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     try:
         import tempfile, shutil, os
+        from typing import List
 
-        suffix = os.path.splitext(file.filename or "")[1] or ".bin"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp_path = tmp.name
-            shutil.copyfileobj(file.file, tmp)
+        tmp_paths: List[str] = []
 
         try:
+            # 1) save each uploaded file to a temp path
+            for f in files:
+                suffix = os.path.splitext(f.filename or "")[1] or ".bin"
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp_path = tmp.name
+                    shutil.copyfileobj(f.file, tmp)
+                try:
+                    await f.close()
+                except Exception:
+                    pass
+                tmp_paths.append(tmp_path)
+
+            # 2) run scan on all files in ONE logical receipt
             result = await service.scan_receipt(
                 user_id=user_id,
                 home_id=home_id,
-                file_path=tmp_path,    
+                files_paths=tmp_paths,
             )
 
             return GeneralResponse(
@@ -350,17 +357,20 @@ async def scan_receipt(
             )
 
         finally:
-            try:
-                os.remove(tmp_path)
-            except:
-                pass
+            # 3) cleanup temp files
+            for p in tmp_paths:
+                try:
+                    if p and os.path.exists(p):
+                        os.remove(p)
+                except Exception as e:
+                    print(f"Cleanup error: {e}")
 
     except Exception as e:
+        print(f"CRITICAL ERROR: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Scanning failed: {str(e)}",
         )
-    
 
 @router.post("/add-receipt", response_model=GeneralResponse)
 async def add_receipt(
