@@ -4,25 +4,6 @@ from tests.container import testing_container
 from src.domain.smart_home.home import Home
 from src.domain.user import User
 
-# --- Setup Hooks ---
-def setup_module():
-    """
-    Switch the container to DB mode for this module.
-    """
-    testing_container.activate_db_mode()
-
-def setup_function():
-    """
-    Clean the database before each test.
-    """
-    testing_container.reset_state()
-
-def teardown_module():
-    """
-    Switch back to memory mode after tests.
-    """
-    testing_container.activate_memory_mode()
-
 # --- Helpers ---
 
 async def create_test_user(email="admin@test.com", name="Admin"):

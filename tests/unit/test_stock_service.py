@@ -9,6 +9,7 @@ from src.domain.smart_home.enums import ExpirationType, LocationType
 # --- Helper Functions ---
 
 def setup_function():
+    testing_container.activate_memory_mode()
     """
     Reset state before every test.
     """

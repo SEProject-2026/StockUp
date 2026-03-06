@@ -30,7 +30,8 @@ from src.api.routes.management_routes import get_management_service
 
 load_dotenv()
 
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:password@localhost:5432/stockup_db")
+# Updated default fallback to port 5433 and stockup_test to match Docker config
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:password@localhost:5433/stockup_test")
 
 class MockCatalogProvider:
     async def get_item_by_barcode(self, barcode, chain_name=None):
@@ -128,9 +129,6 @@ class TestingContainer:
             
             try:
                 # 3. TRUNCATE ... CASCADE
-                # - TRUNCATE is faster than DELETE.
-                # - CASCADE deletes data in dependent tables (fixing FK violations).
-                # - RESTART IDENTITY resets auto-increment counters.
                 cleanup_session.execute(text("""
                     TRUNCATE TABLE products, product_items, homes, users 
                     RESTART IDENTITY CASCADE;
@@ -139,19 +137,21 @@ class TestingContainer:
             except Exception as e:
                 print(f"DB Cleanup Failed: {e}")
                 cleanup_session.rollback()
+                raise e  # CRITICAL: Fail fast if we can't clean the DB!
             finally:
                 cleanup_session.close()
 
             # 4. Create a NEW session for the next test
             self.db_session = self.TestingSessionLocal()
             
-            # 5. Re-bind repositories to the new session
-            self.user_repo.db = self.db_session
-            self.stock_repo.db = self.db_session
-            self.home_repo.db = self.db_session
+            # 5. RECREATE repositories cleanly with the fresh session
+            self.user_repo = DbUserRepository(self.db_session)
+            self.stock_repo = DbProductRepository(self.db_session)
+            self.home_repo = DbHomeRepository(self.db_session)
             
-            # 6. Update FastAPI Override
+            # 6. Update FastAPI Override and Services
             app.dependency_overrides[get_db] = lambda: self.db_session
+            self._configure_services_and_overrides()
 
         else:
             # Memory Cleanup
