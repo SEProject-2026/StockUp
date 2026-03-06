@@ -1,166 +1,57 @@
-// app/home/[homeId].tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
+import React, { useCallback, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
+// Components
 import QuickActionButton from "@/src/components/ui/buttons/QuickActionButton";
 import LocationAreaButton from "@/src/components/homes/LocationAreaButton";
 import BottomNavBar from "@/src/layout/BottomNavBar";
-import InventoryStatusCard, { Stats } from "@/src/components/homes/InventoryStatusCard";
+import InventoryStatusCard from "@/src/components/homes/InventoryStatusCard";
 import SideTitleCard from "@/src/components/ui/cards/SideTitleCard";
 import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
-import { getAllStock, type ProductDTO } from "@/src/api/stock";
-import type { location } from "@/src/context/inventory-context";
-
-import { setSelectedHomeId } from "./selected-home";
+// Hooks & Logic
+import { useHomeData } from "@/src/hooks/useHomeData";
+import { setSelectedHomeId } from "@/src/utils/selected-home";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
-
-type HomeItem = {
-  id: string;        
-  productId: string; 
-  name: string;
-  location: location;
-  quantity: number;
-  expiresAt?: string;
-};
-
-
-function locationTolocation(loc?: string | null): location {
-  switch ((loc ?? "").toUpperCase()) {
-    case "FRIDGE":
-      return "fridge";
-    case "FREEZER":
-      return "freezer";
-    case "PANTRY":
-      return "pantry";
-    case "CLEANING":
-      return "cleaning";
-    case "OTHER":
-    default:
-      return "other";
-  }
-}
-
-
-function productDtoToHomeItems(dto: ProductDTO): HomeItem[] {
-  const displayName = dto.nickname?.trim() ? dto.nickname : dto.original_name;
-
-  if (dto.items?.length) {
-    return dto.items.map((it) => ({
-      id: String(it.id),           
-      productId: String(dto.id), 
-      name: displayName,
-      location: locationTolocation(it.location),
-      quantity: it.quantity,
-      expiresAt: it.expiration_date ?? undefined,
-    }));
-  }
-
-  return [
-    {
-      id: `${dto.id}__fallback`,
-      productId: String(dto.id),
-      name: displayName,
-      location: "other",
-      quantity: dto.total_quantity ?? 0,
-      expiresAt: undefined,
-    },
-  ];
-}
 
 export default function HomeDashboardScreen() {
   const { homeId } = useLocalSearchParams<{ homeId: string }>();
   const currentHomeId = String(homeId);
 
-  useEffect(() => {
-    if (!currentHomeId) return;
-    setSelectedHomeId(currentHomeId).catch(() => {
-    });
-  }, [currentHomeId]);
+  const { stats, expiringSoon, loadData, isLoading } = useHomeData(currentHomeId);
 
-  const [homeItems, setHomeItems] = useState<HomeItem[]>([]);
   const homeAreasScrollRef = useRef<ScrollView>(null);
   const didAutoScrollAreas = useRef(false);
 
-  const loadHome = useCallback(async () => {
-    if (!currentHomeId) return;
-
-    try {
-      const res = await getAllStock(currentHomeId);
-      const products = res.data ?? [];
-      setHomeItems(products.flatMap(productDtoToHomeItems));
-    } catch (e: any) {
-      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון נתוני בית");
-      setHomeItems([]);
+  useEffect(() => {
+    if (currentHomeId) {
+      setSelectedHomeId(currentHomeId).catch(() => {});
     }
   }, [currentHomeId]);
 
   useEffect(() => {
-    loadHome();
-  }, [loadHome]);
+    if (currentHomeId) {
+      loadData(); 
+    }
+  }, [currentHomeId, loadData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadHome();
-    }, [loadHome])
-  );
-
-  const stats: Stats = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let fridge = 0,
-      freezer = 0,
-      pantry = 0,
-      cleaningSupplies = 0,
-      other = 0,
-      expiringSoon = 0;
-
-    homeItems.forEach((item) => {
-      if (item.location === "fridge") fridge++;
-      if (item.location === "freezer") freezer++;
-      if (item.location === "pantry") pantry++;
-      if (item.location === "cleaning") cleaningSupplies++;
-      if (item.location === "other") other++;
-
-      if (item.expiresAt) {
-        const exp = new Date(item.expiresAt);
-        exp.setHours(0, 0, 0, 0);
-        const diffDays = (exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-        if (diffDays >= 0 && diffDays <= 3) expiringSoon++;
-      }
-    });
-
-    return { total: homeItems.length, fridge, freezer, pantry, cleaningSupplies, other, expiringSoon };
-  }, [homeItems]);
-
-  const expiringSoonItems = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return homeItems
-      .filter((item) => {
-        if (!item.expiresAt) return false;
-        const exp = new Date(item.expiresAt);
-        exp.setHours(0, 0, 0, 0);
-        const diffDays = (exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-        return diffDays >= 0 && diffDays <= 3;
-      })
-      .sort((a, b) => new Date(a.expiresAt!).getTime() - new Date(b.expiresAt!).getTime())
-      .slice(0, 3);
-  }, [homeItems]);
+  const onManualRefresh = useCallback(() => {
+    loadData(true);
+  }, [loadData]);
 
   const goInventory = (loc: string) => {
     router.push(`/inventory/${loc}?homeId=${currentHomeId}`);
   };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.main}>
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+          
           {/* HEADER */}
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
@@ -172,9 +63,14 @@ export default function HomeDashboardScreen() {
             </View>
           </View>
 
-          <InventoryStatusCard stats={stats} />
+          {/* LOADING INDICATOR */}
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#007AFF" style={{ marginVertical: 20 }} />
+          ) : (
+            <InventoryStatusCard stats={stats} />
+          )}
 
-          {/* home areas */}
+          {/* HOME AREAS */}
           <View style={styles.horizontalSection}>
             <ScrollView
               ref={homeAreasScrollRef}
@@ -184,74 +80,38 @@ export default function HomeDashboardScreen() {
               onContentSizeChange={() => {
                 if (didAutoScrollAreas.current) return;
                 didAutoScrollAreas.current = true;
-
                 requestAnimationFrame(() => {
                   homeAreasScrollRef.current?.scrollToEnd({ animated: false });
                 });
               }}
             >
               <SideTitleCard label={"אזורי\nהבית"} />
-
-              <LocationAreaButton
-                label="מקרר"
-                value={stats.fridge}
-                icon="snow-outline"
-                onPress={() => goInventory("fridge")}
-              />
-
-              <LocationAreaButton
-                label="מקפיא"
-                value={stats.freezer}
-                icon="cube-outline"
-                onPress={() => goInventory("freezer")}
-              />     
-
-              <LocationAreaButton
-                label="מזווה"
-                value={stats.pantry}
-                icon="restaurant-outline"
-                onPress={() => goInventory("pantry")}
-              />
-
-              <LocationAreaButton
-                label="ציוד ניקוי"
-                value={stats.cleaningSupplies}
-                icon="water-outline"
-                onPress={() => goInventory("cleaning")}
-              />
-
-              <LocationAreaButton
-                label="אחר"
-                value={stats.other}
-                icon="ellipsis-horizontal-outline"
-                onPress={() => goInventory("other")}
-              />
+              <LocationAreaButton label="מקרר" value={stats.fridge} icon="snow-outline" onPress={() => goInventory("fridge")} />
+              <LocationAreaButton label="מקפיא" value={stats.freezer} icon="cube-outline" onPress={() => goInventory("freezer")} />
+              <LocationAreaButton label="מזווה" value={stats.pantry} icon="restaurant-outline" onPress={() => goInventory("pantry")} />
+              <LocationAreaButton label="ציוד ניקוי" value={stats.cleaningSupplies} icon="water-outline" onPress={() => goInventory("cleaning")} />
+              <LocationAreaButton label="אחר" value={stats.other} icon="ellipsis-horizontal-outline" onPress={() => goInventory("other")} />
             </ScrollView>
           </View>
 
-          {/* quick actions */}
+          {/* QUICK ACTIONS */}
           <View style={styles.horizontalSection}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalListContent}
-              contentOffset={{ x: 20, y: 0 }}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalListContent}>
               <SideTitleCard label={"פעולות\nמהירות"} />
-              <QuickActionButton
-                label="סריקת קבלה"
-                icon="camera-outline"
-                onPress={() => router.push({ pathname: "/receipts/upload", params: { homeId: currentHomeId } })}
+              <QuickActionButton 
+                label="סריקת קבלה" 
+                icon="camera-outline" 
+                onPress={() => router.push({ pathname: "/receipts/upload", params: { homeId: currentHomeId } })} 
               />
-              <QuickActionButton
-                label="הוספת מוצר"
-                icon="add-circle-outline"
-                onPress={() => router.push({ pathname: "/inventory/add-item", params: { homeId: currentHomeId } })}
+              <QuickActionButton 
+                label="הוספת מוצר" 
+                icon="add-circle-outline" 
+                onPress={() => router.push({ pathname: "/inventory/add-item", params: { homeId: currentHomeId } })} 
               />
             </ScrollView>
           </View>
 
-          <ExpiringSoonCard items={expiringSoonItems as any} />
+          <ExpiringSoonCard items={expiringSoon} />
         </ScrollView>
 
         <BottomNavBar activeTab="home" />
