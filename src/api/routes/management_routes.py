@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.infrastructure.db.database import get_db
 from src.services.management_service import ManagementService
-from src.api.schemas.management_schemas import CreateHomeRequest, HomeDTO
+from src.api.schemas.management_schemas import AnswerJoinRequest, CreateHomeRequest, HomeDTO, JoinHomeRequest, UpdateHomeHeadRequest
 from src.api.schemas.common import GeneralResponse
 from src.api.security import get_current_user_id
 from src.infrastructure.app_container import AppContainer
@@ -59,3 +59,104 @@ async def get_my_homes(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+
+
+@router.get("/{home_id}/join_code", response_model=GeneralResponse)
+async def view_home_code(
+    home_id: UUID,
+    service: ManagementServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        code = await service.view_home_code(user_id, home_id)
+        return GeneralResponse(status="success", data={"join_code": code})
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+@router.post("/join", response_model=GeneralResponse)
+async def join_home(
+    request: JoinHomeRequest,
+    service: ManagementServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        await service.join_home(user_id, request.home_code)
+        return GeneralResponse(status="success", message="Join request sent successfully")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/{home_id}/answer_request", response_model=GeneralResponse)
+async def answer_join_request(
+    home_id: UUID,
+    request: AnswerJoinRequest,
+    service: ManagementServiceDep,
+    head_user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        home = await service.answer_join_request(home_id, head_user_id, request.user_id, request.approved)
+        return GeneralResponse(status="success", data=HomeDTO.from_domain(home))
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.delete("/{home_id}/members/{target_user_id}", response_model=GeneralResponse)
+async def remove_member(
+    home_id: UUID,
+    target_user_id: UUID,
+    service: ManagementServiceDep,
+    head_user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        home = await service.remove_member(head_user_id, home_id, target_user_id)
+        return GeneralResponse(status="success", data=HomeDTO.from_domain(home))
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/{home_id}/leave", response_model=GeneralResponse)
+async def leave_home(
+    home_id: UUID,
+    service: ManagementServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        await service.leave_home(user_id, home_id)
+        return GeneralResponse(status="success", message="Left home successfully")
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.put("/{home_id}/switch_head", response_model=GeneralResponse)
+async def switch_home_head(
+    home_id: UUID,
+    request: UpdateHomeHeadRequest,
+    service: ManagementServiceDep,
+    current_head_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        home = await service.switch_home_head(current_head_id, home_id, request.new_head_id)
+        return GeneralResponse(status="success", data=HomeDTO.from_domain(home))
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.delete("/{home_id}", response_model=GeneralResponse)
+async def delete_home(
+    home_id: UUID,
+    service: ManagementServiceDep,
+    head_user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        await service.delete_home(head_user_id, home_id)
+        return GeneralResponse(status="success", message="Home deleted successfully")
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.get("/{home_id}/details", response_model=GeneralResponse)
+async def get_home_details(
+    home_id: UUID,
+    service: ManagementServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        details = await service.get_home_details(user_id, home_id)
+        return GeneralResponse(status="success", data=details)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

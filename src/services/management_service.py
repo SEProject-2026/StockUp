@@ -105,6 +105,12 @@ class ManagementService:
         homes: List[Home] = await self._home_repository.get_homes_by_user_id(user_id)
         return homes
     
+    async def update_expiration_range(self, head_user_id: UUID, home_id: UUID, new_range: int) -> Home:
+        home = await self._home_repository.get_by_id(home_id)
+        home.update_expiration_range(head_user_id, new_range)
+        await self._home_repository.update(home)
+        return home
+
     async def _check_access(self, user_id: UUID, home_id: UUID) -> Home:
         """Helper to verify user exists, logged in, and member of the home"""
         if not user_id or not home_id:

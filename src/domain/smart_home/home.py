@@ -122,3 +122,11 @@ class Home:
     def can_delete_home(self, head_user_id: UUID) -> None:
         if not self.is_admin(head_user_id):
             raise PermissionError("Only admin can delete the home.")
+        
+
+    def update_expiration_range(self, head_user_id: UUID, new_range: int) -> None:
+        if not self.is_admin(head_user_id):
+            raise PermissionError("Only admin can update expiration range.")
+        if new_range <= 0:
+            raise ValueError("Expiration range must be a positive integer.")
+        self.set_expiration_range(new_range)
