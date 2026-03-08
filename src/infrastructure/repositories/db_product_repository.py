@@ -38,19 +38,52 @@ class DbProductRepository(IProductRepository):
             db_product.original_name = product.original_name
             db_product.nickname = product.nickname
             db_product.barcode = product.barcode
+        
+        existing_items = {item.id: item for item in db_product.items} if db_product.items else {}
 
-        db_product.items = []
-        db_product.items = [
-            ProductItemModel(
-                id=str(item.id),
-                product_id=str(product.id),
-                quantity=item.quantity,
-                expiration_date=item.expiration_date,
-                location=item.location.name if item.location else "OTHER"
-            ) for item in product.items
-        ]
-        # Flush ensures the SQL is sent to the DB buffer
+        for domain_item in product.items:
+            domain_item_id_str = str(domain_item.id)
+            
+            if domain_item_id_str in existing_items:
+                db_item = existing_items[domain_item_id_str]
+                
+                db_item.expiration_date = domain_item.expiration_date
+                db_item.location = domain_item.location.name if domain_item.location else "OTHER"
+                
+                
+                quantity_diff = domain_item.quantity - db_item.quantity 
+                if quantity_diff != 0:
+                    db_item.quantity = ProductItemModel.quantity + quantity_diff
+
+                del existing_items[domain_item_id_str]
+                
+            else:
+                new_db_item = ProductItemModel(
+                    id=domain_item_id_str,
+                    product_id=str(product.id),
+                    quantity=domain_item.quantity,
+                    expiration_date=domain_item.expiration_date,
+                    location=domain_item.location.name if domain_item.location else "OTHER"
+                )
+                self.db.add(new_db_item)
+
+        for leftover_item in existing_items.values():
+            self.db.delete(leftover_item)
+
         self.db.flush()
+
+        # db_product.items = []
+        # db_product.items = [
+        #     ProductItemModel(
+        #         id=str(item.id),
+        #         product_id=str(product.id),
+        #         quantity=item.quantity,
+        #         expiration_date=item.expiration_date,
+        #         location=item.location.name if item.location else "OTHER"
+        #     ) for item in product.items
+        # ]
+        # # Flush ensures the SQL is sent to the DB buffer
+        # self.db.flush()
 
     async def get_by_id(self, product_id: UUID) -> Optional[Product]:
         db_product = (
