@@ -7,16 +7,6 @@ from src.domain.smart_home.enums import LocationType
 from src.domain.smart_home.home import Home
 from src.domain.user import User
 
-# --- Setup Hooks ---
-def setup_module():
-    testing_container.activate_db_mode()
-
-def setup_function():
-    testing_container.reset_state()
-
-def teardown_module():
-    testing_container.activate_memory_mode()
-
 # --- Helpers ---
 
 async def create_context():
