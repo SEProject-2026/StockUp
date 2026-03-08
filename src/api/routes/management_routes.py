@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.infrastructure.db.database import get_db
 from src.services.management_service import ManagementService
-from src.api.schemas.management_schemas import AnswerJoinRequest, CreateHomeRequest, HomeDTO, JoinHomeRequest, UpdateHomeHeadRequest
+from src.api.schemas.management_schemas import AnswerJoinRequest, CreateHomeRequest, HomeDTO, JoinHomeRequest, UpdateExpirationRangeRequest, UpdateHomeHeadRequest
 from src.api.schemas.common import GeneralResponse
 from src.api.security import get_current_user_id
 from src.infrastructure.app_container import AppContainer
@@ -160,3 +160,30 @@ async def get_home_details(
         return GeneralResponse(status="success", data=details)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    
+
+@router.patch("/{home_id}/expiration_range", response_model=GeneralResponse)
+async def update_expiration_range(
+    home_id: UUID,
+    request: UpdateExpirationRangeRequest,
+    service: ManagementServiceDep,
+    head_user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        updated_home = await service.update_expiration_range(
+            head_user_id=head_user_id, 
+            home_id=home_id, 
+            new_range=request.new_range
+        )
+        
+        return GeneralResponse(
+            status="success",
+            message="Expiration range updated successfully",
+            data=HomeDTO.from_domain(updated_home)
+        )
+    except PermissionError as e:
+        # User is not the head of the house
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        # Home not found or invalid input
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
