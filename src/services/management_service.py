@@ -2,17 +2,12 @@ from uuid import UUID
 from typing import List
 from src.repositories.i_home_repository import IHomeRepository
 from src.domain.smart_home.home import Home
-from src.response import Response
 
 
 class ManagementService:
 
     def __init__(self, home_repository: IHomeRepository):
             self._home_repository = home_repository
-
-
-    def get_home_repository(self) -> IHomeRepository:
-            return self._home_repository
 
     # ==========================================
     # 1. Home Management (House & Members)
@@ -28,258 +23,95 @@ class ManagementService:
         
         return new_home
 
-    async def view_home_code(self, user_id: UUID, home_id: UUID) -> Response:
+    async def view_home_code(self, user_id: UUID, home_id: UUID) -> str:
         """Retrieves the home join code (Admin only)."""
-        if not user_id or not home_id:
-            return Response(isOk = False, error_message = "User ID and Home ID are required.")
-        # Check if home exists
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
-        
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            join_code = home.view_home_code(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while viewing the home code.")
-        
-        return Response(
-            isOk = True,
-            data = {
-                "home id": str(home_id),
-                "join code": join_code
-            }
-        )
+        home = await self._check_access(user_id, home_id)
 
-    async def join_home(self, user_id: UUID, home_code: str) -> Response:
+        join_code = home.view_home_code(user_id)
+
+        return join_code
+
+    async def join_home(self, user_id: UUID, home_code: str) -> None:
         """
         User requests to join a home using a code.
         Creates a 'join request' waiting for approval.
         """
-        if not user_id or not home_code:
-            return Response(isOk = False, error_message = "User ID and Home Code are required.")
-        # Check if home exists
-        try:
-            home: Home = await self._home_repository.get_by_join_code(home_code)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
-        
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            home.add_join_request(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while joining the home.")
-        
-        try:
-            await self._home_repository.update(home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
-        
-        return Response(isOk = True, data = {"message": "Join request sent successfully."})
+        home: Home = await self._home_repository.get_by_join_code(home_code)
 
-    async def answer_join_request(self, home_id: UUID, head_user_id: UUID, user_id: UUID, approved: bool) -> Response:
+        if home is None:
+            raise ValueError("Home not found.")
+
+        home.add_join_request(user_id)
+        await self._home_repository.update(home)
+
+    async def answer_join_request(self, home_id: UUID, head_user_id: UUID, user_id: UUID, approved: bool) -> Home:
         """Head of House approves or denies a join request."""
-        # Authentication session should provide user_id
-        if not user_id or not home_id or not head_user_id:
-            return Response(isOk = False, error_message = "Users ID and Home ID are required.")        
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
-        
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            home.answer_join_request(head_user_id, user_id, approved)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while answering the join request.")
-        
-        try:
-            await self._home_repository.update(home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
-        
-        return Response(isOk = True, data = {"message": "Join request answered successfully."})
+        home = await self._check_access(head_user_id, home_id)
+        home.answer_join_request(head_user_id, user_id, approved)
 
-    async def remove_member(self, head_user_id: UUID, home_id: UUID, target_user_id: UUID) -> Response:
+        await self._home_repository.update(home)
+        return home
+    
+    async def remove_member(self, head_user_id: UUID, home_id: UUID, target_user_id: UUID) -> Home:
         """Head of House removes a member from the home."""
-        if not head_user_id or not home_id or not target_user_id:
-            return Response(isOk = False, error_message = "Users ID and Home ID are required.") 
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        home = await self._check_access(head_user_id, home_id)
+        home.remove_member(head_user_id, target_user_id)
         
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            home.remove_member(head_user_id, target_user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while removing the user.")
-        
-        try:
-            await self._home_repository.update(home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
-        
-        return Response(isOk = True, data = {"message": "User removed successfully."})
+        await self._home_repository.update(home)
+        return home
 
-    async def switch_home(self, user_id: UUID, target_home_id: UUID) -> Response:
+    async def switch_home(self, user_id: UUID, target_home_id: UUID) -> Home:
         """Switches user context to a different home (returns new home details)."""
-        if not user_id or not target_home_id:
-            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
-        try:
-            target_home: Home = await self._home_repository.get_by_id(target_home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
-        
-        if target_home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            target_home.can_switch_home(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = str(e))
-        
-        return Response(
-            isOk = True,
-            data = {
-                "home id": str(target_home.get_id()),
-                "home name": target_home.get_name(),
-                "message": "Switched home successfully."
-            }
-        )
+        target_home = await self._check_access(user_id, target_home_id)
+        target_home.can_switch_home(user_id)
+       
+        return target_home
 
-    async def leave_home(self, user_id: UUID, home_id: UUID) -> Response:
+    async def leave_home(self, user_id: UUID, home_id: UUID) -> None:
         """User voluntarily leaves a home."""
-        if not user_id or not home_id:
-            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        home = await self._check_access(user_id, home_id)
+        home.leave_home(user_id)
         
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            home.leave_home(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while leaving the home.")
-        
-        try:
-            await self._home_repository.update(home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
-        
-        return Response(isOk = True, data = {"message": "Left home successfully."})
+        await self._home_repository.update(home)
 
-    async def switch_home_head(self, current_head_id: UUID, home_id: UUID, new_head_id: UUID) -> Response:
+    async def switch_home_head(self, current_head_id: UUID, home_id: UUID, new_head_id: UUID) -> Home:
         """Transfers 'Head of House' role to another member."""
-        if not current_head_id or not home_id or not new_head_id:
-            return Response(isOk = False, error_message = "Users ID and Home ID are required.") 
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
+        home = await self._check_access(current_head_id, home_id)
+        home.assign_admin(current_head_id, new_head_id)
         
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
+        await self._home_repository.update(home)
+        return home
         
-        try:
-            home.assign_admin(current_head_id, new_head_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while switching home head.")
-        
-        try:
-            await self._home_repository.update(home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while updating the home.")
-        
-        return Response(isOk = True, data = {"message": "Home head switched successfully."})
-
-    async def delete_home(self, head_user_id: UUID, home_id: UUID) -> Response:
+    async def delete_home(self, head_user_id: UUID, home_id: UUID) -> None:
         """Permanently deletes the home and all associated data (Admin only)."""
-        if not head_user_id or not home_id:
-            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
-        
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            home.can_delete_home(head_user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = str(e))
-        
-        try:
-            await self._home_repository.delete(home)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while deleting the home.")
-        
-        return Response(isOk = True, data = {"message": "Home deleted successfully."})
+        home = await self._check_access(head_user_id, home_id)
+        home.can_delete_home(head_user_id)
 
-    async def get_home_details(self, user_id: UUID, home_id: UUID) -> Response:
+        # Note: When implementing the notification system, we should also trigger 
+        # notifications to all members about the home deletion here.
+        
+        await self._home_repository.delete(home_id)
+        
+    async def get_home_details(self, user_id: UUID, home_id: UUID) -> dict:
         """Retrieves home details including members and inventory summary."""
-        if not user_id or not home_id:
-            return Response(isOk = False, error_message = "User ID and Home ID are required.") 
-        try:
-            home: Home = await self._home_repository.get_by_id(home_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving the home.")
-        
-        if home is None:
-            return Response(isOk = False, error_message = "Home not found.")
-        
-        try:
-            home_details = home.get_home_details(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while getting home details.")
-        
-        return Response(isOk = True, data = home_details)
+        home = await self._check_access(user_id, home_id)
+        home_details = home.get_home_details(user_id)
+        return home_details
     
     async def get_all_homes_for_user(self, user_id: UUID) -> List[Home]:
         """Retrieves a list of all homes the user is a member of."""
         if not user_id:
-            return Response(isOk = False, error_message = "User ID is required.") 
-        try:
-            homes: List[Home] = await self._home_repository.get_homes_by_user_id(user_id)
-        except Exception as e:
-            print(e)
-            return Response(isOk = False, error_message = "An internal error occurred while retrieving homes.")
-        
+            raise ValueError("User ID is required.")
+        homes: List[Home] = await self._home_repository.get_homes_by_user_id(user_id)
         return homes
+    
+    async def _check_access(self, user_id: UUID, home_id: UUID) -> Home:
+        """Helper to verify user exists, logged in, and member of the home"""
+        if not user_id or not home_id:
+            raise ValueError("User ID and Home ID are required.")
+        home = await self._home_repository.get_by_id(home_id)
+        if not home:
+            raise ValueError("Home retrieval failed.")
+        if not home.is_member(user_id):
+            raise ValueError("User is not a member of the home")
+        return home
