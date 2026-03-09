@@ -20,3 +20,6 @@ class InMemoryUserRepository(IUserRepository):
 
     async def get_by_id(self, user_id: UUID) -> Optional[User]:
         return self.users.get(user_id, None)
+    
+    async def get_names_by_ids(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        return {user_id: self.users[user_id].name for user_id in user_ids if user_id in self.users}

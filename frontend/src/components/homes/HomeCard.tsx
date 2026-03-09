@@ -5,8 +5,9 @@ import { Ionicons } from "@expo/vector-icons";
 type Home = {
   id: string;
   name: string;
-  membersCount: number;
-  updatedAt: string; 
+  pendingRequestsCount: number;
+  adminId: string;
+  expirationRange: number;
 };
 
 const BRAND_PRIMARY = "#0284C7";
@@ -14,6 +15,8 @@ const TEXT = "#111827";
 const MUTED = "#6B7280";
 const BORDER = "#E5E7EB";
 const CARD = "#FFFFFF";
+const SOFT_BLUE = "rgba(2,132,199,0.10)";
+const SOFT_ORANGE = "rgba(245,158,11,0.12)";
 
 type Props = {
   home: Home;
@@ -23,55 +26,32 @@ type Props = {
 export default function HomeCard({ home, onPress }: Props) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.card}>
-      {/* Top row: icon + updated */}
       <View style={styles.cardTopRow}>
         <View style={styles.gridIcon}>
           <Ionicons name="home-outline" size={22} color={BRAND_PRIMARY} />
         </View>
 
-        <View style={styles.updatedPill}>
-          <Ionicons name="time" size={14} color={MUTED} />
-          <Text style={styles.updatedText} numberOfLines={1}>
-            {formatRelativeDate(home.updatedAt)}
-          </Text>
-        </View>
+        {home.pendingRequestsCount > 0 ? (
+          <View style={styles.pendingBadge}>
+            <Ionicons name="mail-unread-outline" size={13} color="#B45309" />
+            <Text style={styles.pendingText} numberOfLines={1}>
+              {home.pendingRequestsCount} ממתינות
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      {/* Name */}
-      <Text style={styles.homeName} numberOfLines={2} ellipsizeMode="tail">
-        {home.name}
-      </Text>
+      <View style={styles.content}>
+        <Text style={styles.homeName} numberOfLines={2} ellipsizeMode="tail">
+          {home.name}
+        </Text>
+      </View>
 
-      {/* Bottom row */}
       <View style={styles.cardBottomRow}>
-        <View style={styles.metaPill}>
-          <Ionicons name="person-outline" size={14} color={BRAND_PRIMARY} />
-          <Text style={styles.metaText} numberOfLines={1}>
-            {home.membersCount} {home.membersCount === 1 ? "אדם" : "אנשים"}
-          </Text>
-        </View>
-
         <Ionicons name="chevron-back" size={18} color={MUTED} />
       </View>
     </TouchableOpacity>
   );
-}
-
-function formatRelativeDate(iso: string) {
-  const d = new Date(iso);
-  const diffMs = Date.now() - d.getTime();
-
-  if (diffMs < 0) return "עוד רגע";
-
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "עכשיו";
-  if (minutes < 60) return `${minutes} דק׳`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ש׳`;
-
-  const days = Math.floor(hours / 24);
-  return days === 1 ? "אתמול" : `${days} ימים`;
 }
 
 const styles = StyleSheet.create({
@@ -96,6 +76,7 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
+    minHeight: 44,
   },
 
   gridIcon: {
@@ -108,37 +89,44 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
 
-  updatedPill: {
+  pendingBadge: {
+    maxWidth: "68%",
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: SOFT_ORANGE,
     borderWidth: 1,
-    borderColor: BORDER,
-    maxWidth: "70%",
+    borderColor: "rgba(245,158,11,0.25)",
   },
-  updatedText: {
+
+  pendingText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: MUTED,
+    fontWeight: "800",
+    color: "#92400E",
     textAlign: "right",
+  },
+
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    marginTop: 8,
   },
 
   homeName: {
-    marginTop: 10,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "800",
     color: TEXT,
     textAlign: "right",
+    lineHeight: 22,
   },
 
-  cardBottomRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "space-between",
+  metaColumn: {
+    marginTop: 12,
+    alignItems: "flex-end",
+    gap: 8,
   },
 
   metaPill: {
@@ -148,14 +136,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "rgba(2,132,199,0.10)",
+    backgroundColor: SOFT_BLUE,
     borderWidth: 1,
     borderColor: "rgba(2,132,199,0.16)",
+    alignSelf: "flex-end",
   },
+
   metaText: {
     fontSize: 12,
     fontWeight: "800",
     color: TEXT,
     textAlign: "right",
+  },
+
+  cardBottomRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    marginTop: 10,
   },
 });

@@ -54,7 +54,14 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
         //router.replace("/ShoppingListScreen");
         break;
       case "settings":
-        router.replace("/settings");
+        if (currentHomeId) {
+          router.replace({
+            pathname: "/settings",
+            params: { homeId: currentHomeId },
+          });
+        } else {
+          router.replace("/settings"); // או "/homes" אם מלאי חייב בית
+        }
         break;
     }
   };

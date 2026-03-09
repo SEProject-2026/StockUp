@@ -39,8 +39,8 @@ async def add_product(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    app_logger.info(f"Add product request received from user {user_id} for home {home_id}")
     try:
-        app_logger.info(f"Attempting to add product for user {user_id} in home {home_id}")
         product = await service.add_product(
             name=request.name,
             user_id=user_id,
@@ -51,14 +51,13 @@ async def add_product(
             location=request.location,
             nickname=request.nickname
         )
-        app_logger.info(f"Product '{request.name}' added successfully for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             message="Product added successfully",
             data=ProductDTO.from_domain(product)
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to add product '{request.name}' for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Failed to add product for user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -72,8 +71,8 @@ async def update_item_quantity(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Updates the quantity of a specific item batch."""
+    app_logger.info(f"Quantity update request received for item {item_id} from user {user_id}")
     try:
-        app_logger.info(f"Attempting to update quantity for item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         updated_product = await service.update_item_quantity(
             user_id=user_id,
             home_id=home_id,
@@ -83,16 +82,14 @@ async def update_item_quantity(
         )
         
         if updated_product is None:
-            app_logger.info(f"Product completely removed for user {user_id} in home {home_id}")
             return GeneralResponse(status="success", message="Product completely removed", data=None)
 
-        app_logger.info(f"Quantity updated successfully for item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             data=ProductDTO.from_domain(updated_product)
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to update quantity for item {item_id} of product {product_id} for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Quantity update failed for item {item_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -106,8 +103,8 @@ async def update_item_expiration(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Updates the expiration date of a specific item batch."""
+    app_logger.info(f"Expiration update request received for item {item_id} from user {user_id}")
     try:
-        app_logger.info(f"Attempting to update expiration date for item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         updated_product = await service.update_item_date(
             user_id=user_id,
             home_id=home_id,
@@ -115,13 +112,12 @@ async def update_item_expiration(
             item_id=item_id,
             new_date=request.new_date
         )
-        app_logger.info(f"Expiration date updated successfully for item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             data=ProductDTO.from_domain(updated_product)
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to update expiration date for item {item_id} of product {product_id} for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Expiration update failed for item {item_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -135,8 +131,8 @@ async def update_item_location(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Moves an item to a new location."""
+    app_logger.info(f"Location update request received for item {item_id} from user {user_id}")
     try:
-        app_logger.info(f"Attempting to update location for item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         updated_product = await service.update_item_location(
             user_id=user_id,
             home_id=home_id,
@@ -144,14 +140,14 @@ async def update_item_location(
             item_id=item_id,
             new_location=request.location
         )
-        app_logger.info(f"Location updated successfully for item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             data=ProductDTO.from_domain(updated_product)
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to update location for item {item_id} of product {product_id} for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Location update failed for item {item_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 
 @router.patch("/{product_id}/nickname", response_model=GeneralResponse)
 async def update_nickname(
@@ -162,21 +158,20 @@ async def update_nickname(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Updates the nickname of the Product aggregate."""
+    app_logger.info(f"Nickname update request received for product {product_id} from user {user_id}")
     try:
-        app_logger.info(f"Attempting to update nickname for product {product_id} for user {user_id} in home {home_id}")
         updated_product = await service.update_nickname(
             user_id=user_id,
             home_id=home_id,
             product_id=product_id,
             new_nickname=request.nickname
         )
-        app_logger.info(f"Nickname updated successfully for product {product_id} for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             data=ProductDTO.from_domain(updated_product)
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to update nickname for product {product_id} for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Nickname update failed for product {product_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -189,8 +184,8 @@ async def remove_item(
     user_id: UUID = Depends(get_current_user_id),
 ):
     """Removes a specific item. If it's the last item, the Product is deleted."""
+    app_logger.info(f"Item removal request received for item {item_id} from user {user_id}")
     try:
-        app_logger.info(f"Attempting to remove item {item_id} of product {product_id} for user {user_id} in home {home_id}")
         result = await service.remove_item(
             user_id=user_id,
             home_id=home_id,
@@ -200,11 +195,11 @@ async def remove_item(
         
         message = "Item removed" if result else "Product completely removed"
         data = ProductDTO.from_domain(result) if result else None
-        app_logger.info(f"Item {item_id} of product {product_id} removed successfully for user {user_id} in home {home_id}")
+        
         return GeneralResponse(status="success", message=message, data=data)
         
     except ValueError as e:
-        app_logger.warning(f"Failed to remove item {item_id} of product {product_id} for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Item removal failed for item {item_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -217,14 +212,12 @@ async def filter_by_location(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    app_logger.info(f"Filter by location ({location}) request received from user {user_id}")
     try:
-        app_logger.info(f"Attempting to filter products by location for user {user_id} in home {home_id}")
-        # Service returns List[ProductDTO]
         results = await service.filter_by_location(user_id, home_id, location)
-        app_logger.info(f"Filtered products by location successfully for user {user_id} in home {home_id}")
         return GeneralResponse(status="success", data=results)
     except ValueError as e:
-        app_logger.warning(f"Failed to filter products by location for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Filter by location failed for user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -235,14 +228,12 @@ async def filter_by_expiration(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    app_logger.info(f"Filter by expiration ({type}) request received from user {user_id}")
     try:
-        app_logger.info(f"Attempting to filter products by expiration type for user {user_id} in home {home_id}")
-        # Service returns List[ProductDTO]
         results = await service.filter_by_expiration_type(user_id, home_id, type)
-        app_logger.info(f"Filtered products by expiration type successfully for user {user_id} in home {home_id}")
         return GeneralResponse(status="success", data=results)
     except ValueError as e:
-        app_logger.warning(f"Failed to filter products by expiration type for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Filter by expiration failed for user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -253,81 +244,72 @@ async def search_products(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    app_logger.info(f"Search products request received from user {user_id} with query '{query}'")
     try:
-        app_logger.info(f"Attempting to search products with query '{query}' for user {user_id} in home {home_id}")
-        # Service returns List[Product], so we convert to DTOs
         results = await service.search_product(user_id, home_id, query)
         dtos = [ProductDTO.from_domain(p) for p in results]
-        app_logger.info(f"Products searched successfully for user {user_id} in home {home_id}")
         return GeneralResponse(status="success", data=dtos)
     except ValueError as e:
-        app_logger.warning(f"Failed to search products with query '{query}' for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Search products failed for query '{query}' - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
 
 @router.get("/all", response_model=GeneralResponse)
 async def get_all_products(
-    service: StockServiceDep, # <--- Injected Service
+    service: StockServiceDep, 
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    app_logger.info(f"Get all products request received from user {user_id} for home {home_id}")
     try:
-        app_logger.info(f"Attempting to retrieve all products for user {user_id} in home {home_id}")
         products = await service.get_home_products(user_id=user_id, home_id=home_id)
-        
         products_dtos = [ProductDTO.from_domain(p) for p in products]
-        app_logger.info(f"All products retrieved successfully for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             data=products_dtos
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to retrieve all products for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Get all products failed for user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
 
 @router.get("/catalog/search", response_model=GeneralResponse)
 async def search_global_catalog_by_name(
-    service: StockServiceDep, # <--- Injected Service (Must come before Query with defaults)
+    service: StockServiceDep, 
     query: str = Query(..., min_length=2, description="Search term (e.g., 'Milk')"),
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
-
+    app_logger.info(f"Global catalog search request from user {user_id} with query '{query}'")
     try:
-        app_logger.info(f"Attempting to search global catalog with query '{query}' for user {user_id} in home {home_id}")
         results = await service.search_product_by_name_external_db(
             user_id=user_id, 
             home_id=home_id, 
             query=query
         )
-        
-        # Convert Pydantic models to dicts for the JSON response
         data = [item.model_dump() for item in results]
-        app_logger.info(f"Global catalog search completed successfully with query '{query}' for user {user_id} in home {home_id}")
         return GeneralResponse(
             status="success",
             message=f"Found {len(results)} items",
             data=data
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to search global catalog with query '{query}' for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Global catalog search failed for query '{query}' - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/catalog/barcode/{barcode}", response_model=GeneralResponse)
 async def get_global_product_by_barcode(
     barcode: str,
-    service: StockServiceDep, # <--- Injected Service (Must come before Query/Header/Depends)
+    service: StockServiceDep, 
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     """
     Lookup a specific product in the global master catalog by barcode.
-    If 'chain' is provided, it tries to find the chain-specific version first.
     """
+    app_logger.info(f"Global catalog barcode lookup request from user {user_id} for barcode '{barcode}'")
     try:
-        app_logger.info(f"Attempting to search global catalog by barcode '{barcode}' for user {user_id} in home {home_id}")
         item = await service.search_product_by_barcode_external_db(
             user_id=user_id, 
             home_id=home_id, 
@@ -335,20 +317,19 @@ async def get_global_product_by_barcode(
         )
         
         if not item:
-            app_logger.info(f"No product found in global catalog with barcode '{barcode}' for user {user_id} in home {home_id}")
             return GeneralResponse(
                 status="success", 
                 message="Product not found in global catalog", 
                 data=None
             )
-        app_logger.info(f"Product found in global catalog with barcode '{barcode}' for user {user_id} in home {home_id}")
+            
         return GeneralResponse(
             status="success",
             message="Product found",
             data=item.model_dump()
         )
     except ValueError as e:
-        app_logger.warning(f"Failed to search global catalog by barcode '{barcode}' for user {user_id} in home {home_id} - {str(e)}")
+        app_logger.warning(f"Barcode lookup failed for '{barcode}' - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
 
@@ -359,54 +340,50 @@ async def scan_receipt(
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
+    app_logger.info(f"Receipt scan request received from user {user_id} with {len(files)} files")
+    import tempfile, shutil, os
+
+    tmp_paths: List[str] = []
+
     try:
-        app_logger.info(f"Attempting to scan receipt for user {user_id} in home {home_id} with {len(files)} files")
-        import tempfile, shutil, os
-        from typing import List
+        for f in files:
+            suffix = os.path.splitext(f.filename or "")[1] or ".bin"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp_path = tmp.name
+                shutil.copyfileobj(f.file, tmp)
+            try:
+                await f.close()
+            except Exception:
+                pass
+            tmp_paths.append(tmp_path)
 
-        tmp_paths: List[str] = []
-
-        try:
-            # 1) save each uploaded file to a temp path
-            for f in files:
-                suffix = os.path.splitext(f.filename or "")[1] or ".bin"
-
-                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                    tmp_path = tmp.name
-                    shutil.copyfileobj(f.file, tmp)
-                try:
-                    await f.close()
-                except Exception:
-                    pass
-                tmp_paths.append(tmp_path)
-
-            # 2) run scan on all files in ONE logical receipt
-            result = await service.scan_receipt(
-                user_id=user_id,
-                home_id=home_id,
-                files_paths=tmp_paths,
-            )
-            app_logger.info(f"Receipt scanned successfully for user {user_id} in home {home_id} with {len(tmp_paths)} files")
-            return GeneralResponse(
-                status="success",
-                data=result.model_dump(),
-            )
-
-        finally:
-            # 3) cleanup temp files
-            for p in tmp_paths:
-                try:
-                    if p and os.path.exists(p):
-                        os.remove(p)
-                except Exception as e:
-                    app_logger.warning(f"Cleanup error: {e}")
+        result = await service.scan_receipt(
+            user_id=user_id,
+            home_id=home_id,
+            files_paths=tmp_paths,
+        )
+        
+        return GeneralResponse(
+            status="success",
+            data=result.model_dump(),
+        )
 
     except Exception as e:
-        app_logger.error(f"CRITICAL ERROR: {str(e)}")
+        # Unexpected server error during scanning process
+        app_logger.error(f"Receipt scanning process failed critically - Error: {str(e)}")
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Scanning failed: {str(e)}",
         )
+    finally:
+        for p in tmp_paths:
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except Exception as e:
+                # Warning is perfect here: Cleanup failed, but it doesn't break the user's flow
+                app_logger.warning(f"Failed to clean up temporary file {p} - {e}")
+
 
 @router.post("/add-receipt", response_model=GeneralResponse)
 async def add_receipt(
@@ -418,9 +395,8 @@ async def add_receipt(
     """
     Accepts confirmed receipt items from the client and adds them to inventory.
     """
+    app_logger.info(f"Add receipt request received from user {user_id} with {len(request.items)} items")
     try:
-        app_logger.info(f"Attempting to add receipt for user {user_id} in home {home_id} with {len(request.items)} items")
-        # Assemble the internal ReceiptDTO from Request and Auth data
         receipt_dto = ReceiptDTO(
             id=uuid4(),
             home_id=home_id,
@@ -429,7 +405,7 @@ async def add_receipt(
             items=[
                 ReceiptItemDTO(
                     name=item.name,
-                    quantity=item.quantity, # Receipt scanner returns floats
+                    quantity=item.quantity, 
                     barcode=item.barcode,
                     expiration_date=item.expiration_date,
                     unit=item.unit,
@@ -440,10 +416,8 @@ async def add_receipt(
             ]
         )
         
-
-        # Process via service which delegates to add_product for upsert logic
         processed_count = await service.add_receipt(receipt_dto)
-        app_logger.info(f"Successfully processed receipt for user {user_id} in home {home_id} - {processed_count} items added")
+        
         return GeneralResponse(
             status="success",
             message=f"Successfully added {processed_count} items from receipt",
@@ -451,10 +425,10 @@ async def add_receipt(
         )
         
     except ValueError as e:
-        app_logger.warning(f"Invalid request data for user {user_id} in home {home_id}: {str(e)}")
+        app_logger.warning(f"Invalid receipt data submitted by user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        app_logger.error(f"CRITICAL ERROR: {str(e)}")
+        app_logger.error(f"Critical error while processing receipt for user {user_id} - Error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"An error occurred while processing the receipt: {str(e)}"

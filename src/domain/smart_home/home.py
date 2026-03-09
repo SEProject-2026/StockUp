@@ -1,15 +1,14 @@
 from uuid import UUID, uuid4
 from typing import Dict, Set
-from src.domain.domain_exception import UserMustBeMemberException
 
-
+join_code_length = 8
 
 class Home:
 
     def __init__(self, user_id: UUID, name: str):
         self._id: UUID = uuid4()
         self._name: str = name
-        self._join_code: str = self._id.hex[:6].upper()  # Simple join code generation
+        self._join_code: str = self._id.hex[:join_code_length].upper()  # Simple join code generation
         self._members: Set[UUID] = set()  # Set of user IDs
         self._members.add(user_id)  # Creator is the first member
         self._admin: UUID = user_id  # Admin user ID, assigned to creator by default
@@ -34,6 +33,11 @@ class Home:
     def get_join_requests(self) -> Set[UUID]:
         return self._join_requests
     
+    def get_join_requests_names(self, head_user_id: UUID) -> Set[UUID]:
+        if not self.is_admin(head_user_id):
+            raise PermissionError("Only admin can view join requests.")
+        return self._join_requests
+    
     def get_expiration_range(self) -> int:
         return self._expiration_range
     
@@ -47,7 +51,7 @@ class Home:
         if not self.is_admin(head_user_id):
                 raise PermissionError("Only current admin can transfer admin rights.")
         if not self.is_member(user_id):
-            raise UserMustBeMemberException()
+            raise ValueError("User is not a member of the home.")
         self._admin = user_id
 
     def is_admin(self, user_id: UUID) -> bool:
@@ -88,7 +92,7 @@ class Home:
         if self.is_member(user_id):
             self._members.remove(user_id)
         else:
-            raise UserMustBeMemberException()
+            raise ValueError("User is not a member of the home.")
         
     def leave_home(self, user_id: UUID) -> None:
         if self.is_admin(user_id):
@@ -105,7 +109,7 @@ class Home:
     
     def get_home_details(self, user_id: UUID) -> Dict:
         if not self.is_member(user_id):
-            raise UserMustBeMemberException()
+            raise ValueError("User is not a member of the home.")
         
         details = {
             "id": str(self.get_id()),
@@ -118,8 +122,16 @@ class Home:
     
     def can_switch_home(self, user_id: UUID) -> None:
         if not self.is_member(user_id):
-            raise UserMustBeMemberException()
-        
+            raise ValueError("User is not a member of the home.")
+
     def can_delete_home(self, head_user_id: UUID) -> None:
         if not self.is_admin(head_user_id):
             raise PermissionError("Only admin can delete the home.")
+        
+
+    def update_expiration_range(self, head_user_id: UUID, new_range: int) -> None:
+        if not self.is_admin(head_user_id):
+            raise PermissionError("Only admin can update expiration range.")
+        if new_range <= 0:
+            raise ValueError("Expiration range must be a positive integer.")
+        self.set_expiration_range(new_range)
