@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,16 +10,32 @@ import {
   TextInput,
   Modal,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
+import { getCurrentUserId } from "@/src/auth/token";
+import {
+  getHomeJoinCode,
+  updateExpirationRange,
+  answerJoinRequest,
+  getJoinRequests,
+  getMyHomes,
+  getHomeDetails,
+  leaveHome,
+  switchHomeHead,
+  removeMember,
+  deleteHome,
+  type HomeDTO,
+  type HomeDetailsDTO,
+} from "@/src/api/homes";
 
 const TEXT = "#111827";
 const MUTED = "#6B7280";
@@ -34,6 +50,16 @@ type RowProps = {
   right?: React.ReactNode;
   onPress?: () => void;
   danger?: boolean;
+};
+
+type JoinRequestItem = {
+  user_id: string;
+  name: string;
+};
+
+type HomeMemberItem = {
+  user_id: string;
+  name: string;
 };
 
 function SettingsRow({ icon, title, subtitle, right, onPress, danger }: RowProps) {
@@ -75,18 +101,37 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const Divider = () => <View style={styles.divider} />;
 
 export default function SettingsScreen() {
-  // demo flags
-  const isHomeCreator = true;
-  const homeInviteCode = "A7K9-3Q";
+  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+  const currentHomeId = homeId ? String(homeId) : undefined;
 
-  // preferences
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expiryAlertsEnabled, setExpiryAlertsEnabled] = useState(true);
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
 
-  // modals
   const [daysModalOpen, setDaysModalOpen] = useState(false);
   const [homeCodeOpen, setHomeCodeOpen] = useState(false);
+  const [joinRequestsOpen, setJoinRequestsOpen] = useState(false);
+  const [switchHeadOpen, setSwitchHeadOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+
+  const [homeInviteCode, setHomeInviteCode] = useState("");
+  const [loadingHomeCode, setLoadingHomeCode] = useState(false);
+  const [savingDays, setSavingDays] = useState(false);
+
+  const [homeMeta, setHomeMeta] = useState<HomeDTO | null>(null);
+  const [homeMembers, setHomeMembers] = useState<HomeMemberItem[]>([]);
+  const [loadingHomeMeta, setLoadingHomeMeta] = useState(false);
+
+  const [joinRequests, setJoinRequests] = useState<JoinRequestItem[]>([]);
+  const [loadingJoinRequests, setLoadingJoinRequests] = useState(false);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+
+  const [switchingHead, setSwitchingHead] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [leavingHomeLoading, setLeavingHomeLoading] = useState(false);
+  const [deletingHomeLoading, setDeletingHomeLoading] = useState(false);
 
   const clampDays = (n: number) => Math.max(0, Math.min(30, n));
 
@@ -100,6 +145,10 @@ export default function SettingsScreen() {
   const handleBack = () => {
     if (router.canGoBack?.()) router.back();
     else router.replace("/home/home");
+  };
+
+  const handleExitHome = () => {
+    router.replace("/home/home");
   };
 
   const confirmLogout = () => {
@@ -118,6 +167,308 @@ export default function SettingsScreen() {
       ? "התראה ביום פג התוקף בלבד"
       : `התראה ${expiryLeadDays} ימים לפני פג התוקף`;
 
+  const loadHomeData = async () => {
+    if (!currentHomeId) return;
+
+    try {
+      setLoadingHomeMeta(true);
+
+      const homesRes = await getMyHomes();
+      const currentHome = Array.isArray(homesRes.data)
+        ? homesRes.data.find((home) => String(home.id) === String(currentHomeId))
+        : null;
+
+      if (!currentHome) {
+        throw new Error("הבית לא נמצא");
+      }
+
+      setHomeMeta(currentHome);
+
+      if (typeof currentHome.expiration_range === "number") {
+        setExpiryLeadDays(currentHome.expiration_range);
+      }
+
+      const detailsRes = await getHomeDetails(currentHomeId);
+      const details: HomeDetailsDTO | undefined = detailsRes.data;
+      const memberNamesMap =
+        details?.member_names && typeof details.member_names === "object"
+          ? (details.member_names as Record<string, string>)
+          : {};
+
+      const membersFromDetails: HomeMemberItem[] = Object.entries(memberNamesMap).map(
+        ([userId, name]) => ({
+          user_id: String(userId),
+          name: String(name),
+        })
+      );
+
+      if (membersFromDetails.length > 0) {
+        setHomeMembers(membersFromDetails);
+      } else {
+        setHomeMembers(
+          Array.isArray(currentHome.member_ids)
+            ? currentHome.member_ids.map((id) => {
+                const normalizedId = String(id);
+                const isCurrentUser =
+                  currentUserId && String(currentUserId) === normalizedId;
+
+                return {
+                  user_id: normalizedId,
+                  name: isCurrentUser ? "את/ה" : `משתמש ${normalizedId.slice(0, 8)}`,
+                };
+              })
+            : []
+        );
+      }
+    } catch (e: any) {
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון את פרטי הבית.");
+    } finally {
+      setLoadingHomeMeta(false);
+    }
+  };
+
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      const userId = await getCurrentUserId();
+      setCurrentUserId(userId);
+    };
+
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    loadHomeData();
+  }, [currentHomeId, currentUserId]);
+
+  const isHomeAdmin =
+    !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
+
+  const switchableMembers = useMemo(() => {
+    if (!homeMeta) return [];
+    return homeMembers.filter((member) => member.user_id !== homeMeta.admin_id);
+  }, [homeMembers, homeMeta]);
+
+  const removableMembers = useMemo(() => {
+    if (!homeMeta) return [];
+    return homeMembers.filter((member) => member.user_id !== homeMeta.admin_id);
+  }, [homeMembers, homeMeta]);
+
+  const openHomeCodeModal = async () => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    try {
+      setLoadingHomeCode(true);
+      setHomeCodeOpen(true);
+
+      const res = await getHomeJoinCode(currentHomeId);
+      const code = res.data?.join_code;
+
+      if (!code) {
+        throw new Error(res.message || "לא התקבל קוד בית");
+      }
+
+      setHomeInviteCode(code);
+    } catch (e: any) {
+      setHomeCodeOpen(false);
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי להביא את קוד הבית.");
+    } finally {
+      setLoadingHomeCode(false);
+    }
+  };
+
+  const openJoinRequestsModal = async () => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    try {
+      setLoadingJoinRequests(true);
+      setJoinRequestsOpen(true);
+
+      const res = await getJoinRequests(currentHomeId);
+      const requestsMap = res.data ?? {};
+
+      const requests: JoinRequestItem[] = Object.entries(requestsMap).map(
+        ([userId, name]) => ({
+          user_id: String(userId),
+          name: String(name),
+        })
+      );
+
+      setJoinRequests(requests);
+    } catch (e: any) {
+      setJoinRequestsOpen(false);
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון את בקשות ההצטרפות.");
+    } finally {
+      setLoadingJoinRequests(false);
+    }
+  };
+
+  const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    try {
+      setProcessingRequestId(userId);
+
+      await answerJoinRequest(currentHomeId, {
+        user_id: userId,
+        approved,
+      });
+
+      setJoinRequests((prev) => prev.filter((item) => item.user_id !== userId));
+      await loadHomeData();
+
+      Alert.alert("בוצע", approved ? "הבקשה אושרה בהצלחה." : "הבקשה נדחתה.");
+    } catch (e: any) {
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לעדכן את הבקשה.");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  const saveExpirationRange = async () => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    try {
+      setSavingDays(true);
+      await updateExpirationRange(currentHomeId, { new_range: expiryLeadDays });
+      await loadHomeData();
+      Alert.alert("עודכן", "טווח ההתראה נשמר בהצלחה.");
+      setDaysModalOpen(false);
+    } catch (e: any) {
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לעדכן את טווח ההתראה.");
+    } finally {
+      setSavingDays(false);
+    }
+  };
+
+  const handleLeaveHome = () => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    Alert.alert("עזיבת בית", "האם אתה בטוח שברצונך לעזוב את הבית? הבית יוסר מרשימת הבתים שלך.", [
+      { text: "ביטול", style: "cancel" },
+      {
+        text: "עזיבה",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setLeavingHomeLoading(true);
+            await leaveHome(currentHomeId);
+            Alert.alert("בוצע", "עזבת את הבית בהצלחה.", [
+              {
+                text: "אישור",
+                onPress: () => router.replace("/home/home"),
+              },
+            ]);
+          } catch (e: any) {
+            Alert.alert(
+              "שגיאה",
+              e?.message ??
+                "לא הצלחתי לעזוב את הבית. אם את מנהלת הבית, ייתכן שצריך קודם להעביר ניהול או למחוק את הבית."
+            );
+          } finally {
+            setLeavingHomeLoading(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSwitchHead = async (newHeadId: string, newHeadName: string) => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    try {
+      setSwitchingHead(true);
+      await switchHomeHead(currentHomeId, { new_head_id: newHeadId });
+      await loadHomeData();
+      setSwitchHeadOpen(false);
+
+      Alert.alert("בוצע", `ניהול הבית הועבר ל־${newHeadName}.`);
+    } catch (e: any) {
+      Alert.alert("שגיאה", e?.message ?? "לא הצלחתי להעביר את ניהול הבית.");
+    } finally {
+      setSwitchingHead(false);
+    }
+  };
+
+  const handleRemoveMember = (member: HomeMemberItem) => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    Alert.alert("הסרת משתתף", `להסיר את ${member.name} מהבית?`, [
+      { text: "ביטול", style: "cancel" },
+      {
+        text: "הסרה",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setRemovingMemberId(member.user_id);
+            await removeMember(currentHomeId, member.user_id);
+            await loadHomeData();
+            Alert.alert("בוצע", `${member.name} הוסר/ה מהבית.`);
+          } catch (e: any) {
+            Alert.alert("שגיאה", e?.message ?? "לא הצלחתי להסיר את המשתתף.");
+          } finally {
+            setRemovingMemberId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteHome = () => {
+    if (!currentHomeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
+    Alert.alert(
+      "מחיקת בית",
+      "האם אתה בטוח שברצונך למחוק את הבית? פעולה זו אינה הפיכה.",
+      [
+        { text: "ביטול", style: "cancel" },
+        {
+          text: "מחיקה",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeletingHomeLoading(true);
+              await deleteHome(currentHomeId);
+              Alert.alert("בוצע", "הבית נמחק בהצלחה.", [
+                {
+                  text: "אישור",
+                  onPress: () => router.replace("/home/home"),
+                },
+              ]);
+            } catch (e: any) {
+              Alert.alert("שגיאה", e?.message ?? "לא הצלחתי למחוק את הבית.");
+            } finally {
+              setDeletingHomeLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <LinearGradient
@@ -132,22 +483,6 @@ export default function SettingsScreen() {
         <ScreenHeader title="הגדרות" onBack={handleBack} />
 
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-          <Section title="חשבון">
-            <SettingsRow
-              icon="person-outline"
-              title="פרופיל"
-              subtitle="שם, אימייל וסיסמה"
-              onPress={() => router.push("/settings")}
-            />
-            <Divider />
-            <SettingsRow
-              icon="people-outline"
-              title="ניהול בתים"
-              subtitle="חברים, הרשאות והזמנות"
-              onPress={() => router.push("/home/home")}
-            />
-          </Section>
-
           <Section title="התראות">
             <SettingsRow
               icon="notifications-outline"
@@ -174,22 +509,73 @@ export default function SettingsScreen() {
               title="התראה לפני פג תוקף"
               subtitle={expiryLeadDays === 0 ? "ביום פג התוקף" : `${expiryLeadDays} ימים מראש`}
               onPress={() => {
-                // אם ההתראות כבויות — לא נפתח
                 if (!notificationsEnabled || !expiryAlertsEnabled) return;
                 setDaysModalOpen(true);
               }}
             />
           </Section>
 
-          {isHomeCreator && (
-            <Section title="בית">
+          <Section title="בית">
+            <SettingsRow
+              icon="arrow-undo-outline"
+              title="יציאה מהבית"
+              subtitle="חזרה למסך הבתים ללא עזיבת הבית"
+              onPress={handleExitHome}
+            />
+            <Divider />
+            <SettingsRow
+              icon="exit-outline"
+              title="עזיבת בית"
+              subtitle="הסרה מהבית כך שלא יופיע יותר ברשימת הבתים שלך"
+              onPress={handleLeaveHome}
+              danger
+            />
+          </Section>
+
+          {isHomeAdmin && (
+            <Section title="הרשאות מנהל">
               <SettingsRow
                 icon="key-outline"
                 title="קוד הבית"
                 subtitle="הצגת קוד להצטרפות לבית"
-                onPress={() => setHomeCodeOpen(true)}
+                onPress={openHomeCodeModal}
+              />
+              <Divider />
+              <SettingsRow
+                icon="mail-open-outline"
+                title="בקשות הצטרפות"
+                subtitle="צפייה ואישור בקשות להצטרפות לבית"
+                onPress={openJoinRequestsModal}
+              />
+              <Divider />
+              <SettingsRow
+                icon="swap-horizontal-outline"
+                title="החלפת מנהל בית"
+                subtitle="בחירה מתוך רשימת המשתתפים בבית"
+                onPress={() => setSwitchHeadOpen(true)}
+              />
+              <Divider />
+              <SettingsRow
+                icon="people-circle-outline"
+                title="ניהול משתתפים"
+                subtitle="צפייה והסרת משתתפים מהבית"
+                onPress={() => setMembersOpen(true)}
+              />
+              <Divider />
+              <SettingsRow
+                icon="trash-outline"
+                title="מחיקת בית"
+                subtitle="מחיקה מלאה של הבית"
+                onPress={handleDeleteHome}
+                danger
               />
             </Section>
+          )}
+
+          {loadingHomeMeta && (
+            <View style={styles.inlineLoader}>
+              <ActivityIndicator size="small" color={BRAND_PRIMARY} />
+            </View>
           )}
 
           <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout} activeOpacity={0.85}>
@@ -203,7 +589,6 @@ export default function SettingsScreen() {
         <BottomNavBar activeTab="settings" />
       </View>
 
-      {/* ───────────── Modal: Lead days ───────────── */}
       <Modal
         visible={daysModalOpen}
         transparent
@@ -255,21 +640,18 @@ export default function SettingsScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, savingDays && styles.disabledBtn]}
                 activeOpacity={0.85}
-                onPress={() => {
-                  Alert.alert("עודכן", "ההגדרות נשמרו (דמו).");
-                  setDaysModalOpen(false);
-                }}
+                onPress={saveExpirationRange}
+                disabled={savingDays}
               >
-                <Text style={styles.primaryBtnText}>שמירה</Text>
+                <Text style={styles.primaryBtnText}>{savingDays ? "שומר..." : "שמירה"}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* ───────────── Modal: Home code ───────────── */}
       <Modal
         visible={homeCodeOpen}
         transparent
@@ -281,11 +663,15 @@ export default function SettingsScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>קוד הבית</Text>
             <Text style={styles.modalSubtitle}>
-              שתפי את הקוד כדי שמשתמשים נוספים יוכלו להצטרף לבית.
+              שתף את הקוד כדי שמשתמשים נוספים יוכלו להצטרף לבית.
             </Text>
 
             <View style={styles.codeBox}>
-              <Text style={styles.codeText}>{homeInviteCode}</Text>
+              {loadingHomeCode ? (
+                <ActivityIndicator size="small" color={BRAND_PRIMARY} />
+              ) : (
+                <Text style={styles.codeText}>{homeInviteCode || "—"}</Text>
+              )}
             </View>
 
             <View style={styles.modalActions}>
@@ -298,8 +684,12 @@ export default function SettingsScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[
+                  styles.primaryBtn,
+                  (!homeInviteCode || loadingHomeCode) && styles.disabledBtn,
+                ]}
                 activeOpacity={0.85}
+                disabled={!homeInviteCode || loadingHomeCode}
                 onPress={async () => {
                   await Clipboard.setStringAsync(homeInviteCode);
                   Alert.alert("הועתק", "קוד הבית הועתק ללוח.");
@@ -311,6 +701,202 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={joinRequestsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setJoinRequestsOpen(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setJoinRequestsOpen(false)} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>בקשות הצטרפות</Text>
+            <Text style={styles.modalSubtitle}>
+              כאן אפשר לצפות בבקשות ולאשר או לדחות אותן.
+            </Text>
+
+            <View style={styles.requestsContainer}>
+              {loadingJoinRequests ? (
+                <View style={styles.requestsLoading}>
+                  <ActivityIndicator size="small" color={BRAND_PRIMARY} />
+                </View>
+              ) : joinRequests.length === 0 ? (
+                <Text style={styles.emptyRequestsText}>אין כרגע בקשות הצטרפות.</Text>
+              ) : (
+                joinRequests.map((request) => {
+                  const isProcessing = processingRequestId === request.user_id;
+
+                  return (
+                    <View key={request.user_id} style={styles.requestCard}>
+                      <View style={styles.requestHeader}>
+                        <View style={styles.requestAvatar}>
+                          <Ionicons name="person-outline" size={16} color={BRAND_PRIMARY} />
+                        </View>
+
+                        <View style={styles.requestTextWrap}>
+                          <Text style={styles.requestName}>{request.name}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.requestActions}>
+                        <TouchableOpacity
+                          style={[styles.rejectBtn, isProcessing && styles.disabledBtn]}
+                          activeOpacity={0.85}
+                          disabled={isProcessing}
+                          onPress={() => handleAnswerJoinRequest(request.user_id, false)}
+                        >
+                          <Text style={styles.rejectBtnText}>דחייה</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.approveBtn, isProcessing && styles.disabledBtn]}
+                          activeOpacity={0.85}
+                          disabled={isProcessing}
+                          onPress={() => handleAnswerJoinRequest(request.user_id, true)}
+                        >
+                          <Text style={styles.approveBtnText}>
+                            {isProcessing ? "מעבד..." : "אישור"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                activeOpacity={0.85}
+                onPress={() => setJoinRequestsOpen(false)}
+              >
+                <Text style={styles.secondaryBtnText}>סגירה</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={switchHeadOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSwitchHeadOpen(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setSwitchHeadOpen(false)} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>החלפת מנהל בית</Text>
+            <Text style={styles.modalSubtitle}>בחר משתתף מתוך הבית להעברת הניהול.</Text>
+
+            <View style={styles.requestsContainer}>
+              {switchableMembers.length === 0 ? (
+                <Text style={styles.emptyRequestsText}>אין משתתפים זמינים להעברת ניהול.</Text>
+              ) : (
+                switchableMembers.map((member) => (
+                  <TouchableOpacity
+                    key={member.user_id}
+                    style={styles.memberRow}
+                    activeOpacity={0.85}
+                    disabled={switchingHead}
+                    onPress={() => handleSwitchHead(member.user_id, member.name)}
+                  >
+                    <View style={styles.requestAvatar}>
+                      <Ionicons name="person-outline" size={16} color={BRAND_PRIMARY} />
+                    </View>
+                    <View style={styles.memberRowText}>
+                      <Text style={styles.requestName}>{member.name}</Text>
+                    </View>
+                    {switchingHead ? (
+                      <ActivityIndicator size="small" color={BRAND_PRIMARY} />
+                    ) : (
+                      <Ionicons name="chevron-back" size={18} color={MUTED} />
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                activeOpacity={0.85}
+                onPress={() => setSwitchHeadOpen(false)}
+              >
+                <Text style={styles.secondaryBtnText}>סגירה</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={membersOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMembersOpen(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setMembersOpen(false)} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>ניהול משתתפים</Text>
+            <Text style={styles.modalSubtitle}>כאן אפשר לצפות ולהסיר משתתפים מהבית.</Text>
+
+            <View style={styles.requestsContainer}>
+              {removableMembers.length === 0 ? (
+                <Text style={styles.emptyRequestsText}>אין משתתפים זמינים להסרה.</Text>
+              ) : (
+                removableMembers.map((member) => {
+                  const isRemoving = removingMemberId === member.user_id;
+
+                  return (
+                    <View key={member.user_id} style={styles.requestCard}>
+                      <View style={styles.requestHeader}>
+                        <View style={styles.requestAvatar}>
+                          <Ionicons name="person-outline" size={16} color={BRAND_PRIMARY} />
+                        </View>
+
+                        <View style={styles.requestTextWrap}>
+                          <Text style={styles.requestName}>{member.name}</Text>
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.rejectBtn, isRemoving && styles.disabledBtn]}
+                        activeOpacity={0.85}
+                        disabled={isRemoving}
+                        onPress={() => handleRemoveMember(member)}
+                      >
+                        <Text style={styles.rejectBtnText}>
+                          {isRemoving ? "מסיר..." : "הסרה מהבית"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                activeOpacity={0.85}
+                onPress={() => setMembersOpen(false)}
+              >
+                <Text style={styles.secondaryBtnText}>סגירה</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {(leavingHomeLoading || deletingHomeLoading) && (
+        <View style={styles.globalOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -382,7 +968,12 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: "#B91C1C", fontWeight: "900", fontSize: 14 },
 
-  /* modal */
+  inlineLoader: {
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 16 },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -467,6 +1058,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryBtnText: { color: "white", fontWeight: "900", fontSize: 14 },
+  disabledBtn: {
+    opacity: 0.6,
+  },
 
   codeBox: {
     marginTop: 14,
@@ -478,11 +1072,113 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 62,
   },
   codeText: {
     fontSize: 22,
     fontWeight: "900",
     letterSpacing: 2,
     color: TEXT,
+  },
+
+  requestsContainer: {
+    marginTop: 14,
+    gap: 10,
+  },
+  requestsLoading: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyRequestsText: {
+    fontSize: 13,
+    color: MUTED,
+    textAlign: "right",
+    paddingVertical: 8,
+  },
+  requestCard: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    gap: 12,
+  },
+  requestHeader: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 10,
+  },
+  requestAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "rgba(2,132,199,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  requestTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  requestName: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: TEXT,
+    textAlign: "right",
+  },
+  requestActions: {
+    flexDirection: "row-reverse",
+    gap: 8,
+  },
+  approveBtn: {
+    flex: 1,
+    backgroundColor: "#16A34A",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approveBtnText: {
+    color: "white",
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  rejectBtn: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectBtnText: {
+    color: "#B91C1C",
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  memberRow: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    backgroundColor: "#F9FAFB",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 10,
+  },
+  memberRowText: {
+    flex: 1,
+  },
+  globalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(17,24,39,0.32)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

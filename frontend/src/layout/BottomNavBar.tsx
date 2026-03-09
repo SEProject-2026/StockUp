@@ -67,7 +67,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
             params: { homeId: currentHomeId },
           });
         } else {
-        router.replace("/settings");
+          router.replace("/settings");
         }
         break;
     }
