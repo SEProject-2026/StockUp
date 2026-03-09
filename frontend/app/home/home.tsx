@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
- StyleSheet,
+  StyleSheet,
   FlatList,
   TouchableOpacity,
   Alert,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import HomeCard from "@/src/components/homes/HomeCard";
 import AddHomeCard from "@/src/components/homes/AddHomeCard";
@@ -47,6 +48,7 @@ const BRAND_PRIMARY = "#0284C7";
 const BRAND_BG = "#F6FAFF";
 const TEXT = "#111827";
 const MUTED = "#6B7280";
+const DANGER = "#DC2626";
 
 function isAuthErrorMessage(msg?: string) {
   if (!msg) return false;
@@ -70,6 +72,7 @@ export default function HomesScreen() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const sortedHomes = useMemo(() => {
     return [...homes].sort((a, b) => a.name.localeCompare(b.name, "he"));
@@ -155,11 +158,36 @@ export default function HomesScreen() {
     setModalOpen(false);
   }, [saving]);
 
+  const performLogout = useCallback(async () => {
+    try {
+      setLoggingOut(true);
+
+      await AsyncStorage.multiRemove([
+        "access_token",
+        "refresh_token",
+        "user",
+      ]);
+
+      router.replace("/login");
+    } catch (e) {
+      Alert.alert("שגיאה", "לא הצלחתי להתנתק כרגע.");
+    } finally {
+      setLoggingOut(false);
+    }
+  }, []);
+
+  const onLogoutPress = useCallback(() => {
+    Alert.alert("התנתקות", "את בטוחה שברצונך להתנתק?", [
+      { text: "ביטול", style: "cancel" },
+      { text: "התנתקות", style: "destructive", onPress: performLogout },
+    ]);
+  }, [performLogout]);
+
   const onCreateHome = useCallback(async () => {
     const name = newName.trim();
 
     if (!name) {
-      return Alert.alert("חסר שם", "בחרי שם לבית החדש.");
+      return Alert.alert("חסר שם", "בחר שם לבית החדש.");
     }
 
     if (name.length < 2) {
@@ -207,7 +235,7 @@ export default function HomesScreen() {
     const code = joinCode.trim().toUpperCase();
 
     if (!code) {
-      return Alert.alert("חסר קוד", "הכניסי קוד הזמנה כדי להצטרף לבית.");
+      return Alert.alert("חסר קוד", "הכנס קוד הזמנה כדי להצטרף לבית.");
     }
 
     if (code.length !== 8) {
@@ -263,6 +291,24 @@ export default function HomesScreen() {
       <HomesHeader title="הבתים שלי" />
 
       <View style={styles.body}>
+        <View style={styles.headerActionsRow}>
+          <TouchableOpacity
+            onPress={onLogoutPress}
+            style={styles.logoutButton}
+            activeOpacity={0.9}
+            disabled={loggingOut}
+          >
+            {loggingOut ? (
+              <ActivityIndicator size="small" color={DANGER} />
+            ) : (
+              <>
+                <Ionicons name="log-out-outline" size={16} color={DANGER} />
+                <Text style={styles.logoutText}>התנתקות</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {loading ? (
           <View style={styles.centerLoader}>
             <ActivityIndicator size="large" color={BRAND_PRIMARY} />
@@ -273,7 +319,7 @@ export default function HomesScreen() {
         ) : (
           <>
             <View style={styles.topRow}>
-              <Text style={styles.sectionTitle}>בחרי בית</Text>
+              <Text style={styles.sectionTitle}>בחר בית</Text>
 
               <TouchableOpacity
                 onPress={openJoin}
@@ -329,6 +375,30 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BRAND_BG },
 
   body: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
+
+  headerActionsRow: {
+    flexDirection: "row-reverse",
+    justifyContent: "flex-start",
+    marginBottom: 8,
+  },
+
+  logoutButton: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(220,38,38,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(220,38,38,0.18)",
+  },
+
+  logoutText: {
+    color: DANGER,
+    fontWeight: "800",
+    fontSize: 12,
+  },
 
   centerLoader: {
     flex: 1,

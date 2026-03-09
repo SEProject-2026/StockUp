@@ -1,5 +1,10 @@
 import { apiFetch, authFetch } from "@/src/api/client";
-import { setAccessToken, clearAccessToken } from "@/src/auth/token";
+import {
+  setAccessToken,
+  clearAccessToken,
+  setCurrentUserId,
+  clearCurrentUserId,
+} from "@/src/auth/token";
 
 export type GeneralResponse<T = any> = {
   status: "success" | "error";
@@ -37,13 +42,20 @@ export async function login(payload: { email: string; password: string }) {
     body: JSON.stringify(payload),
   });
 
-  // שמירת JWT
-  if (res.access_token) await setAccessToken(res.access_token);
+  if (res.access_token) {
+    await setAccessToken(res.access_token);
+  }
+
+  if (res.data?.id) {
+    await setCurrentUserId(res.data.id);
+  }
+
   return res;
 }
 
 export async function logout() {
   await clearAccessToken();
+  await clearCurrentUserId();
 }
 
 export async function updateName(payload: { name: string }) {
