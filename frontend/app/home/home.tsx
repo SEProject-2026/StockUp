@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
+ StyleSheet,
   FlatList,
   TouchableOpacity,
   Alert,
@@ -21,13 +21,19 @@ import HomesHeader from "@/src/components/home-selector/HomesHeader";
 import HomesEmptyState from "@/src/components/home-selector/HomesEmptyState";
 import CreateOrJoinHomeModal from "@/src/components/home-selector/CreateOrJoinHomeModal";
 
-import { createHome, getMyHomes, joinHomeByCode } from "@/src/api/homes";
+import {
+  createHome,
+  getMyHomes,
+  joinHomeByCode,
+  type HomeDTO,
+} from "@/src/api/homes";
 
 type Home = {
   id: string;
   name: string;
-  membersCount: number;
-  updatedAt: string;
+  pendingRequestsCount: number;
+  adminId: string;
+  expirationRange: number;
 };
 
 type GridItem =
@@ -66,9 +72,7 @@ export default function HomesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const sortedHomes = useMemo(() => {
-    return [...homes].sort(
-      (a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)
-    );
+    return [...homes].sort((a, b) => a.name.localeCompare(b.name, "he"));
   }, [homes]);
 
   const gridData: GridItem[] = useMemo(() => {
@@ -76,7 +80,11 @@ export default function HomesScreen() {
       ...sortedHomes.map((h) => ({ kind: "home", home: h } as const)),
       { kind: "add", id: "add-home" } as const,
     ];
-    if (data.length % 2 === 1) data.push({ kind: "spacer", id: "spacer" } as const);
+
+    if (data.length % 2 === 1) {
+      data.push({ kind: "spacer", id: "spacer" } as const);
+    }
+
     return data;
   }, [sortedHomes]);
 
@@ -84,12 +92,16 @@ export default function HomesScreen() {
     router.push({ pathname: "/home/[homeId]", params: { homeId } });
   }, []);
 
-  const mapDtoToHome = useCallback((dto: any): Home => {
+  const mapDtoToHome = useCallback((dto: HomeDTO): Home => {
     return {
-      id: String(dto.id ?? dto.home_id ?? dto.uuid),
-      name: dto.name ?? dto.home_name ?? dto.homeName ?? "בית ללא שם",
-      membersCount: dto.membersCount ?? dto.members_count ?? 1,
-      updatedAt: dto.updatedAt ?? dto.updated_at ?? new Date().toISOString(),
+      id: String(dto.id),
+      name: dto.name?.trim() || "בית ללא שם",
+      pendingRequestsCount: Array.isArray(dto.join_requests)
+        ? dto.join_requests.length
+        : 0,
+      adminId: String(dto.admin_id),
+      expirationRange:
+        typeof dto.expiration_range === "number" ? dto.expiration_range : 7,
     };
   }, []);
 
@@ -105,10 +117,14 @@ export default function HomesScreen() {
       } catch (e: any) {
         const msg = e?.message ?? "לא הצלחתי לטעון בתים";
         if (isAuthErrorMessage(msg)) {
-          Alert.alert("צריך להתחבר", "כדי לראות/ליצור/להצטרף לבתים צריך להתחבר.", [
-            { text: "להתחברות", onPress: () => router.replace("/login") },
-            { text: "ביטול", style: "cancel" },
-          ]);
+          Alert.alert(
+            "צריך להתחבר",
+            "כדי לראות, ליצור או להצטרף לבתים צריך להתחבר.",
+            [
+              { text: "להתחברות", onPress: () => router.replace("/login") },
+              { text: "ביטול", style: "cancel" },
+            ]
+          );
           return;
         }
         Alert.alert("שגיאה", msg);
@@ -141,22 +157,36 @@ export default function HomesScreen() {
 
   const onCreateHome = useCallback(async () => {
     const name = newName.trim();
-    if (!name) return Alert.alert("חסר שם", "בחר שם לבית החדש.");
-    if (name.length < 2) return Alert.alert("שם קצר מדי", "שם הבית צריך להיות לפחות 2 תווים.");
+
+    if (!name) {
+      return Alert.alert("חסר שם", "בחרי שם לבית החדש.");
+    }
+
+    if (name.length < 2) {
+      return Alert.alert("שם קצר מדי", "שם הבית צריך להיות לפחות 2 תווים.");
+    }
 
     try {
       setSaving(true);
+
       const res = await createHome({ name });
       const dto = res.data;
 
-      if (!dto?.id) throw new Error(res.message || "Create home failed");
+      if (!dto?.id) {
+        throw new Error(res.message || "Create home failed");
+      }
 
       const created = mapDtoToHome(dto);
-      setHomes((prev) => [created, ...prev]);
+
+      setHomes((prev) => {
+        const exists = prev.some((h) => h.id === created.id);
+        return exists ? prev : [created, ...prev];
+      });
 
       setNewName("");
       setJoinCode("");
       setModalOpen(false);
+
       openHome(created.id);
     } catch (e: any) {
       const msg = e?.message ?? "לא הצלחתי ליצור בית כרגע.";
@@ -174,28 +204,33 @@ export default function HomesScreen() {
   }, [newName, openHome, mapDtoToHome]);
 
   const onJoinHome = useCallback(async () => {
-    const code = joinCode.trim();
-    if (!code) return Alert.alert("חסר קוד", "הכניסי קוד הזמנה כדי להצטרף לבית.");
-    if (code.length < 4) return Alert.alert("קוד קצר מדי", "בדוק את הקוד ונסה שוב.");
+    const code = joinCode.trim().toUpperCase();
+
+    if (!code) {
+      return Alert.alert("חסר קוד", "הכניסי קוד הזמנה כדי להצטרף לבית.");
+    }
+
+    if (code.length !== 8) {
+      return Alert.alert("קוד לא תקין", "קוד ההצטרפות חייב להכיל 8 תווים.");
+    }
 
     try {
       setSaving(true);
-      const res = await joinHomeByCode({ code });
-      const dto = res.data;
 
-      const joined = mapDtoToHome(dto);
-
-      setHomes((prev) => {
-        const exists = prev.some((h) => h.id === joined.id);
-        return exists ? prev : [joined, ...prev];
-      });
+      await joinHomeByCode({ home_code: code });
 
       setNewName("");
       setJoinCode("");
       setModalOpen(false);
-      openHome(joined.id);
+
+      Alert.alert(
+        "הבקשה נשלחה",
+        "בקשת ההצטרפות נשלחה בהצלחה. לאחר אישור מנהל הבית, הבית יופיע ברשימה שלך."
+      );
+
+      await loadHomes("refresh");
     } catch (e: any) {
-      const msg = e?.message ?? "לא הצלחתי להצטרף לבית כרגע.";
+      const msg = e?.message ?? "לא הצלחתי לשלוח בקשת הצטרפות כרגע.";
       if (isAuthErrorMessage(msg)) {
         Alert.alert("צריך להתחבר", "כדי להצטרף לבית צריך להתחבר.", [
           { text: "להתחברות", onPress: () => router.replace("/login") },
@@ -207,7 +242,7 @@ export default function HomesScreen() {
     } finally {
       setSaving(false);
     }
-  }, [joinCode, openHome, mapDtoToHome]);
+  }, [joinCode, loadHomes]);
 
   const renderItem = useCallback(
     ({ item }: { item: GridItem }) => {
@@ -218,9 +253,10 @@ export default function HomesScreen() {
     [openHome, openCreate]
   );
 
-  const isValid = modalMode === "create"
-    ? newName.trim().length >= 2
-    : joinCode.trim().length >= 4;
+  const isValid =
+    modalMode === "create"
+      ? newName.trim().length >= 2
+      : joinCode.trim().length === 8;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -237,9 +273,13 @@ export default function HomesScreen() {
         ) : (
           <>
             <View style={styles.topRow}>
-              <Text style={styles.sectionTitle}>בחר בית</Text>
+              <Text style={styles.sectionTitle}>בחרי בית</Text>
 
-              <TouchableOpacity onPress={openJoin} style={styles.joinPill} activeOpacity={0.9}>
+              <TouchableOpacity
+                onPress={openJoin}
+                style={styles.joinPill}
+                activeOpacity={0.9}
+              >
                 <Ionicons name="key-outline" size={14} color={BRAND_PRIMARY} />
                 <Text style={styles.joinPillText}>הצטרפות עם קוד</Text>
               </TouchableOpacity>
@@ -251,10 +291,17 @@ export default function HomesScreen() {
               renderItem={renderItem}
               numColumns={2}
               columnWrapperStyle={{ gap: 12 }}
-              contentContainerStyle={{ paddingTop: 8, paddingBottom: 24, gap: 12 }}
+              contentContainerStyle={{
+                paddingTop: 8,
+                paddingBottom: 24,
+                gap: 12,
+              }}
               showsVerticalScrollIndicator={false}
               refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={() => loadHomes("refresh")} />
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => loadHomes("refresh")}
+                />
               }
             />
           </>
@@ -289,7 +336,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-  loaderText: { color: MUTED, fontWeight: "700" },
+
+  loaderText: {
+    color: MUTED,
+    fontWeight: "700",
+  },
 
   topRow: {
     flexDirection: "row-reverse",
@@ -297,6 +348,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 6,
   },
+
   sectionTitle: {
     fontSize: 12,
     fontWeight: "700",
@@ -315,5 +367,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(2,132,199,0.25)",
     backgroundColor: "rgba(2,132,199,0.08)",
   },
-  joinPillText: { color: BRAND_PRIMARY, fontWeight: "900", fontSize: 12 },
+
+  joinPillText: {
+    color: BRAND_PRIMARY,
+    fontWeight: "900",
+    fontSize: 12,
+  },
 });

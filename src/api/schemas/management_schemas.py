@@ -8,7 +8,7 @@ class CreateHomeRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
 
 class JoinHomeRequest(BaseModel):
-    home_code: str = Field(..., min_length=6, max_length=6)
+    home_code: str = Field(..., min_length=8, max_length=8)
 
 class AnswerJoinRequest(BaseModel):
     user_id: UUID

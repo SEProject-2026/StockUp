@@ -1,19 +1,60 @@
 import { authFetch } from "@/src/api/client";
 
-export type GeneralResponse<T> = {
+export type GeneralResponse<T = unknown> = {
   status: "success" | "error";
   message?: string;
   data?: T;
 };
 
+// ---------- Request DTOs ----------
+
+export type CreateHomeRequest = {
+  name: string;
+};
+
+export type JoinHomeRequest = {
+  home_code: string;
+};
+
+export type AnswerJoinRequestRequest = {
+  user_id: string;
+  approved: boolean;
+};
+
+export type UpdateHomeHeadRequest = {
+  new_head_id: string;
+};
+
+export type UpdateExpirationRangeRequest = {
+  new_range: number;
+};
+
+// ---------- Response DTOs ----------
+
 export type HomeDTO = {
   id: string;
   name: string;
-  membersCount?: number;
-  updatedAt?: string;
+  admin_id: string;
+  member_ids: string[];
+  join_requests: string[];
+  expiration_range: number;
 };
 
-export async function createHome(payload: { name: string }) {
+export type JoinCodeDTO = {
+  join_code: string;
+};
+
+/**
+ * כי ה-backend מחזיר details בלי schema מפורש בקוד ששלחת
+ * נשאיר כרגע טיפוס פתוח.
+ */
+export type HomeDetailsDTO = {
+  [key: string]: unknown;
+};
+
+// ---------- API functions ----------
+
+export async function createHome(payload: CreateHomeRequest) {
   return authFetch<GeneralResponse<HomeDTO>>("/homes/create", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -26,9 +67,81 @@ export async function getMyHomes() {
   });
 }
 
-export async function joinHomeByCode(payload: { code: string }) {
-  return authFetch<GeneralResponse<HomeDTO>>("/homes/join", {
+export async function getHomeJoinCode(homeId: string) {
+  return authFetch<GeneralResponse<JoinCodeDTO>>(`/homes/${homeId}/join_code`, {
+    method: "GET",
+  });
+}
+
+export async function joinHomeByCode(payload: JoinHomeRequest) {
+  return authFetch<GeneralResponse<null>>("/homes/join", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function answerJoinRequest(
+  homeId: string,
+  payload: AnswerJoinRequestRequest
+) {
+  return authFetch<GeneralResponse<HomeDTO>>(
+    `/homes/${homeId}/answer_request`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function removeMember(homeId: string, targetUserId: string) {
+  return authFetch<GeneralResponse<HomeDTO>>(
+    `/homes/${homeId}/members/${targetUserId}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+export async function leaveHome(homeId: string) {
+  return authFetch<GeneralResponse<null>>(`/homes/${homeId}/leave`, {
+    method: "POST",
+  });
+}
+
+export async function switchHomeHead(
+  homeId: string,
+  payload: UpdateHomeHeadRequest
+) {
+  return authFetch<GeneralResponse<HomeDTO>>(`/homes/${homeId}/switch_head`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteHome(homeId: string) {
+  return authFetch<GeneralResponse<null>>(`/homes/${homeId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getHomeDetails(homeId: string) {
+  return authFetch<GeneralResponse<HomeDetailsDTO>>(
+    `/homes/${homeId}/details`,
+    {
+      method: "GET",
+    }
+  );
+}
+
+export async function updateExpirationRange(
+  homeId: string,
+  payload: UpdateExpirationRangeRequest
+) {
+  return authFetch<GeneralResponse<HomeDTO>>(
+    `/homes/${homeId}/expiration_range`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
 }
