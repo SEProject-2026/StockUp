@@ -8,11 +8,12 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# 4. Install system dependencies for OpenCV
-# We need libgl1 and libglib2.0-0 for cv2 to work on slim images
+# 4. Install system dependencies for OpenCV AND Tesseract OCR
 RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
+    tesseract-ocr \
+    tesseract-ocr-heb \
     && rm -rf /var/lib/apt/lists/*
 
 # 5. Copy requirements and install
