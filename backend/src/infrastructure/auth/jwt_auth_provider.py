@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import UUID
 from jose import jwt, JWTError
 from src.authentication.auth_provider import IAuthProvider
+from src.infrastructure.logger import app_logger
 from dotenv import load_dotenv
 
 
@@ -34,6 +35,7 @@ class JwtAuthProvider(IAuthProvider):
                 
             return UUID(user_id_str)
             
-        except JWTError:
+        except Exception as e:
             # invalid token(invalid signature, expired)
+            app_logger.error(f"JWT Verification failed: {str(e)}")
             return None
