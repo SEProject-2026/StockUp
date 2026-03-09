@@ -162,7 +162,6 @@ export default function HomesScreen() {
     try {
       setLoggingOut(true);
 
-      // עדכני כאן לפי המפתחות האמיתיים אצלך בפרויקט
       await AsyncStorage.multiRemove([
         "access_token",
         "refresh_token",
