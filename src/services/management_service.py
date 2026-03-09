@@ -1,6 +1,6 @@
 from uuid import UUID
 from typing import List
-from repositories.user_repository import IUserRepository
+from src.repositories.user_repository import IUserRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.domain.smart_home.home import Home
 from src.infrastructure.logger import app_logger
@@ -23,7 +23,7 @@ class ManagementService:
         new_home = Home(user_id=user_id, name=home_name)
 
         await self._home_repository.save(new_home)
-        app_logger.info(f"Home '{home_name}' created successfully with ID: {new_home.id} by user {user_id}")
+        app_logger.info(f"Home '{home_name}' created successfully with ID: {new_home.get_id()} by user {user_id}")
         
         return new_home
 
@@ -49,7 +49,7 @@ class ManagementService:
 
         home.add_join_request(user_id)
         await self._home_repository.update(home)
-        app_logger.info(f"User {user_id} successfully submitted a join request to home {home.id}")
+        app_logger.info(f"User {user_id} successfully submitted a join request to home {home.get_id()}")
 
     async def answer_join_request(self, home_id: UUID, head_user_id: UUID, user_id: UUID, approved: bool) -> Home:
         """Head of House approves or denies a join request."""
@@ -122,9 +122,19 @@ class ManagementService:
         
         home_details = home.get_home_details(user_id)
         names = await self._user_repository.get_names_by_ids(list(home_details['members']))
-        home_details['member_names'] = names
+        home_details['member_names'] = names.values()
         home_details.pop('members')
         return home_details
+    
+
+    async def get_join_requests(self, head_user_id: UUID, home_id: UUID) -> dict:
+        """Head of House retrieves list of pending join requests."""
+        app_logger.debug(f"User {head_user_id} requesting join requests for home {home_id}")
+        home = await self._check_access(head_user_id, home_id)
+        
+        join_requests = home.get_join_requests_names(head_user_id)
+        names = await self._user_repository.get_names_by_ids(list(join_requests))
+        return names
     
     async def get_all_homes_for_user(self, user_id: UUID) -> List[Home]:
         """Retrieves a list of all homes the user is a member of."""

@@ -204,3 +204,25 @@ async def update_expiration_range(
     except ValueError as e:
         app_logger.warning(f"Expiration range update failed for home {home_id} - Reason: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+
+@router.get("/{home_id}/join_requests", response_model=GeneralResponse)
+async def get_join_requests(
+    home_id: UUID,
+    service: ManagementServiceDep,
+    head_user_id: UUID = Depends(get_current_user_id)
+):
+    app_logger.info(f"Get join requests received from head user {head_user_id} for home {home_id}")
+    try:
+        # The service returns a dict mapping UUIDs to Names
+        requests_data = await service.get_join_requests(head_user_id, home_id)
+        
+        return GeneralResponse(
+            status="success",
+            message="Join requests retrieved successfully",
+            data=requests_data
+        )
+    except (ValueError, PermissionError) as e:
+        app_logger.warning(f"Failed to get join requests for home {home_id} - Reason: {str(e)}")
+        # If the user is not the head of the house, return 403 Forbidden
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
