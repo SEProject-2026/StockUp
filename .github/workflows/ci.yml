@@ -58,6 +58,7 @@ jobs:
         DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
         JWT_SECRET: test_secret_for_ci
         JWT_ALGORITHM: HS256
+        JWT_EXPIRES_IN: 60
         ENVIRONMENT: testing
         PYTHONPATH: .
       run: |
