@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1
 # 4. Install system dependencies for OpenCV
 # We need libgl1 and libglib2.0-0 for cv2 to work on slim images
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
