@@ -1,72 +1,96 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Alert } from "react-native";
-import { getMyHomes, createHome, joinHomeByCode } from "@/src/api/homes";
+import { getMyHomes, createHome, joinHomeByCode, type HomeDTO } from "@/src/api/homes";
 import { router } from "expo-router";
 
 export type Home = {
   id: string;
   name: string;
-  membersCount: number;
+  pendingRequestsCount: number;
+  adminId: string;
+  expirationRange: number;
   updatedAt: string;
 };
 
-//normalizing data from the API
-const mapDtoToHome = (dto: any) => ({
+const mapDtoToHome = (dto: any): Home => ({
   id: String(dto.id),
-  name: dto.name,
-  membersCount: dto.membersCount ?? 1,
+  name: dto.name?.trim() || "בית ללא שם",
+  pendingRequestsCount: Array.isArray(dto.join_requests) 
+    ? dto.join_requests.length 
+    : (dto.pendingRequestsCount ?? 0),
+  adminId: String(dto.admin_id || dto.adminId || ""),
+  expirationRange: typeof dto.expiration_range === "number" 
+    ? dto.expiration_range 
+    : (dto.expirationRange ?? 7),
   updatedAt: dto.updatedAt ?? dto.updated_at ?? new Date().toISOString(),
 });
 
 export function useHomes() {
-  const [homes, setHomes] = useState<any[]>([]);
+  const [homes, setHomes] = useState<Home[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Loading houses
+  const handleAuthError = useCallback((msg: string) => {
+    const s = (msg || "").toLowerCase();
+    if (s.includes("401") || s.includes("unauthorized") || s.includes("token") || s.includes("auth")) {
+      Alert.alert("צריך להתחבר", "פג תוקף החיבור, נא להתחבר מחדש.", [
+        { text: "להתחברות", onPress: () => router.replace("/login") },
+        { text: "ביטול", style: "cancel" }
+      ]);
+      return true;
+    }
+    return false;
+  }, []);
+
   const loadHomes = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     try {
       mode === "initial" ? setLoading(true) : setRefreshing(true);
       const res = await getMyHomes();
-      setHomes((res.data ?? []).map(mapDtoToHome));
+      const rawData = res.data ?? [];
+      setHomes(rawData.map(mapDtoToHome));
     } catch (e: any) {
-      handleAuthError(e.message);
+      if (!handleAuthError(e.message)) {
+        Alert.alert("שגיאה", "לא הצלחתי לטעון בתים");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [handleAuthError]);
 
-  // create/join home
   const handleHomeAction = async (type: "create" | "join", value: string) => {
-    if (!value.trim()) return Alert.alert("שגיאה", "נא להזין ערך תקין");
-    
+    const cleanValue = value.trim();
+    if (!cleanValue) {
+      Alert.alert("חסר מידע", type === "create" ? "נא להזין שם לבית" : "נא להזין קוד הצטרפות");
+      return null;
+    }
+
     setSaving(true);
     try {
-      const res = type === "create" 
-        ? await createHome({ name: value }) 
-        : await joinHomeByCode({ code: value });
+      let res;
+      if (type === "create") {
+        res = await createHome({ name: cleanValue });
+      } else {
+        res = await joinHomeByCode({ home_code: cleanValue.toUpperCase() });
+      }
+
+      if (type === "join") {
+        await loadHomes("refresh");
+        return "joined_pending"; 
+      }
 
       const newHome = mapDtoToHome(res.data);
       setHomes(prev => [newHome, ...prev]);
-      return newHome.id; // Return the ID so we can navigate to it
+      return newHome.id;
+
     } catch (e: any) {
-      handleAuthError(e.message);
+      if (!handleAuthError(e.message)) {
+        Alert.alert("שגיאה", e.message || "הפעולה נכשלה");
+      }
       return null;
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleAuthError = (msg: string) => {
-    const s = msg.toLowerCase();
-    if (s.includes("401") || s.includes("unauthorized") || s.includes("token")) {
-      Alert.alert("צריך להתחבר", "פג תוקף החיבור, נא להתחבר מחדש.", [
-        { text: "להתחברות", onPress: () => router.replace("/login") }
-      ]);
-    } else {
-      Alert.alert("שגיאה", msg || "פעולה נכשלה");
     }
   };
 
@@ -74,5 +98,12 @@ export function useHomes() {
     [...homes].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)), 
   [homes]);
 
-  return { homes: sortedHomes, loading, refreshing, saving, loadHomes, handleHomeAction };
+  return { 
+    homes: sortedHomes, 
+    loading, 
+    refreshing, 
+    saving, 
+    loadHomes, 
+    handleHomeAction 
+  };
 }

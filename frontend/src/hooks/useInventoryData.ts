@@ -29,7 +29,6 @@ import {
 
 type LoadMode = "initial" | "soft";
 
-// ✅ CACHE: נשמר מחוץ ל-Hook כדי שהנתונים לא יאבדו במעבר בין מסכים
 let inventoryCache: Record<string, InventoryRow[]> = {};
 
 export function useInventoryData(params: {
@@ -39,10 +38,8 @@ export function useInventoryData(params: {
 }) {
   const { homeId, initiallocation, hideTabs } = params;
 
-  // ✅ איתחול הסטייט ישירות מה-Cache (מונע את הלבן בעיניים)
   const [rows, setRows] = useState<InventoryRow[]>(homeId ? (inventoryCache[homeId] || []) : []);
   
-  // ✅ טעינה ראשונית תהיה true רק אם אין לנו כלום בזיכרון
   const [initialLoading, setInitialLoading] = useState(!homeId || (inventoryCache[homeId] || []).length === 0);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -109,7 +106,6 @@ export function useInventoryData(params: {
       const q = debouncedSearch.trim();
 
       try {
-        // מציגים טעינה רק במידה ואין נתונים או שזה חיפוש אקטיבי
         if (mode === "initial") setInitialLoading(true);
         else if (q.length > 0) setIsSearching(true);
 
@@ -121,11 +117,9 @@ export function useInventoryData(params: {
 
         const nextSig = rowsSignature(filtered);
         
-        // עדכון רק אם הנתונים באמת השתנו (מונע רינדור מיותר)
         if (nextSig !== prevSigRef.current) {
           prevSigRef.current = nextSig;
           setRows(filtered);
-          // ✅ שמירה ב-Cache לשימוש עתידי
           if (!q && statusFilter === "all" && effectivelocation === "all") {
             inventoryCache[homeId] = filtered;
           }
@@ -143,7 +137,6 @@ export function useInventoryData(params: {
     [homeId, debouncedSearch, effectivelocation, statusFilter, fetchProducts, applyClientFilters]
   );
 
-  // ✅ EFFECT מאוחד: מטפל בכל שינויי הפרמטרים במקום אחד
   useEffect(() => {
     if (!homeId) {
       setRows([]);
@@ -151,14 +144,12 @@ export function useInventoryData(params: {
       return;
     }
 
-    // החלטה על סוג הטעינה: אם יש ב-Cache, נטען "רך" (בשקט)
     const hasCache = (inventoryCache[homeId] || []).length > 0;
     const mode = hasCache ? "soft" : "initial";
     
     loadInventory(mode);
   }, [homeId, debouncedSearch, effectivelocation, statusFilter]);
 
-  // --- לוגיקת Grouping (נשארה זהה) ---
   const groupedItems: ProductGroupVM[] = useMemo(() => {
     const productMap = new Map<string, any>();
     for (const r of rows) {
@@ -198,7 +189,6 @@ export function useInventoryData(params: {
     }).sort((a, b) => a.title.localeCompare(b.title, "he"));
   }, [rows]);
 
-  // --- פונקציות עריכה ושינוי כמות (נשארו זהות, רק עדכון ה-Cache בסוף) ---
   const changeQty = useCallback(async (itemId: string, delta: number) => {
     if (!homeId) return;
     const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
@@ -217,14 +207,11 @@ export function useInventoryData(params: {
     try {
       if (next === 0) await removeItem(homeId, current.productId, current.itemId);
       else await updateItemQuantity(homeId, current.productId, current.itemId, { new_quantity: next });
-      // עדכון ה-Cache
       inventoryCache[homeId] = nextRows;
     } catch (e: any) {
       loadInventory("soft");
     }
   }, [homeId, rows, loadInventory]);
-
-  // שאר הפונקציות (deleteRow, saveEdit) צריכות להישאר כפי שהן
 
   return {
     rows, groupedItems, initialLoading, isSearching,

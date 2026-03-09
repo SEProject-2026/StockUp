@@ -3,7 +3,6 @@ import { Alert } from "react-native";
 import { getAllStock, ProductDTO } from "@/src/api/stock";
 import { location } from "@/src/context/inventory-context";
 
-// מנגנון Caching חיצוני ל-Hook - נשמר כל עוד האפליקציה פתוחה
 let cachedHomeData: Record<string, any[]> = {};
 
 function locationToLocation(loc?: string | null): location {
@@ -39,13 +38,11 @@ function productDtoToHomeItems(dto: ProductDTO) {
 
 export function useHomeData(homeId: string) {
   const [items, setItems] = useState<any[]>(cachedHomeData[homeId] || []);
-  const [isLoading, setIsLoading] = useState(items.length === 0); // טעינה רק אם המחסן ריק לגמרי
+  const [isLoading, setIsLoading] = useState(items.length === 0);
 
   const loadData = useCallback(async (forceRefresh = false) => {
     if (!homeId) return;
 
-    // אם יש כבר פריטים, אנחנו לא מפעילים את ה-Spinner הראשי
-    // זה ימנע את הקפיצה של כל המסך
     if (items.length === 0) {
       setIsLoading(true);
     }
@@ -55,16 +52,13 @@ export function useHomeData(homeId: string) {
       const products = res.data ?? [];
       const normalized = products.flatMap(productDtoToHomeItems);
       
-      // השלב הקריטי: אנחנו מעדכנים את הסטייט רק אם הנתונים באמת השתנו
-      // או פשוט דורסים בשקט בלי לאפס את המערך קודם
       setItems(normalized);
       cachedHomeData[homeId] = normalized;
     } catch (e: any) {
-      // כאן אפשר להוסיף לוגיקה שקטה לטעות
     } finally {
       setIsLoading(false);
     }
-  }, [homeId]); // הסרנו את items.length מה-dependencies כדי למנוע לופים
+  }, [homeId]);
 
   const stats = useMemo(() => {
     const today = new Date().setHours(0, 0, 0, 0);
