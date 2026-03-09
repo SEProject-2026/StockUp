@@ -32,3 +32,11 @@ class IUserRepository(ABC):
         Returns a User entity object if found, else None.
         """
         pass
+
+    @abstractmethod
+    async def get_names_by_ids(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        """
+        Retrieve a mapping of user IDs to their names for a list of user IDs.
+        Returns a dictionary where keys are user UUIDs and values are user names.
+        """
+        pass

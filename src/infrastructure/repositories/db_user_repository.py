@@ -34,6 +34,9 @@ class DbUserRepository(IUserRepository):
         if not db_user:
             return None
         return self._to_domain(db_user)
+    async def get_names_by_ids(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        db_users = self.db.query(UserModel).filter(UserModel.id.in_([str(uid) for uid in user_ids])).all()
+        return {UUID(db_user.id): db_user.name for db_user in db_users}
 
     def _to_domain(self, db_user: UserModel) -> User:
         return User(

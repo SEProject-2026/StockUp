@@ -1,7 +1,7 @@
-from typing import Annotated # <--- Added for cleaner dependency injection
+from typing import Annotated 
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from sqlalchemy.orm import Session # <--- Added to type-hint the DB session
+from sqlalchemy.orm import Session 
 from src.infrastructure.logger import app_logger
 
 from src.infrastructure.db.database import get_db
@@ -21,12 +21,8 @@ from src.services.user_service import UserService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-
-# --- ADDED: Dependency Helper ---
-# This function gets a fresh DB session from FastAPI and passes it to the Container.
 def get_user_service(db: Session = Depends(get_db)) -> UserService:
     return AppContainer.get_user_service(db)
-
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
@@ -39,9 +35,8 @@ async def register(
     """
     Register a new user.
     """
+    app_logger.info(f"Registration request received for email: {request.email}")
     try:
-        app_logger.info(f"Attempting to register user with email: {request.email} and name: {request.name}")
-        # We use the injected 'user_service' instance
         user = await user_service.register(
             email=request.email, 
             password=request.password, 
@@ -49,7 +44,6 @@ async def register(
             name=request.name
         )
         
-        app_logger.info(f"User registered successfully with email: {request.email} and name: {request.name}")
         return GeneralResponse(
             status="success", 
             message="User created successfully", 
@@ -57,8 +51,9 @@ async def register(
         )
     
     except ValueError as e:
-        app_logger.error(f"Registration failed for email: {request.email} and name: {request.name} - {str(e)}")
+        app_logger.warning(f"Registration failed for email {request.email} - Reason: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
@@ -68,10 +63,10 @@ async def login(
     """
     Login and retrieve an access token.
     """
+    app_logger.info(f"Login request received for email: {request.email}")
     try:
-        app_logger.info(f"Attempting to log in user with email: {request.email}")
         user_entity, token = await user_service.login(request.email, request.password)
-        app_logger.info(f"User logged in successfully with email: {request.email}")
+        
         return LoginResponse(
             status="success",
             access_token=token,
@@ -79,11 +74,12 @@ async def login(
         )
     
     except ValueError:
-        app_logger.warning(f"Login failed for email: {request.email}")
+        app_logger.warning(f"Login failed: Invalid credentials for email {request.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Invalid credentials"
         )
+
 
 @router.put("/update_name", response_model=GeneralResponse)
 async def update_name(
@@ -94,44 +90,43 @@ async def update_name(
     """
     Update the user's name (Protected Route).
     """
+    app_logger.info(f"Name update request received from user {user_id}")
     try:
-        app_logger.info(f"User {user_id} is attempting to update their name to: {request.name}")
         updated_user = await user_service.update_name(user_id, request.name)
-        app_logger.info(f"User {user_id} updated their name successfully to: {request.name}")
+        
         return GeneralResponse(
             status="success", 
             message="Name updated successfully", 
             data=UserDTO.model_validate(updated_user)
         )
     except ValueError as e:
-        app_logger.error(f"Failed to update name for user {user_id} - {str(e)}")
+        app_logger.warning(f"Name update failed for user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
+
 @router.put("/password", response_model=GeneralResponse)
 async def change_password(
     request: ChangePasswordRequest,
-        user_service: UserServiceDep, 
+    user_service: UserServiceDep, 
     user_id: UUID = Depends(get_current_user_id)
-
 ):
     """
     Change the authenticated user's password.
     Protected Route.
     """
+    app_logger.info(f"Password change request received from user {user_id}")
     try:
-        app_logger.info(f"User {user_id} is attempting to change their password")
         await user_service.change_password(
             user_id=user_id,
             current_password=request.current_password,
             new_password=request.new_password
         )
         
-        app_logger.info(f"User {user_id} changed their password successfully")
         return GeneralResponse(
             status="success", 
             message="Password changed successfully"
         )
         
     except ValueError as e:
-        app_logger.error(f"Failed to change password for user {user_id} - {str(e)}")
+        app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
