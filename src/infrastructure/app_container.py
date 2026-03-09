@@ -117,12 +117,13 @@ class AppContainer:
     def get_management_service(db: Optional[Session] = None) -> ManagementService:
         # Production (DB)
         if db:
-            return ManagementService(home_repository=DbHomeRepository(db))
+            return ManagementService(home_repository=DbHomeRepository(db), user_repository=DbUserRepository(db))
         
         # Testing (In-Memory)
         if AppContainer._management_service_instance is None:
             AppContainer._management_service_instance = ManagementService(
-                home_repository=InMemoryHomeRepository()
+                home_repository=InMemoryHomeRepository(),
+                user_repository=InMemoryUserRepository()
             )
             
         return AppContainer._management_service_instance

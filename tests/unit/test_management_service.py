@@ -1,15 +1,19 @@
 import pytest
 from uuid import UUID, uuid4
+from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from src.services.management_service import ManagementService
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 
+@pytest.fixture
+def user_repo():
+    return InMemoryUserRepository()
 @pytest.fixture
 def home_repo():
     return InMemoryHomeRepository()
 
 @pytest.fixture
-def management_service(home_repo):
-    return ManagementService(home_repository=home_repo)
+def management_service(home_repo, user_repo):
+    return ManagementService(home_repository=home_repo, user_repository=user_repo)
 
 # ==========================================
 # 1. Success Paths

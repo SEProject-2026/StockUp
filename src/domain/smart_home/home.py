@@ -33,6 +33,11 @@ class Home:
     def get_join_requests(self) -> Set[UUID]:
         return self._join_requests
     
+    def get_join_requests_names(self, head_user_id: UUID) -> Set[UUID]:
+        if not self.is_admin(head_user_id):
+            raise PermissionError("Only admin can view join requests.")
+        return self._join_requests
+    
     def get_expiration_range(self) -> int:
         return self._expiration_range
     
