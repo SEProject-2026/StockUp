@@ -45,12 +45,21 @@ export type JoinCodeDTO = {
 };
 
 /**
- * כי ה-backend מחזיר details בלי schema מפורש בקוד ששלחת
- * נשאיר כרגע טיפוס פתוח.
+ * ה-backend מחזיר details בלי schema מפורש כאן,
+ * לכן נשאיר טיפוס גמיש.
  */
-export type HomeDetailsDTO = {
-  [key: string]: unknown;
-};
+export type HomeDetailsDTO = Record<string, unknown>;
+
+/**
+ * לפי ה-backend:
+ * service.get_join_requests(...) מחזיר dict mapping UUID -> Name
+ * כלומר בצד ה-frontend זה יהיה אובייקט:
+ * {
+ *   "user-uuid-1": "Eden",
+ *   "user-uuid-2": "Noa"
+ * }
+ */
+export type JoinRequestsDTO = Record<string, string>;
 
 // ---------- API functions ----------
 
@@ -142,6 +151,15 @@ export async function updateExpirationRange(
     {
       method: "PATCH",
       body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function getJoinRequests(homeId: string) {
+  return authFetch<GeneralResponse<JoinRequestsDTO>>(
+    `/homes/${homeId}/join_requests`,
+    {
+      method: "GET",
     }
   );
 }

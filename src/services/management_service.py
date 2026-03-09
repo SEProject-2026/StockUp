@@ -122,7 +122,7 @@ class ManagementService:
         
         home_details = home.get_home_details(user_id)
         names = await self._user_repository.get_names_by_ids(list(home_details['members']))
-        home_details['member_names'] = names.values()
+        home_details['member_names'] = names
         home_details.pop('members')
         return home_details
     

@@ -1,15 +1,28 @@
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const TOKEN_KEY = "access_token";
+const CURRENT_USER_ID_KEY = "current_user_id";
 
 export async function setAccessToken(token: string) {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  await AsyncStorage.setItem(TOKEN_KEY, token);
 }
 
 export async function getAccessToken() {
-  return await SecureStore.getItemAsync(TOKEN_KEY);
+  return await AsyncStorage.getItem(TOKEN_KEY);
 }
 
 export async function clearAccessToken() {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await AsyncStorage.removeItem(TOKEN_KEY);
+}
+
+export async function setCurrentUserId(userId: string) {
+  await AsyncStorage.setItem(CURRENT_USER_ID_KEY, userId);
+}
+
+export async function getCurrentUserId() {
+  return AsyncStorage.getItem(CURRENT_USER_ID_KEY);
+}
+
+export async function clearCurrentUserId() {
+  await AsyncStorage.removeItem(CURRENT_USER_ID_KEY);
 }
