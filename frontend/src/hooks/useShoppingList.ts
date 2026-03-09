@@ -23,12 +23,11 @@ export function useShoppingList() {
   const [query, setQuery] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  // טעינת נתונים ראשונית
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        // כאן תקרא ל-API האמיתי שלך
+        // api
         const list = [
           { id: "1", name: "חלב 3%", quantity: 2, source: "manual" },
           { id: "2", name: "לחם", quantity: 1, source: "manual" },
@@ -83,12 +82,11 @@ export function useShoppingList() {
       return copy;
     });
   };
-  // בתוך ה-Hook useShoppingList
   const updateQuantity = (id: string, delta: number) => {
     setItems(prev => prev.map(item => {
       if (item.id === id) {
         const currentQty = item.quantity || 1;
-        const newQty = Math.max(1, currentQty + delta); // מונע ירידה מתחת ל-1
+        const newQty = Math.max(1, currentQty + delta); 
         return { ...item, quantity: newQty };
       }
       return item;

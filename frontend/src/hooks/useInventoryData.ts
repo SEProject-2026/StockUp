@@ -196,7 +196,6 @@ export function useInventoryData(params: {
     const next = current.quantity + delta;
     if (next < 0) return;
 
-    // אופטימיות ב-UI
     const nextRows = next === 0 
         ? rows.filter(r => r.itemId !== current.itemId) 
         : rows.map(r => r.itemId === current.itemId ? { ...r, quantity: next } : r);

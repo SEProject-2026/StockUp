@@ -180,11 +180,11 @@ export default function ShoppingListScreen() {
           }}
         />
 
-        {/* תפריט ניווט תחתון */}
+
+        </SafeAreaView>
         <View style={[styles.bottomBar, { paddingBottom: 10 + insets.bottom }]}>
           <BottomNavBar activeTab="shopping-list" />
         </View>
-      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

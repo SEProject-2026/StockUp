@@ -8,9 +8,9 @@ import {
   Pressable, 
   StyleSheet, 
   Alert, 
-  KeyboardAvoidingView, // הוספנו
-  Platform,             // הוספנו
-  ScrollView            // הוספנו כדי לאפשר גלילה אם הטקסט ארוך
+  KeyboardAvoidingView, 
+  Platform,             
+  ScrollView            
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
@@ -39,7 +39,6 @@ export default function AddBaseItemModal(props: { open: boolean; onClose: () => 
 
   return (
     <Modal visible={props.open} transparent animationType="slide" onRequestClose={props.onClose}>
-      {/* הוספת KeyboardAvoidingView לכל שטח המודאל */}
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"} 
         style={{ flex: 1 }}
@@ -114,7 +113,7 @@ const styles = StyleSheet.create({
   modalBackdrop: { 
     flex: 1, 
     backgroundColor: "rgba(17,24,39,0.35)", 
-    justifyContent: "flex-end", // גורם למודאל להיצמד לתחתית
+    justifyContent: "flex-end", 
     padding: 12 
   },
   modalCard: { 
@@ -123,7 +122,7 @@ const styles = StyleSheet.create({
     padding: 16, 
     borderWidth: 1, 
     borderColor: BRAND.BORDER,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16 // תוספת פדינג ל-iOS כדי שלא ייצמד לקצה המסך
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16 
   },
   modalHandle: { alignSelf: "center", width: 42, height: 5, borderRadius: 999, backgroundColor: "#D1D5DB", marginBottom: 12 },
   modalHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },

@@ -7,7 +7,6 @@ const BORDER = "#E5E7EB";
 const TEXT = "#111827";
 const MUTED = "#6B7280";
 
-// 1. מודאל ימי התראה
 export const ExpiryDaysModal = ({ visible, onClose, days, setDays, onSave, loading, clamp }: any) => (
   <Modal visible={visible} transparent animationType="fade">
     <View style={styles.modalRoot}>
@@ -31,7 +30,6 @@ export const ExpiryDaysModal = ({ visible, onClose, days, setDays, onSave, loadi
   </Modal>
 );
 
-// 2. מודאל קוד בית - תוקן מ-div ל-View בשורה 40
 export const HomeCodeModal = ({ visible, onClose, code, loading, onCopy }: any) => (
   <Modal visible={visible} transparent animationType="fade">
     <View style={styles.modalRoot}>
@@ -55,7 +53,6 @@ export const HomeCodeModal = ({ visible, onClose, code, loading, onCopy }: any) 
   </Modal>
 );
 
-// 3. מודאל בקשות הצטרפות
 export const JoinRequestsModal = ({ visible, onClose, requests, loading, onAnswer, processingId }: any) => (
   <Modal visible={visible} transparent animationType="slide">
     <View style={styles.modalRoot}>
@@ -91,7 +88,6 @@ export const JoinRequestsModal = ({ visible, onClose, requests, loading, onAnswe
   </Modal>
 );
 
-// 4. מודאל החלפת מנהל בית
 export const SwitchHeadModal = ({ visible, onClose, members, onSwitch, currentAdminId }: any) => (
   <Modal visible={visible} transparent animationType="slide">
     <View style={styles.modalRoot}>

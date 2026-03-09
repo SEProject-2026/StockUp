@@ -78,7 +78,6 @@ export function useHomeSettings(currentHomeId?: string) {
 
   const isHomeAdmin = !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
 
-  // פונקציות ביצוע (Actions)
   const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
     try {
       setProcessingRequestId(userId);

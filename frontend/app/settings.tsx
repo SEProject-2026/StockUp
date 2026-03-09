@@ -21,7 +21,7 @@ export default function SettingsScreen() {
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
   const { state, actions } = useHomeSettings(homeId);
 
-  // לוגיקה מקומית לפתיחת מודאלים מורכבים (כדי לשמור על עיצוב)
+
   const handleOpenCode = async () => {
     actions.setHomeCodeOpen(true);
     actions.setLoadingHomeCode(true);
@@ -85,7 +85,6 @@ export default function SettingsScreen() {
         <BottomNavBar activeTab="settings" />
       </View>
 
-      {/* כל המודאלים */}
       <ExpiryDaysModal visible={state.daysModalOpen} onClose={() => actions.setDaysModalOpen(false)} days={state.expiryLeadDays} setDays={actions.setExpiryLeadDays} onSave={actions.handleSaveExpiration} loading={state.savingDays} clamp={actions.clampDays} />
       <HomeCodeModal visible={state.homeCodeOpen} onClose={() => actions.setHomeCodeOpen(false)} code={state.homeInviteCode} loading={state.loadingHomeCode} onCopy={() => { Clipboard.setStringAsync(state.homeInviteCode); Alert.alert("הועתק"); }} />
       <JoinRequestsModal visible={state.joinRequestsOpen} onClose={() => actions.setJoinRequestsOpen(false)} requests={state.joinRequests} loading={state.loadingJoinRequests} onAnswer={actions.handleAnswerJoinRequest} processingId={state.processingRequestId} />
