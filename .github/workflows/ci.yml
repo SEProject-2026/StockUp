@@ -19,9 +19,9 @@ jobs:
       db:
         image: postgres:15
         env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: stockup_test
         ports:
           - 5433:5432
         options: >-
@@ -55,7 +55,7 @@ jobs:
 
     - name: Run Pytest
       env:
-        DATABASE_URL: postgresql://test_user:test_password@localhost:5433/test_db
+        DATABASE_URL: postgresql://postgres:password@localhost:5433/stockup_test
         JWT_SECRET: test_secret_for_ci
         JWT_ALGORITHM: HS256
         JWT_EXPIRES_IN: 60
