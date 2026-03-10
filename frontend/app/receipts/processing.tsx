@@ -9,7 +9,7 @@ import InfoBox from "@/src/components/ui/InfoBox";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import PrimaryButton from "@/src/components/ui/buttons/PrimaryButton";
 
-import { getSelectedHomeId } from "../home/selected-home";
+import { getSelectedHomeId } from "@/src/utils/selected-home";
 import { scanReceiptMulti } from "@/src/api/stock";
 import { setLastScannedReceipt } from "@/src/context/receipt-scan-store";
 

@@ -47,11 +47,18 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
             params: { homeId: currentHomeId },
           });
         } else {
-          router.replace("/inventory/inventory"); // או "/homes" אם מלאי חייב בית
+          router.replace("/inventory/inventory"); 
         }
         break;
       case "shopping-list":
-        //router.replace("/ShoppingListScreen");
+        if (currentHomeId) {
+          router.replace({
+            pathname: "/shopping-list",
+            params: { homeId: currentHomeId },
+          });
+        } else {
+        router.replace("/shopping-list");
+        }
         break;
       case "settings":
         if (currentHomeId) {
@@ -60,7 +67,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
             params: { homeId: currentHomeId },
           });
         } else {
-          router.replace("/settings"); // או "/homes" אם מלאי חייב בית
+          router.replace("/settings");
         }
         break;
     }

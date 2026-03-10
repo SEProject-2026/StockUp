@@ -20,7 +20,7 @@ const MUTED = "#6B7280";
 const BORDER = "#E5E7EB";
 
 export default function CreateOrJoinHomeModal({
-  visible,
+  visible,// Is the model open
   saving,
   mode,
   onChangeMode,
