@@ -1,4 +1,4 @@
-from backend.tests.container import testing_container
+from tests.container import testing_container
 
 def setup_function():
     testing_container.reset_state()

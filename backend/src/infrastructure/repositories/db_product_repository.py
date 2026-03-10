@@ -1,11 +1,10 @@
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from backend.src.repositories.i_product_repository import IProductRepository
-from backend.src.domain.smart_home.product import Product, ProductItem
-from backend.src.domain.smart_home.enums import LocationType
-from backend.src.infrastructure.db.models import ProductModel, ProductItemModel
+from src.repositories.i_product_repository import IProductRepository
+from src.domain.smart_home.product import Product, ProductItem
+from src.domain.smart_home.enums import LocationType
+from src.infrastructure.db.models import ProductModel, ProductItemModel
 
 class DbProductRepository(IProductRepository):
     def __init__(self, db: Session):
@@ -18,51 +17,9 @@ class DbProductRepository(IProductRepository):
 
     async def save_all(self, products: List[Product]) -> None:
         """Bulk save for receipts - Commits once at the end."""
-        
-        """
-        Note from David: On scenario when there is no some product in a shared home
-                        and two users add the same product at the same time, the same product
-                        now will get different IDs in the database, which is not ideal. 
-                        there will be two entries for the same product.
-        """
         for product in products:
-            stmt = pg_insert(ProductModel).values(
-                id=str(product.id),
-                home_id=str(product.home_id),
-                original_name=product.original_name,
-                nickname=product.nickname,
-                barcode=product.barcode
-            )
-            
-            update_dict = {
-                "nickname": stmt.excluded.nickname,
-                "barcode": stmt.excluded.barcode
-            }
-
-            stmt = stmt.on_conflict_do_update(
-                index_elements=['home_id', 'original_name'], 
-                set_=update_dict
-            ).returning(ProductModel.id)
-            
-            result = self.db.execute(stmt)
-            actual_product_id = result.scalar()
-
-            for item in product.items:
-                item_model = ProductItemModel(
-                    id=str(item.id),
-                    product_id=actual_product_id,
-                    quantity=item.quantity,
-                    expiration_date=item.expiration_date,
-                    location=item.location.name if item.location else "OTHER"
-                )
-                self.db.add(item_model)
-                
+            self._perform_upsert_logic(product)
         self.db.commit()
-        
-        
-        # for product in products:
-        #     self._perform_upsert_logic(product)
-        # self.db.commit()
 
     def _perform_upsert_logic(self, product: Product) -> None:
         """Internal helper to handle the mapping logic without commit."""
@@ -231,60 +188,3 @@ class DbProductRepository(IProductRepository):
         product._items = restored_items
         
         return product
-    
-    async def adjust_quantity_and_cleanup(self, product_id: UUID, item_id: UUID, delta: int) -> Optional[Product]:
-        """
-        Adjusts the quantity of a specific line item and performs cleanup if quantity drops to 0 or below.
-        Returns the updated product, or None if the product was deleted.
-        """
-        self.db.query(ProductItemModel).filter(
-            ProductItemModel.id == str(item_id),
-            ProductItemModel.product_id == str(product_id)
-        ).update(
-            {"quantity": ProductItemModel.quantity + delta},
-            synchronize_session=False
-        )
-
-        self.db.flush()
-
-        db_product = self.db.query(ProductModel).options(joinedload(ProductModel.items)).filter(
-            ProductModel.id == str(product_id)
-        ).first()
-
-        if not db_product:
-            return None
-        
-        total_qty = sum(item.quantity for item in db_product.items) if db_product.items else 0
-
-        if total_qty <= 0:
-            self.db.delete(db_product)
-            self.db.commit()
-            return None
-            
-        self.db.commit()
-        return self._to_domain(db_product)
-    
-    async def remove_item_and_cleanup(self, product_id: UUID, item_id: UUID) -> Optional[Product]:
-        self.db.query(ProductItemModel).filter(
-            ProductItemModel.id == str(item_id),
-            ProductItemModel.product_id == str(product_id)
-        ).delete(synchronize_session=False)
-        
-        self.db.flush() 
-
-        db_product = self.db.query(ProductModel).options(joinedload(ProductModel.items)).filter(
-            ProductModel.id == str(product_id)
-        ).first()
-
-        if not db_product:
-            return None
-
-        total_qty = sum(item.quantity for item in db_product.items) if db_product.items else 0
-
-        if total_qty <= 0 or not db_product.items:
-            self.db.delete(db_product)
-            self.db.commit()
-            return None
-            
-        self.db.commit()
-        return self._to_domain(db_product)

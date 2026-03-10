@@ -2,10 +2,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from sqlalchemy.orm import Session 
-from backend.src.infrastructure.logger import app_logger
+from src.infrastructure.logger import app_logger
 
-from backend.src.infrastructure.db.database import get_db
-from backend.src.api.schemas.user_schemas import (
+from src.infrastructure.db.database import get_db
+from src.api.schemas.user_schemas import (
     UserDTO,
     RegisterRequest, 
     LoginRequest, 
@@ -13,11 +13,11 @@ from backend.src.api.schemas.user_schemas import (
     UpdateNameRequest, 
     ChangePasswordRequest
 )
-from backend.src.api.schemas.common import GeneralResponse
+from src.api.schemas.common import GeneralResponse
 
-from backend.src.infrastructure.app_container import AppContainer
-from backend.src.api.security import get_current_user_id
-from backend.src.services.user_service import UserService 
+from src.infrastructure.app_container import AppContainer
+from src.api.security import get_current_user_id
+from src.services.user_service import UserService 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

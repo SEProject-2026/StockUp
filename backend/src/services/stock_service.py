@@ -4,16 +4,16 @@ from uuid import UUID, uuid4
 from typing import Any, Callable, List, Optional, Dict
 from datetime import date
 
-from backend.src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
-from backend.src.domain.smart_home.product import Product
-from backend.src.repositories.i_product_repository import IProductRepository
-from backend.src.repositories.i_home_repository import IHomeRepository
-from backend.src.repositories.catalog_provider import ICatalogProvider
-from backend.src.repositories.catalog_provider import CatalogItem
-from backend.src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
-from backend.src.infrastructure.scanner.receipt_scanner import ReceiptScanner
-from backend.src.domain.receipt import ReceiptItemDTO, ReceiptDTO
-from backend.src.infrastructure.logger import app_logger
+from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
+from src.domain.smart_home.product import Product
+from src.repositories.i_product_repository import IProductRepository
+from src.repositories.i_home_repository import IHomeRepository
+from src.repositories.catalog_provider import ICatalogProvider
+from src.repositories.catalog_provider import CatalogItem
+from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
+from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
+from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
+from src.infrastructure.logger import app_logger
 
 class StockService:
  
@@ -193,53 +193,27 @@ class StockService:
         Removes a specific item batch (line) from the product.
         If the product becomes empty, it deletes the product entity entirely.
         """
-
-        """
-        Note from David: On scenario where one user is removing an item 
-        while another user is simultaneously adding quantity to the same product, 
-        we need to ensure that the remove will not affect on the adding user.
-        """
         app_logger.debug(f"Attempting to remove item {item_id} from product {product_id}")
         await self._check_access(user_id, home_id)
-
-        updated_product = await self._product_repository.remove_item_and_cleanup(
-            product_id=product_id, 
-            item_id=item_id
-        )
         
-        if not updated_product:
-            app_logger.info(f"Removed last item {item_id}. Product {product_id} deleted completely from DB.")
+        product = await self._product_repository.get_by_id(product_id)
+        
+        if not product or product.home_id != home_id:
+            app_logger.warning(f"Item removal failed: Product {product_id} not found or access denied for home {home_id}")
+            raise ValueError("Product not found in this home")
+        
+        product.remove_item(item_id)
+        
+        if product.total_quantity > 0:
+            await self._product_repository.update(product)
+            app_logger.info(f"Removed item {item_id}. Product {product_id} updated with new total: {product.total_quantity}")
+            return product
+        else:
+            await self._product_repository.delete(product_id)
+            app_logger.info(f"Removed last item {item_id}. Product {product_id} deleted completely.")
             return None
-            
-        app_logger.info(f"Removed item {item_id}. Product {product_id} updated with new total: {updated_product.total_quantity}")
-        return updated_product
-        
-        # product = await self._product_repository.get_by_id(product_id)
-        
-        # if not product or product.home_id != home_id:
-        #     app_logger.warning(f"Item removal failed: Product {product_id} not found or access denied for home {home_id}")
-        #     raise ValueError("Product not found in this home")
-        
-        # product.remove_item(item_id)
-        
-        # if product.total_quantity > 0:
-        #     await self._product_repository.update(product)
-        #     app_logger.info(f"Removed item {item_id}. Product {product_id} updated with new total: {product.total_quantity}")
-        #     return product
-        # else:
-        #     await self._product_repository.delete(product_id)
-        #     app_logger.info(f"Removed last item {item_id}. Product {product_id} deleted completely.")
-        #     return None
 
     async def update_item_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_quantity: int) -> Optional[Product]:
-        
-        """
-        Note from David: On scenario where one user is decreasing the quantity of an item 
-        while another user is simultaneously adding quantity to the same product, 
-        we need to ensure that the decrease will not affect the addition.
-        """
-        if new_quantity < 0:
-            raise ValueError("Quantity cannot be negative")
         app_logger.debug(f"Attempting to update quantity of item {item_id} to {new_quantity}")
         await self._check_access(user_id, home_id)
         
@@ -247,33 +221,17 @@ class StockService:
         if not product or product.home_id != home_id:
             app_logger.warning(f"Quantity update failed: Product {product_id} not found in home {home_id}")
             raise ValueError("Product not found")
-        old_quantity = product.get_item_quantity(item_id)
-        delta_to_change = new_quantity - old_quantity
 
-        updated_product = await self._product_repository.adjust_quantity_and_cleanup(
-            product_id=product_id, 
-            item_id=item_id, 
-            delta=delta_to_change
-        )
+        product.update_item_quantity(item_id, new_quantity)
         
-        if not updated_product:
-            app_logger.info(f"Product {product_id} reached 0 and was cleanly deleted from DB.")
+        if product.total_quantity > 0:
+            await self._product_repository.update(product)
+            app_logger.info(f"Quantity for item {item_id} updated to {new_quantity}")
+            return product
+        else:
+            await self._product_repository.delete(product_id)
+            app_logger.info(f"Quantity set to 0. Product {product_id} deleted completely.")
             return None
-            
-        app_logger.info(f"Quantity adjusted. New total for product {product_id} is {updated_product.total_quantity}")
-        return updated_product
-
-        # product.update_item_quantity(item_id, new_quantity)
-        
-        # if product.total_quantity > 0:
-        #     await self._product_repository.update(product)
-        #     app_logger.info(f"Quantity for item {item_id} updated to {new_quantity}")
-        #     return product
-        # else:
-
-        #     await self._product_repository.delete(product_id)
-        #     app_logger.info(f"Quantity set to 0. Product {product_id} deleted completely.")
-        #     return None
 
     async def update_item_date(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_date: Optional[date]) -> Product:
         app_logger.debug(f"Attempting to update expiration date of item {item_id} to {new_date}")

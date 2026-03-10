@@ -1,8 +1,8 @@
 import uuid
 from typing import Dict, List, Optional
-from backend.src.domain.smart_home.enums import ExpirationType, LocationType
-from backend.src.repositories.i_product_repository import IProductRepository
-from backend.src.domain.smart_home.product import Product
+from src.domain.smart_home.enums import ExpirationType, LocationType
+from src.repositories.i_product_repository import IProductRepository
+from src.domain.smart_home.product import Product
 
 class InMemoryProductRepository(IProductRepository):
     
@@ -83,57 +83,3 @@ class InMemoryProductRepository(IProductRepository):
 
     async def clear(self):
         self._products_db.clear()
-
-    async def adjust_quantity_and_cleanup(self, product_id: uuid.UUID, item_id: uuid.UUID, delta: int) -> Optional[Product]:
-        """
-        Adjusts the quantity of a specific line item and performs cleanup if quantity drops to 0 or below.
-        Returns the updated product, or None if the product was deleted.
-        """
-        product = await self.get_by_id(product_id)
-        if not product:
-            raise KeyError(f"Product {product_id} not found for quantity adjustment.")
-        
-        item = product.get_item_by_id(item_id)
-        if not item:
-            raise KeyError(f"Item {item_id} not found in product {product_id} for quantity adjustment.")
-        
-        # Adjust quantity
-        item.quantity += delta
-        
-        # If quantity drops to 0 or below, remove the item
-        if item.quantity <= 0:
-            product.remove_item(item_id)
-        
-        # If after cleanup, the product has no more items, delete the product
-        if not product.items:
-            await self.delete(product_id)
-            return None
-        
-        # Otherwise, update the product in the repository
-        await self.update(product)
-        return product
-    
-    async def remove_item_and_cleanup(self, product_id: uuid.UUID, item_id: uuid.UUID) -> Optional[Product]:
-        """
-        Completely removes a specific line item and performs cleanup if total quantity drops to 0 or below.
-        Returns the updated product, or None if the product was deleted.
-        """
-        product = await self.get_by_id(product_id)
-        if not product:
-            raise KeyError(f"Product {product_id} not found for item removal.")
-        
-        item = product.get_item_by_id(item_id)
-        if not item:
-            raise KeyError(f"Item {item_id} not found in product {product_id} for item removal.")
-        
-        # Remove the item
-        product.remove_item(item_id)
-        
-        # If after cleanup, the product has no more items, delete the product
-        if not product.items:
-            await self.delete(product_id)
-            return None
-        
-        # Otherwise, update the product in the repository
-        await self.update(product)
-        return product

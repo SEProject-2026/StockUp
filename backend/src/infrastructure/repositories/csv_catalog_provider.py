@@ -3,7 +3,7 @@ import os
 import shutil
 from tempfile import NamedTemporaryFile
 from typing import List, Optional, Dict
-from backend.src.repositories.catalog_provider import ICatalogProvider, CatalogItem
+from src.repositories.catalog_provider import ICatalogProvider, CatalogItem
 
 class CsvCatalogProvider(ICatalogProvider):
     """

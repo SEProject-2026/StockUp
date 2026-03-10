@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from uuid import UUID
 from sqlalchemy.orm import Session
 
-from backend.src.infrastructure.db.database import get_db
-from backend.src.services.management_service import ManagementService
-from backend.src.api.schemas.management_schemas import AnswerJoinRequest, CreateHomeRequest, HomeDTO, JoinHomeRequest, UpdateExpirationRangeRequest, UpdateHomeHeadRequest
-from backend.src.api.schemas.common import GeneralResponse
-from backend.src.api.security import get_current_user_id
-from backend.src.infrastructure.app_container import AppContainer
-from backend.src.infrastructure.logger import app_logger  # <--- Added logger import
+from src.infrastructure.db.database import get_db
+from src.services.management_service import ManagementService
+from src.api.schemas.management_schemas import AnswerJoinRequest, CreateHomeRequest, HomeDTO, JoinHomeRequest, UpdateExpirationRangeRequest, UpdateHomeHeadRequest
+from src.api.schemas.common import GeneralResponse
+from src.api.security import get_current_user_id
+from src.infrastructure.app_container import AppContainer
+from src.infrastructure.logger import app_logger  # <--- Added logger import
 
 router = APIRouter(prefix="/homes", tags=["Home Management"])
 

@@ -4,10 +4,10 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query, File
 from sqlalchemy.orm import Session
 
-from backend.src.domain.receipt import ReceiptDTO, ReceiptItemDTO
-from backend.src.infrastructure.db.database import get_db
-from backend.src.services.stock_service import StockService
-from backend.src.api.schemas.product_schemas import (
+from src.domain.receipt import ReceiptDTO, ReceiptItemDTO
+from src.infrastructure.db.database import get_db
+from src.services.stock_service import StockService
+from src.api.schemas.product_schemas import (
     AddReceiptRequest,
     ProductDTO, 
     AddProductRequest,
@@ -16,11 +16,11 @@ from backend.src.api.schemas.product_schemas import (
     UpdateItemExpirationRequest,
     UpdateProductNicknameRequest
 )
-from backend.src.api.schemas.common import GeneralResponse
-from backend.src.domain.smart_home.enums import LocationType, ExpirationType
-from backend.src.infrastructure.app_container import AppContainer
-from backend.src.api.security import get_current_user_id
-from backend.src.infrastructure.logger import app_logger
+from src.api.schemas.common import GeneralResponse
+from src.domain.smart_home.enums import LocationType, ExpirationType
+from src.infrastructure.app_container import AppContainer
+from src.api.security import get_current_user_id
+from src.infrastructure.logger import app_logger
 
 router = APIRouter(prefix="/stock", tags=["Stock Management"])
 

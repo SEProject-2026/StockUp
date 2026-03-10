@@ -1,7 +1,7 @@
 from datetime import date
 from unittest.mock import AsyncMock, patch
-from backend.src.repositories.catalog_provider import CatalogItem
-from backend.tests.container import testing_container
+from src.repositories.catalog_provider import CatalogItem
+from tests.container import testing_container
 
 def setup_function():
     testing_container.reset_state()
