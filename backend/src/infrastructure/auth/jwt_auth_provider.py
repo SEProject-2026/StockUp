@@ -14,7 +14,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = os.getenv("JWT_ALGORITHM")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_IN")) 
-
 class JwtAuthProvider(IAuthProvider):
     def create_token(self, user_id: UUID) -> str:
         #creation of the token payload

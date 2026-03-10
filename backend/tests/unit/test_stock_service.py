@@ -983,7 +983,6 @@ async def test_add_receipt_success():
             quantity=2.0,
             barcode="111",
             expiration_date=date.today(),
-            unit=UnitType.UNIT,
             location=LocationType.FRIDGE
         ),
         ReceiptItemDTO(
@@ -991,7 +990,6 @@ async def test_add_receipt_success():
             quantity=1.0,
             barcode="222",
             expiration_date=None,
-            unit=UnitType.UNIT,
             location=LocationType.PANTRY
         )
     ]
@@ -1000,7 +998,6 @@ async def test_add_receipt_success():
         id=uuid4(),
         home_id=home_id,
         user_id=user_id,
-        chain="Shufersal",
         items=items
     )
     
