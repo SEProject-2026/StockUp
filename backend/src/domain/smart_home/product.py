@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import date
 from dataclasses import dataclass, field
-from backend.src.domain.smart_home.enums import LocationType, ExpirationType
+from src.domain.smart_home.enums import LocationType, ExpirationType
 
 @dataclass
 class ProductItem:

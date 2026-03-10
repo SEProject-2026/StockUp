@@ -1,9 +1,9 @@
 from uuid import UUID
 from typing import List
-from backend.src.repositories.user_repository import IUserRepository
-from backend.src.repositories.i_home_repository import IHomeRepository
-from backend.src.domain.smart_home.home import Home
-from backend.src.infrastructure.logger import app_logger
+from src.repositories.user_repository import IUserRepository
+from src.repositories.i_home_repository import IHomeRepository
+from src.domain.smart_home.home import Home
+from src.infrastructure.logger import app_logger
 
 class ManagementService:
 

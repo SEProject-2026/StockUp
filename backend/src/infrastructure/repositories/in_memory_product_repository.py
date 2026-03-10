@@ -1,8 +1,8 @@
 import uuid
 from typing import Dict, List, Optional
-from backend.src.domain.smart_home.enums import ExpirationType, LocationType
-from backend.src.repositories.i_product_repository import IProductRepository
-from backend.src.domain.smart_home.product import Product
+from src.domain.smart_home.enums import ExpirationType, LocationType
+from src.repositories.i_product_repository import IProductRepository
+from src.domain.smart_home.product import Product
 
 class InMemoryProductRepository(IProductRepository):
     

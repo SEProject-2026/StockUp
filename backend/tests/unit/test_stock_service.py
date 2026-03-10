@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from uuid import UUID, uuid4
 from datetime import date, timedelta
-from backend.src.domain.smart_home.product import Product
-from backend.tests.container import testing_container
-from backend.src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
+from src.domain.smart_home.product import Product
+from tests.container import testing_container
+from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
 
 # --- Helper Functions ---
 
@@ -962,9 +962,9 @@ async def test_get_home_products_success():
 import pytest
 from datetime import date
 from uuid import uuid4
-from backend.src.domain.receipt import ReceiptDTO, ReceiptItemDTO
-from backend.src.domain.smart_home.enums import LocationType
-from backend.tests.container import testing_container
+from src.domain.receipt import ReceiptDTO, ReceiptItemDTO
+from src.domain.smart_home.enums import LocationType
+from tests.container import testing_container
 
 @pytest.mark.asyncio
 async def test_add_receipt_success():

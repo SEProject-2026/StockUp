@@ -2,10 +2,10 @@ from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from backend.src.repositories.i_product_repository import IProductRepository
-from backend.src.domain.smart_home.product import Product, ProductItem
-from backend.src.domain.smart_home.enums import LocationType
-from backend.src.infrastructure.db.models import ProductModel, ProductItemModel
+from src.repositories.i_product_repository import IProductRepository
+from src.domain.smart_home.product import Product, ProductItem
+from src.domain.smart_home.enums import LocationType
+from src.infrastructure.db.models import ProductModel, ProductItemModel
 
 class DbProductRepository(IProductRepository):
     def __init__(self, db: Session):

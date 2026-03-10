@@ -1,9 +1,9 @@
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from backend.src.repositories.i_home_repository import IHomeRepository
-from backend.src.domain.smart_home.home import Home
-from backend.src.infrastructure.db.models import HomeModel, UserModel
+from src.repositories.i_home_repository import IHomeRepository
+from src.domain.smart_home.home import Home
+from src.infrastructure.db.models import HomeModel, UserModel
 
 class DbHomeRepository(IHomeRepository):
     def __init__(self, db: Session):

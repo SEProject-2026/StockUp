@@ -1,8 +1,8 @@
 import pytest
 from uuid import UUID, uuid4
-from backend.src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
-from backend.src.services.management_service import ManagementService
-from backend.src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
+from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from src.services.management_service import ManagementService
+from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 
 @pytest.fixture
 def user_repo():

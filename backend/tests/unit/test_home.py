@@ -1,6 +1,6 @@
 import pytest
 from uuid import UUID, uuid4
-from backend.src.domain.smart_home.home import Home
+from src.domain.smart_home.home import Home
 
 
 USER_ID = uuid4()
