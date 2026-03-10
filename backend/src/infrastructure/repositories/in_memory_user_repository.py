@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
-from src.domain.user import User
-from src.repositories.user_repository import IUserRepository
+from backend.src.domain.user import User
+from backend.src.repositories.user_repository import IUserRepository
 
 
 class InMemoryUserRepository(IUserRepository):

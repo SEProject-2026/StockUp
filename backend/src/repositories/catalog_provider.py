@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
-from src.domain.smart_home.enums import LocationType
+from backend.src.domain.smart_home.enums import LocationType
 
 # === DTO (Data Transfer Object) ===
 class CatalogItem(BaseModel):

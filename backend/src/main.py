@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from src.infrastructure.db.database import engine
+from backend.src.infrastructure.db.database import engine
 from fastapi.middleware.cors import CORSMiddleware
-from src.infrastructure.db import models
-from src.api.routes import auth_routes, management_routes, stock_routes
+from backend.src.infrastructure.db import models
+from backend.src.api.routes import auth_routes, management_routes, stock_routes
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="StockUp API", version="1.0.0")

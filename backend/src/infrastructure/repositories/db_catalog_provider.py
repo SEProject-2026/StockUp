@@ -1,8 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from src.repositories.catalog_provider import ICatalogProvider, CatalogItem
-from src.infrastructure.db.models import CatalogItemModel
+from backend.src.repositories.catalog_provider import ICatalogProvider, CatalogItem
+from backend.src.infrastructure.db.models import CatalogItemModel
 
 class DbCatalogProvider(ICatalogProvider):
     def __init__(self, db: Session):

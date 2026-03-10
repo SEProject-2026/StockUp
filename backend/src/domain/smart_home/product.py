@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import date
 from dataclasses import dataclass, field
-from src.domain.smart_home.enums import LocationType, ExpirationType
+from backend.src.domain.smart_home.enums import LocationType, ExpirationType
 
 @dataclass
 class ProductItem:
@@ -99,7 +99,7 @@ class Product:
 
     def remove_item(self, item_id: UUID) -> None:
         """Completely removes a specific line item."""
-        for i, item in enumerate(self._items):
+        for i, item in enumerate(self._items.copy()):
             if item.id == item_id:
                 self._items.pop(i)
                 return
@@ -128,6 +128,13 @@ class Product:
                 return
         
         raise ValueError(f"Item {item_id} not found")
+    
+    def get_item_quantity(self, item_id: UUID) -> int:
+        """Returns the quantity of a specific line item."""
+        for item in self._items:
+            if item.id == item_id:
+                return item.quantity
+        return 0
 
     # ==========================================
     # Update Methods with Merge Logic
@@ -171,7 +178,7 @@ class Product:
         it merges the quantities and deletes the old item ID.
         """
         # 1. Find the source item
-        source_item = self._get_item_by_id(item_id)
+        source_item = self.get_item_by_id(item_id)
         
         if source_item.expiration_date == new_date:
             return 
@@ -195,7 +202,7 @@ class Product:
     # Private Helpers
     # ==========================================
 
-    def _get_item_by_id(self, item_id: UUID) -> ProductItem:
+    def get_item_by_id(self, item_id: UUID) -> ProductItem:
         for item in self._items:
             if item.id == item_id:
                 return item

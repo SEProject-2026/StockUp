@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from src.infrastructure.app_container import AppContainer
+from backend.src.infrastructure.app_container import AppContainer
 
 # 1. Define the OAuth2 Scheme
 # This tells FastAPI to look for a "Bearer" token in the Authorization header.

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from uuid import UUID
-from src.domain.user import User
+from backend.src.domain.user import User
 
 class IUserRepository(ABC):
     """

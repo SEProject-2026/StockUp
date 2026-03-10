@@ -1,6 +1,6 @@
 from sqlalchemy import Column, DateTime, Float, String, Integer, Date, ForeignKey, Table
 from sqlalchemy.orm import relationship
-from src.infrastructure.db.database import Base
+from backend.src.infrastructure.db.database import Base
 
 # Association Tables (No changes)
 user_home_association = Table(

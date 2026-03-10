@@ -3,26 +3,26 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 # --- Services ---
-from src.services.user_service import UserService
-from src.services.stock_service import StockService
-from src.services.management_service import ManagementService
+from backend.src.services.user_service import UserService
+from backend.src.services.stock_service import StockService
+from backend.src.services.management_service import ManagementService
 
 # --- Auth ---
-from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
+from backend.src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 
 # --- Repositories (DB Implementation) ---
-from src.infrastructure.repositories.db_user_repository import DbUserRepository
-from src.infrastructure.repositories.db_home_repository import DbHomeRepository
-from src.infrastructure.repositories.db_product_repository import DbProductRepository
+from backend.src.infrastructure.repositories.db_user_repository import DbUserRepository
+from backend.src.infrastructure.repositories.db_home_repository import DbHomeRepository
+from backend.src.infrastructure.repositories.db_product_repository import DbProductRepository
 
 # --- Repositories (In-Memory for Tests) ---
-from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
-from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
-from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
+from backend.src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from backend.src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
+from backend.src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
 
 # --- Catalog ---
-from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
-from src.infrastructure.repositories.db_catalog_provider import DbCatalogProvider
+from backend.src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
+from backend.src.infrastructure.repositories.db_catalog_provider import DbCatalogProvider
 
 class AppContainer:
     """
