@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from datetime import date, timedelta
 from src.domain.smart_home.product import Product
 from tests.container import testing_container
-from src.domain.smart_home.enums import ExpirationType, LocationType
+from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
 
 # --- Helper Functions ---
 
