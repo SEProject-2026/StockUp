@@ -1,7 +1,7 @@
 import pytest
 from datetime import date, timedelta
 from uuid import uuid4
-from tests.container import testing_container
+from backend.tests.container import testing_container
 from backend.src.domain.smart_home.product import Product
 from backend.src.domain.smart_home.enums import LocationType
 from backend.src.domain.smart_home.home import Home

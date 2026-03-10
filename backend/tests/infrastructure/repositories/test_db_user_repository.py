@@ -1,5 +1,5 @@
 import pytest
-from tests.container import testing_container
+from backend.tests.container import testing_container
 from backend.src.domain.user import User
 
 # --- Tests ---

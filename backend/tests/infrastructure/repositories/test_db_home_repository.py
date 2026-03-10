@@ -1,6 +1,6 @@
 import pytest
 from uuid import uuid4
-from tests.container import testing_container
+from backend.tests.container import testing_container
 from backend.src.domain.smart_home.home import Home
 from backend.src.domain.user import User
 
