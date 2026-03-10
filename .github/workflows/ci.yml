@@ -29,11 +29,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
-    defaults:
-      run:
-        working-directory: ./backend
-
+          
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -62,4 +58,4 @@ jobs:
         ENVIRONMENT: testing
         PYTHONPATH: .
       run: |
-        pytest
+        python -m pytest backend/tests -v -s
