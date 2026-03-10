@@ -1,6 +1,6 @@
 import pytest
 from uuid import UUID
-from src.domain.user import User
+from backend.src.domain.user import User
 
 def test_user_initialization():
     """

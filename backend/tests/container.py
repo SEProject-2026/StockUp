@@ -4,29 +4,29 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from fastapi.testclient import TestClient
-from src.main import app
-from src.infrastructure.db.database import get_db, Base 
+from backend.src.main import app
+from backend.src.infrastructure.db.database import get_db, Base 
 
 # In-Memory Repos
-from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
-from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
-from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
+from backend.src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from backend.src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
+from backend.src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 
 # DB Repos
-from src.infrastructure.repositories.db_user_repository import DbUserRepository
-from src.infrastructure.repositories.db_product_repository import DbProductRepository
-from src.infrastructure.repositories.db_home_repository import DbHomeRepository
+from backend.src.infrastructure.repositories.db_user_repository import DbUserRepository
+from backend.src.infrastructure.repositories.db_product_repository import DbProductRepository
+from backend.src.infrastructure.repositories.db_home_repository import DbHomeRepository
 
 # Services & Auth
-from src.services.user_service import UserService
-from src.services.stock_service import StockService
-from src.services.management_service import ManagementService
-from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
+from backend.src.services.user_service import UserService
+from backend.src.services.stock_service import StockService
+from backend.src.services.management_service import ManagementService
+from backend.src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 
 # Route Dependencies
-from src.api.routes.auth_routes import get_user_service
-from src.api.routes.stock_routes import get_stock_service
-from src.api.routes.management_routes import get_management_service
+from backend.src.api.routes.auth_routes import get_user_service
+from backend.src.api.routes.stock_routes import get_stock_service
+from backend.src.api.routes.management_routes import get_management_service
 
 load_dotenv()
 

@@ -1,8 +1,8 @@
 import pytest
 from uuid import UUID
-from src.services.user_service import UserService
-from src.authentication.auth_provider import IAuthProvider
-from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from backend.src.services.user_service import UserService
+from backend.src.authentication.auth_provider import IAuthProvider
+from backend.src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 
 # --- 1. Mocks ---
 

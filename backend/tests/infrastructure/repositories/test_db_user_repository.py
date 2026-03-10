@@ -1,6 +1,6 @@
 import pytest
 from tests.container import testing_container
-from src.domain.user import User
+from backend.src.domain.user import User
 
 # --- Tests ---
 
