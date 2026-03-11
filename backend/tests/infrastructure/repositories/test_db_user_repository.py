@@ -1,6 +1,6 @@
 import pytest
 from tests.container import testing_container
-from src.domain.user import User
+from src.domain.user.user import User
 
 # --- Tests ---
 

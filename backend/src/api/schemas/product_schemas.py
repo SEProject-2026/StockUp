@@ -2,8 +2,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 from typing import List, Optional, Any
 from datetime import date
-from src.domain.receipt import ReceiptItemDTO
-from src.domain.smart_home.enums import LocationType, ExpirationType, UnitType
+from src.domain.receipt.receipt import ReceiptItemDTO
+from src.domain.enums import LocationType, ExpirationType, UnitType
 
 # ==========================================
 # Response Models (DTOs)

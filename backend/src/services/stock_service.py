@@ -5,14 +5,14 @@ from typing import Any, Callable, List, Optional, Dict
 from datetime import date
 
 from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
-from src.domain.smart_home.product import Product
+from src.domain.product.product import Product
 from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
-from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
+from src.domain.enums import ExpirationType, LocationType, UnitType
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
-from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
+from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
 
 class StockService:
