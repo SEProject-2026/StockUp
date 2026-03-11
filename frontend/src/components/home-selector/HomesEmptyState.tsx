@@ -22,7 +22,7 @@ export default function HomesEmptyState({
 
       <Text style={styles.emptyTitle}>אין לך עדיין בתים</Text>
       <Text style={styles.emptySubtitle}>
-        צור בית חדש או הצטרפי לבית קיים בעזרת קוד הזמנה.
+        צור בית חדש או הצטרף לבית קיים בעזרת קוד הזמנה.
       </Text>
 
       <View style={styles.row}>
