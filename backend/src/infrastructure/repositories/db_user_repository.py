@@ -19,7 +19,7 @@ class DbUserRepository(IUserRepository):
         db_user.email = user.email
         db_user.name = user.name
         db_user.hashed_password = user.hashed_password
-        
+        db_user.push_token = user.push_token
         self.db.commit()
         return self._to_domain(db_user)
 
@@ -37,11 +37,20 @@ class DbUserRepository(IUserRepository):
     async def get_names_by_ids(self, user_ids: list[UUID]) -> dict[UUID, str]:
         db_users = self.db.query(UserModel).filter(UserModel.id.in_([str(uid) for uid in user_ids])).all()
         return {UUID(db_user.id): db_user.name for db_user in db_users}
+    
+    async def update_push_token(self, user_id: UUID, new_push_token: str) -> Optional[User]:
+        db_user = self.db.query(UserModel).filter(UserModel.id == str(user_id)).first()
+        if not db_user:
+            return None
+        db_user.push_token = new_push_token
+        self.db.commit()
+        return self._to_domain(db_user)
 
     def _to_domain(self, db_user: UserModel) -> User:
         return User(
             id=UUID(db_user.id),
             email=db_user.email,
             name=db_user.name,
-            hashed_password=db_user.hashed_password
+            hashed_password=db_user.hashed_password,
+            push_token=db_user.push_token
         )

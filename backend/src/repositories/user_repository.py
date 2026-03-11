@@ -40,3 +40,11 @@ class IUserRepository(ABC):
         Returns a dictionary where keys are user UUIDs and values are user names.
         """
         pass
+
+    @abstractmethod
+    async def update_push_token(self, user_id: UUID, new_push_token: str) -> Optional[User]:
+        """
+        Update the push notification token for a user.
+        Returns the updated User entity if successful, else None if user not found.
+        """
+        pass

@@ -94,3 +94,17 @@ class UserService:
         
         await self.user_repo.save(user)
         app_logger.info(f"User {user_id} successfully changed their password")
+
+    async def update_push_token(self, user_id: UUID, new_push_token: str) -> User:
+        app_logger.debug(f"Starting push token update for user {user_id}")
+
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            app_logger.warning(f"Push token update failed: User not found with ID {user_id}")
+            raise ValueError("User not found")
+
+        user.update_push_token(new_push_token) 
+        await self.user_repo.update_push_token(user_id, new_push_token)
+        
+        app_logger.info(f"User {user_id} successfully updated their push token")
+        return user

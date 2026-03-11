@@ -23,3 +23,10 @@ class InMemoryUserRepository(IUserRepository):
     
     async def get_names_by_ids(self, user_ids: list[UUID]) -> dict[UUID, str]:
         return {user_id: self.users[user_id].name for user_id in user_ids if user_id in self.users}
+    
+    async def update_push_token(self, user_id: UUID, new_push_token: str) -> Optional[User]:
+        user = self.users.get(user_id, None)
+        if user:
+            user.update_push_token(new_push_token)
+            return user
+        return None

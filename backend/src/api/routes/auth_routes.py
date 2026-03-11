@@ -2,8 +2,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from sqlalchemy.orm import Session 
+from backend.src.domain.user import User
+from backend.src.infrastructure import app_container
 from backend.src.infrastructure.logger import app_logger
-
+from pydantic import BaseModel
 from backend.src.infrastructure.db.database import get_db
 from backend.src.api.schemas.user_schemas import (
     UserDTO,
@@ -129,4 +131,20 @@ async def change_password(
         
     except ValueError as e:
         app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    
+class PushTokenUpdateDTO(BaseModel):
+    push_token: str
+
+
+@router.patch("/me/push-token")
+async def update_push_token(
+    data: PushTokenUpdateDTO,
+    current_user: User = Depends(get_current_user_id),
+    container: AppContainer = Depends(app_container)
+):
+    try:
+        await container.get_user_service().update_push_token(current_user.id, data.push_token)
+        return {"status": "success", "message": "Push token saved"}
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
