@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,7 +8,7 @@ import * as Clipboard from "expo-clipboard";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
-import { useHomeSettings } from "@/src/hooks/useHomeSettings";
+import { useHomeSettings, useRealtimeJoinRequestsRefresh } from "@/src/hooks/useHomeSettings";
 import { Section, SettingsRow, Divider } from "@/src/components/settings/SettingsUI";
 import { 
   ExpiryDaysModal, HomeCodeModal, JoinRequestsModal, 
@@ -42,6 +42,22 @@ export default function SettingsScreen() {
     } catch (e) { Alert.alert("שגיאה", "טעינת בקשות נכשלה"); }
     finally { actions.setLoadingJoinRequests(false); }
   };
+  
+  const refreshJoinRequests = useCallback(async () => {
+    if (!homeId) return;
+
+    try {
+      const res = await getJoinRequests(homeId);
+      const requests = Object.entries(res.data || {}).map(([id, name]) => ({
+        user_id: id,
+        name,
+      }));
+      actions.setJoinRequests(requests);
+    } catch (e) {
+      console.log("[JoinRequests] refresh failed", e);
+    }
+  }, [homeId, actions]);
+  useRealtimeJoinRequestsRefresh(homeId, refreshJoinRequests);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>

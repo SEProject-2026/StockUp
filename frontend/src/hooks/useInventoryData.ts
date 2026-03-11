@@ -27,10 +27,32 @@ import {
   locationToLocationType,
   toIsoDateOnly,
 } from "@/src/components/inventory/inventory.utils";
+import { useRealtimeContext } from "../providers/RealtimeProvider";
 
 type LoadMode = "initial" | "soft";
 
 let inventoryCache: Record<string, InventoryRow[]> = {};
+export function useRealtimeInventoryRefresh(
+  homeId: string | undefined,
+  refreshInventory: () => Promise<void>
+) {
+  const { inventoryVersionByHome } = useRealtimeContext();
+  const firstRunRef = useRef(true);
+  const currentVersion = homeId ? (inventoryVersionByHome[homeId] ?? 0) : 0;
+
+  useEffect(() => {
+    if (!homeId) return;
+
+    console.log("[InventoryRefresh] homeId:", homeId, "version:", currentVersion);
+
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+
+    refreshInventory();
+  }, [homeId, currentVersion, refreshInventory]);
+}
 
 export function useInventoryData(params: {
   homeId?: string;

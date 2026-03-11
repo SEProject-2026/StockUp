@@ -13,7 +13,9 @@ import { getCurrentUserId } from "@/src/auth/token";
 type RealtimeContextValue = {
   homesVersion: number;
   inventoryVersionByHome: Record<string, number>;
+  joinRequestsVersionByHome: Record<string, number>;
   bumpInventoryVersion: (homeId: string) => void;
+  bumpJoinRequestsVersion: (homeId: string) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -21,6 +23,7 @@ const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
+  const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
 
   const channelsRef = useRef<any[]>([]);
 
@@ -30,8 +33,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpInventoryVersion = useCallback((homeId: string) => {
     if (!homeId) return;
-
     setInventoryVersionByHome((prev) => ({
+      ...prev,
+      [homeId]: (prev[homeId] ?? 0) + 1,
+    }));
+  }, []);
+
+  const bumpJoinRequestsVersion = useCallback((homeId: string) => {
+    if (!homeId) return;
+    setJoinRequestsVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
     }));
@@ -51,30 +61,30 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-    const userHomeChannel = supabase
-      .channel(`rt-user-home-debug-${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "user_home",
-        },
-        (payload) => {
-          console.log("[Realtime][DEBUG] user_home payload:", payload);
+        const userHomeChannel = supabase
+          .channel(`rt-user-home-${userId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "user_home",
+            },
+            (payload) => {
+              console.log("[Realtime] user_home payload:", payload);
 
-          const row = payload.new as { user_id?: string; home_id?: string } | null;
-          console.log("[Realtime][DEBUG] inserted user_id:", row?.user_id);
-          console.log("[Realtime][DEBUG] current userId:", userId);
+              const next = payload.new as { user_id?: string; home_id?: string } | null;
+              const oldRow = payload.old as { user_id?: string; home_id?: string } | null;
+              const rowUserId = next?.user_id ?? oldRow?.user_id;
 
-          if (row?.user_id === userId) {
-            bumpHomesVersion();
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log("[Realtime][DEBUG] user_home status:", status);
-      });
+              if (rowUserId === userId) {
+                bumpHomesVersion();
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log("[Realtime] user_home status:", status);
+          });
 
         const productItemsChannel = supabase
           .channel(`rt-product-items-${userId}`)
@@ -101,7 +111,34 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             console.log("[Realtime] product_items status:", status);
           });
 
-        channelsRef.current = [userHomeChannel, productItemsChannel];
+        const joinRequestsChannel = supabase
+          .channel(`rt-home-join-requests-${userId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "home_join_requests",
+            },
+            (payload) => {
+              console.log("[Realtime] home_join_requests payload:", payload);
+
+              const next = payload.new as { home_id?: string; user_id?: string } | null;
+              const oldRow = payload.old as { home_id?: string; user_id?: string } | null;
+              const changedHomeId = next?.home_id ?? oldRow?.home_id;
+
+              if (changedHomeId) {
+                bumpJoinRequestsVersion(changedHomeId);
+              }
+
+              // אם בקשה אושרה/נדחתה ונוצר/נמחק שיוך, גם homes יתעדכן דרך user_home
+            }
+          )
+          .subscribe((status) => {
+            console.log("[Realtime] home_join_requests status:", status);
+          });
+
+        channelsRef.current = [userHomeChannel, productItemsChannel, joinRequestsChannel];
       } catch (error) {
         console.log("[Realtime] setup error:", error);
       }
@@ -111,7 +148,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
-
       channelsRef.current.forEach((channel) => {
         try {
           supabase.removeChannel(channel);
@@ -119,18 +155,19 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           console.log("[Realtime] remove channel error:", error);
         }
       });
-
       channelsRef.current = [];
     };
-  }, [bumpHomesVersion, bumpInventoryVersion]);
+  }, [bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion]);
 
   const value = useMemo(
     () => ({
       homesVersion,
       inventoryVersionByHome,
+      joinRequestsVersionByHome,
       bumpInventoryVersion,
+      bumpJoinRequestsVersion,
     }),
-    [homesVersion, inventoryVersionByHome, bumpInventoryVersion]
+    [homesVersion, inventoryVersionByHome, joinRequestsVersionByHome, bumpInventoryVersion, bumpJoinRequestsVersion]
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
@@ -138,10 +175,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
 export function useRealtimeContext() {
   const ctx = useContext(RealtimeContext);
-
   if (!ctx) {
     throw new Error("useRealtimeContext must be used inside RealtimeProvider");
   }
-
   return ctx;
 }
