@@ -22,7 +22,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
 
-  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
+  const channelsRef = useRef<any[]>([]);
 
   const bumpHomesVersion = useCallback(() => {
     setHomesVersion((prev) => prev + 1);
@@ -43,28 +43,35 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const setup = async () => {
       try {
         const rawUser = await AsyncStorage.getItem("user");
-        if (!rawUser || !mounted) return;
+        if (!rawUser || !mounted) {
+          console.log("[Realtime] no stored user");
+          return;
+        }
 
         const parsedUser = JSON.parse(rawUser);
         const userId = parsedUser?.id;
+
+        console.log("[Realtime] current userId:", userId);
+
         if (!userId) return;
 
-        const homeMembersChannel = supabase
-          .channel(`rt-home-members-${userId}`)
+        const userHomeChannel = supabase
+          .channel(`rt-user-home-${userId}`)
           .on(
             "postgres_changes",
             {
               event: "*",
               schema: "public",
-              table: "home_members",
+              table: "user_home",
               filter: `user_id=eq.${userId}`,
             },
-            () => {
+            (payload) => {
+              console.log("[Realtime] user_home payload:", payload);
               bumpHomesVersion();
             }
           )
           .subscribe((status) => {
-            console.log("[Realtime] home_members:", status);
+            console.log("[Realtime] user_home status:", status);
           });
 
         const homesChannel = supabase
@@ -76,12 +83,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               schema: "public",
               table: "homes",
             },
-            () => {
+            (payload) => {
+              console.log("[Realtime] homes payload:", payload);
               bumpHomesVersion();
             }
           )
           .subscribe((status) => {
-            console.log("[Realtime] homes:", status);
+            console.log("[Realtime] homes status:", status);
           });
 
         const productItemsChannel = supabase
@@ -94,20 +102,22 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               table: "product_items",
             },
             (payload) => {
+              console.log("[Realtime] product_items payload:", payload);
+
               const next = payload.new as { home_id?: string } | null;
               const oldRow = payload.old as { home_id?: string } | null;
-              const homeId = next?.home_id ?? oldRow?.home_id;
+              const changedHomeId = next?.home_id ?? oldRow?.home_id;
 
-              if (homeId) {
-                bumpInventoryVersion(homeId);
+              if (changedHomeId) {
+                bumpInventoryVersion(changedHomeId);
               }
             }
           )
           .subscribe((status) => {
-            console.log("[Realtime] product_items:", status);
+            console.log("[Realtime] product_items status:", status);
           });
 
-        channelsRef.current = [homeMembersChannel, homesChannel, productItemsChannel];
+        channelsRef.current = [userHomeChannel, homesChannel, productItemsChannel];
       } catch (error) {
         console.log("[Realtime] setup error:", error);
       }
@@ -118,9 +128,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
 
-      for (const channel of channelsRef.current) {
-        supabase.removeChannel(channel);
-      }
+      channelsRef.current.forEach((channel) => {
+        try {
+          supabase.removeChannel(channel);
+        } catch (error) {
+          console.log("[Realtime] remove channel error:", error);
+        }
+      });
 
       channelsRef.current = [];
     };
