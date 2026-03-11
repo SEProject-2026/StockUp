@@ -16,4 +16,5 @@ function getDevServerHost() {
   return host;
 }
 
-export const API_BASE_URL = `http://${getDevServerHost()}:8000`;
+//export const API_BASE_URL = `https://stockup-api-e511.onrender.com`;
+ export const API_BASE_URL = `http://${getDevServerHost()}:8000`;

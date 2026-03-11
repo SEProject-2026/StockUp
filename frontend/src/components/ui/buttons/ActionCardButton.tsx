@@ -75,19 +75,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   textBlock: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
   },
   label: {
     fontSize: 13,
     fontWeight: "600",
     color: "#111827",
-    textAlign: "right",
+    textAlign: "center",
   },
   subtitle: {
     marginTop: 4,
     fontSize: 11,
     fontWeight: "600",
     color: "#14365aff",
-    textAlign: "right",
+    textAlign: "center",
   },
 });

@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "@/src/config/api";
 import { getAccessToken } from "@/src/auth/token";
-import { getSelectedHomeId } from "@/app/home/selected-home";
+import { getSelectedHomeId } from "../utils/selected-home";
 
 type FastApiDetailItem = {
   loc?: (string | number)[];

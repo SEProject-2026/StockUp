@@ -15,7 +15,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
-import { getSelectedHomeId } from "../home/selected-home";
+import { getSelectedHomeId } from "@/src/utils/selected-home";
 import { addReceipt } from "@/src/api/stock";
 import { consumeLastScannedReceipt } from "@/src/context/receipt-scan-store";
 import { consumeLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
