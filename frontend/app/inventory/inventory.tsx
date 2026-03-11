@@ -12,7 +12,8 @@ import { GroupedInventoryList } from "@/src/components/inventory/GroupedInventor
 import { EditItemModal } from "@/src/components/inventory/EditItemModal";
 
 import type { locationKey } from "@/src/components/inventory/inventory.utils";
-import { useInventoryData, useRealtimeInventoryRefresh } from "@/src/hooks/useInventoryData";
+import { useInventoryData } from "@/src/hooks/useInventoryData";
+import { useRealtimeInventoryRefresh } from "@/src/hooks/useRealtimeInventoryRefresh";
 
 export function InventoryScreenBase({
   initiallocation = "all",
@@ -31,7 +32,7 @@ export function InventoryScreenBase({
     initiallocation,
     hideTabs,
   });
-  
+
   useRealtimeInventoryRefresh(currentHomeId, () => inv.loadInventory("soft"));
 
     useFocusEffect(

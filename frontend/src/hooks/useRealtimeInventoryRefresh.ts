@@ -1,18 +1,21 @@
 import { useEffect, useRef } from "react";
 import { useRealtimeContext } from "@/src/providers/RealtimeProvider";
 
-type RefreshInventoryFn = () => Promise<void>;
-
 export function useRealtimeInventoryRefresh(
   homeId: string | undefined,
-  refreshInventory: RefreshInventoryFn
+  refreshInventory: () => Promise<void>
 ) {
   const { inventoryVersionByHome } = useRealtimeContext();
   const firstRunRef = useRef(true);
-  const currentVersion = homeId ? (inventoryVersionByHome[homeId] ?? 0) : 0;
+
+  const currentVersion = homeId
+    ? (inventoryVersionByHome[homeId] ?? 0)
+    : 0;
 
   useEffect(() => {
     if (!homeId) return;
+
+    console.log("[InventoryRefresh] homeId:", homeId, "version:", currentVersion);
 
     if (firstRunRef.current) {
       firstRunRef.current = false;
