@@ -31,7 +31,7 @@ export async function registerForPushNotificationsAsync() {
     }
 
     try {
-      const projectId = "YOUR_PROJECT_ID"; // נראה בהמשך מאיפה להביא את זה
+      const projectId = "ed2287fa-7806-490d-8a2e-e3e71c5ddaa2";
       token = (await Notifications.getExpoPushTokenAsync({
         projectId,
       })).data;

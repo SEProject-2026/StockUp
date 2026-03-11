@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
 import { register } from "@/src/api/auth";
+import { registerForPushNotificationsAsync } from '../src/api/notifications';
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
@@ -51,6 +52,7 @@ export default function SignupScreen() {
       password,
       password_confirm: confirm,
     });
+    registerForPushNotificationsAsync().catch(console.error);
       Alert.alert("נרשמת בהצלחה", "אפשר להתחבר עכשיו", [
         { text: "להתחברות", onPress: () => router.replace("/login") },
       ]);

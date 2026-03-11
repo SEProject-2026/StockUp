@@ -142,11 +142,11 @@ class PushTokenUpdateDTO(BaseModel):
 @router.patch("/me/push-token")
 async def update_push_token(
     data: PushTokenUpdateDTO,
-    current_user: User = Depends(get_current_user_id),
-    container: AppContainer = Depends(app_container)
+    user_service: UserServiceDep, 
+    user_id: UUID = Depends(get_current_user_id)
 ):
     try:
-        await container.get_user_service().update_push_token(current_user.id, data.push_token)
+        await user_service.update_push_token(user_id, data.push_token)
         return {"status": "success", "message": "Push token saved"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
