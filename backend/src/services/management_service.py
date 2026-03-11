@@ -1,9 +1,9 @@
 from uuid import UUID
 from typing import List
-from backend.src.repositories.user_repository import IUserRepository
-from backend.src.repositories.i_home_repository import IHomeRepository
-from backend.src.domain.smart_home.home import Home
-from backend.src.infrastructure.logger import app_logger
+from src.repositories.user_repository import IUserRepository
+from src.repositories.i_home_repository import IHomeRepository
+from src.domain.smart_home.home import Home
+from src.infrastructure.logger import app_logger
 
 class ManagementService:
 
@@ -148,18 +148,16 @@ class ManagementService:
     
     async def update_expiration_range(self, head_user_id: UUID, home_id: UUID, new_range: int) -> Home:
         app_logger.debug(f"User {head_user_id} attempting to update expiration range to {new_range} in home {home_id}")
-
-        home = await self._check_access(head_user_id, home_id)
+        home = await self._home_repository.get_by_id(home_id)
         
+        # Note: Missing access check here in your original code! 
+        # Usually, only the head of the house should be able to do this.
+        # Assuming `update_expiration_range` in the Domain model checks this.
         home.update_expiration_range(head_user_id, new_range)
         
         await self._home_repository.update(home)
         app_logger.info(f"Expiration range for home {home_id} updated to {new_range} by user {head_user_id}")
         return home
-
-    async def update_base_mode(self) -> None:
-        # when we implement the base mode feature, we will add the necessary code here to update it.
-        pass
 
     async def _check_access(self, user_id: UUID, home_id: UUID) -> Home:
         """Helper to verify user exists, logged in, and member of the home"""

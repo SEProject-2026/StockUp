@@ -1,5 +1,5 @@
-# from backend.src.infrastructure.app_container import AppContainer
-from backend.src.infrastructure.scanner.receipt_scanner import ReceiptScanner
+# from src.infrastructure.app_container import AppContainer
+from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from uuid import uuid4
 
 

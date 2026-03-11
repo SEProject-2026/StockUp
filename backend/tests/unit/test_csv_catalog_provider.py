@@ -2,7 +2,7 @@ import os
 import csv
 import pytest
 import tempfile
-from backend.src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
+from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
 
 # === Setup: Create a temporary CSV with English Chain names ===
 @pytest.fixture

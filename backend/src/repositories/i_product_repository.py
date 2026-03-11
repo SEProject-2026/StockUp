@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from backend.src.domain.smart_home.enums import ExpirationType
-from backend.src.domain.smart_home.product import Product
+from src.domain.smart_home.enums import ExpirationType
+from src.domain.smart_home.product import Product
 from uuid import UUID
 
 class IProductRepository(ABC):
@@ -52,20 +52,4 @@ class IProductRepository(ABC):
     @abstractmethod
     async def get_by_location(self, home_id: UUID, location: str) -> List[Product]:
         """Retrieves products stored in a specific location within the home."""
-        pass
-
-    @abstractmethod
-    async def adjust_quantity_and_cleanup(self, product_id: UUID, item_id: UUID, delta: int) -> Optional[Product]:
-        """
-        Adjusts the quantity of a specific line item and performs cleanup if quantity drops to 0 or below.
-        Returns the updated product, or None if the product was deleted.
-        """
-        pass
-
-    @abstractmethod
-    async def remove_item_and_cleanup(self, product_id: UUID, item_id: UUID) -> Optional[Product]:
-        """
-        Completely removes a specific line item and performs cleanup if total quantity drops to 0 or below.
-        Returns the updated product, or None if the product was deleted.
-        """
         pass

@@ -3,17 +3,17 @@ import os
 from typing import Optional
 from uuid import UUID
 from jose import jwt, JWTError
-from backend.src.authentication.auth_provider import IAuthProvider
-from backend.src.infrastructure.logger import app_logger
+from src.authentication.auth_provider import IAuthProvider
+from src.infrastructure.logger import app_logger
 from dotenv import load_dotenv
 
 
 load_dotenv()
 
 
-SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-test-key")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_IN", "60")) 
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("JWT_ALGORITHM")
+EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_IN")) 
 class JwtAuthProvider(IAuthProvider):
     def create_token(self, user_id: UUID) -> str:
         #creation of the token payload

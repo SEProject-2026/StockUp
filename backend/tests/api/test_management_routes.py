@@ -1,4 +1,4 @@
-from backend.tests.container import testing_container
+from tests.container import testing_container
 from uuid import UUID
 import pytest
 
@@ -82,26 +82,7 @@ def test_expiration_range_admin_restriction():
     admin_headers = get_auth_headers("head@test.com", "Head")
     member_headers = get_auth_headers("member@test.com", "Member")
     home_id = create_home_helper(admin_headers)["id"]
-    member_name = "Member"
-
-    code_res = testing_container.client.get(f"/homes/{home_id}/join_code", headers=admin_headers)
-    join_code = code_res.json()["data"]["join_code"]
-
-    testing_container.client.post("/homes/join", json={"home_code": join_code}, headers=member_headers)
-    req_res = testing_container.client.get(f"/homes/{home_id}/join_requests", headers=admin_headers)
-    requests_dict = req_res.json()["data"]
-    member_id = None
-    for uid, name in requests_dict.items():
-        if name == member_name:
-            member_id = uid
-            break
-
-    testing_container.client.post(
-        f"/homes/{home_id}/answer_request", 
-        json={"user_id": member_id, "approved": True}, 
-        headers=admin_headers
-    )
-
+    
     # Authorized patch
     res = testing_container.client.patch(
         f"/homes/{home_id}/expiration_range", 

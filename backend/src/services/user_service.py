@@ -1,10 +1,10 @@
 from uuid import UUID
 from typing import Tuple
-from backend.src.authentication.auth_provider import IAuthProvider
-from backend.src.authentication.password_encoder import PasswordEncoder
-from backend.src.domain.user import User
-from backend.src.repositories.user_repository import IUserRepository
-from backend.src.infrastructure.logger import app_logger
+from src.authentication.auth_provider import IAuthProvider
+from src.authentication.password_encoder import PasswordEncoder
+from src.domain.user import User
+from src.repositories.user_repository import IUserRepository
+from src.infrastructure.logger import app_logger
 
 class UserService:
 
