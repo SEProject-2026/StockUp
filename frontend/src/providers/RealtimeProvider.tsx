@@ -7,8 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/src/lib/supabase";
+import { getCurrentUserId } from "@/src/auth/token";
 
 type RealtimeContextValue = {
   homesVersion: number;
@@ -42,13 +42,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     const setup = async () => {
       try {
-        const { data } = await supabase.auth.getUser();
+        const userId = await getCurrentUserId();
 
-        const userId = data?.user?.id;
+        console.log("[Realtime] stored userId:", userId);
 
-        console.log("[Realtime] supabase user:", userId);
-
-        if (!userId) return;
+        if (!mounted || !userId) {
+          console.log("[Realtime] no stored user_id");
+          return;
+        }
 
         const userHomeChannel = supabase
           .channel(`rt-user-home-${userId}`)
