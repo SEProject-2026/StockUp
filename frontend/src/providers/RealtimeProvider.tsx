@@ -56,7 +56,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           .on(
             "postgres_changes",
             {
-              event: "*",
+              event: "INSERT",
               schema: "public",
               table: "user_home",
               filter: `user_id=eq.${userId}`,
@@ -68,24 +68,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe((status) => {
             console.log("[Realtime] user_home status:", status);
-          });
-
-        const homesChannel = supabase
-          .channel(`rt-homes-${userId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "homes",
-            },
-            (payload) => {
-              console.log("[Realtime] homes payload:", payload);
-              bumpHomesVersion();
-            }
-          )
-          .subscribe((status) => {
-            console.log("[Realtime] homes status:", status);
           });
 
         const productItemsChannel = supabase
@@ -113,7 +95,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             console.log("[Realtime] product_items status:", status);
           });
 
-        channelsRef.current = [userHomeChannel, homesChannel, productItemsChannel];
+        channelsRef.current = [userHomeChannel, productItemsChannel];
       } catch (error) {
         console.log("[Realtime] setup error:", error);
       }
