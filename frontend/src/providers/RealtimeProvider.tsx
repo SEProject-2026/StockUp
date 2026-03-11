@@ -42,16 +42,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     const setup = async () => {
       try {
-        const rawUser = await AsyncStorage.getItem("user");
-        if (!rawUser || !mounted) {
-          console.log("[Realtime] no stored user");
-          return;
-        }
+        const { data } = await supabase.auth.getUser();
 
-        const parsedUser = JSON.parse(rawUser);
-        const userId = parsedUser?.id;
+        const userId = data?.user?.id;
 
-        console.log("[Realtime] current userId:", userId);
+        console.log("[Realtime] supabase user:", userId);
 
         if (!userId) return;
 
