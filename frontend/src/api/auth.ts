@@ -4,9 +4,7 @@ import {
   clearAccessToken,
   setCurrentUserId,
   clearCurrentUserId,
-  getCurrentUserId,
 } from "@/src/auth/token";
-const userId = await getCurrentUserId();
 
 export type GeneralResponse<T = any> = {
   status: "success" | "error";
