@@ -52,8 +52,10 @@ export default function SignupScreen() {
       password,
       password_confirm: confirm,
     });
+
     registerForPushNotificationsAsync().catch(console.error);
-      Alert.alert("נרשמת בהצלחה", "אפשר להתחבר עכשיו", [
+    
+    Alert.alert("נרשמת בהצלחה", "אפשר להתחבר עכשיו", [
         { text: "להתחברות", onPress: () => router.replace("/login") },
       ]);
     } catch (e: any) {

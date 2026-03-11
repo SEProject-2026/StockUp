@@ -36,7 +36,9 @@ export default function LoginScreen() {
       setLoading(true);
 
       await login({ email: email.trim().toLowerCase(), password });
+
       registerForPushNotificationsAsync().catch(console.error);
+      
       router.replace("/home/home"); 
     } catch (e: any) {
       Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");
