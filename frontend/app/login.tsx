@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import { login } from "@/src/api/auth";
+import { registerForPushNotificationsAsync } from '../src/api/notifications';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
