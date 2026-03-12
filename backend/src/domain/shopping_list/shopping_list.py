@@ -51,7 +51,7 @@ class ShoppingList(BaseModel):
     def check_item_as_bought(self, item_name: str) -> None:
         for item in self.items:
             if item.item_name == item_name:
-                item.is_bought = True
+                item.is_bought = not item.is_bought  # Toggle bought status
                 self._refresh_timestamp()
                 return
 
