@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { supabase } from "@/src/lib/supabase";
 import { getCurrentUserId } from "@/src/auth/token";
+import { router } from "expo-router"; // ייבוא הראוטר לצורך ניתוב מחדש
 
 type RealtimeContextValue = {
   homesVersion: number;
@@ -39,6 +40,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const bumpAllInventoryVersions = useCallback(() => {
+    setInventoryVersionByHome((prev) => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach((id) => {
+        newState[id] = (newState[id] ?? 0) + 1;
+      });
+      return newState;
+    });
+  }, []);
+
   const bumpJoinRequestsVersion = useCallback((homeId: string) => {
     if (!homeId) return;
     setJoinRequestsVersionByHome((prev) => ({
@@ -61,6 +72,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        // 1. User Home Channel - אחראי על רשימת הבתים והוצאה מהבית
         const userHomeChannel = supabase
           .channel(`rt-user-home-${userId}`)
           .on(
@@ -78,6 +90,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               const rowUserId = next?.user_id ?? oldRow?.user_id;
 
               if (rowUserId === userId) {
+                // בדיקה אם המשתמש הוסר מהבית (DELETE)
+                if (payload.eventType === "DELETE") {
+                  console.log("[Realtime] User was removed from home, redirecting to home list...");
+                  router.replace("/home/home"); 
+                  return;
+                }
+                
+                // במקרה של עדכון או הוספה, פשוט מרעננים את רשימת הבתים
                 bumpHomesVersion();
               }
             }
@@ -86,6 +106,36 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             console.log("[Realtime] user_home status:", status);
           });
 
+        // 2. Products Channel
+        const productsChannel = supabase
+          .channel(`rt-products-${userId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "products",
+            },
+            (payload) => {
+              console.log("[Realtime] products payload:", payload);
+
+              const next = payload.new as { home_id?: string } | null;
+              const oldRow = payload.old as { home_id?: string } | null;
+              const changedHomeId = next?.home_id ?? oldRow?.home_id;
+
+              if (payload.eventType === "DELETE" && !changedHomeId) {
+                console.log("[Realtime] DELETE detected without home_id, bumping all homes");
+                bumpAllInventoryVersions();
+              } else if (changedHomeId) {
+                bumpInventoryVersion(changedHomeId);
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log("[Realtime] products status:", status);
+          });
+
+        // 3. Product Items Channel
         const productItemsChannel = supabase
           .channel(`rt-product-items-${userId}`)
           .on(
@@ -95,15 +145,37 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               schema: "public",
               table: "product_items",
             },
-            (payload) => {
+            async (payload) => {
               console.log("[Realtime] product_items payload:", payload);
 
-              const next = payload.new as { home_id?: string } | null;
-              const oldRow = payload.old as { home_id?: string } | null;
-              const changedHomeId = next?.home_id ?? oldRow?.home_id;
+              if (payload.eventType === "DELETE") {
+                 bumpAllInventoryVersions();
+                 return;
+              }
 
-              if (changedHomeId) {
-                bumpInventoryVersion(changedHomeId);
+              const next = payload.new as { product_id?: string } | null;
+              const productId = next?.product_id;
+
+              if (!productId) return;
+
+              try {
+                const { data, error } = await supabase
+                  .from("products")
+                  .select("home_id")
+                  .eq("id", productId)
+                  .single();
+
+                if (error) {
+                  console.log("[Realtime] failed to resolve home_id from product_id:", error);
+                  return;
+                }
+
+                const changedHomeId = data?.home_id;
+                if (changedHomeId) {
+                  bumpInventoryVersion(changedHomeId);
+                }
+              } catch (error) {
+                console.log("[Realtime] product_items handler error:", error);
               }
             }
           )
@@ -111,6 +183,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             console.log("[Realtime] product_items status:", status);
           });
 
+        // 4. Join Requests Channel
         const joinRequestsChannel = supabase
           .channel(`rt-home-join-requests-${userId}`)
           .on(
@@ -130,15 +203,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               if (changedHomeId) {
                 bumpJoinRequestsVersion(changedHomeId);
               }
-
-              // אם בקשה אושרה/נדחתה ונוצר/נמחק שיוך, גם homes יתעדכן דרך user_home
             }
           )
           .subscribe((status) => {
             console.log("[Realtime] home_join_requests status:", status);
           });
 
-        channelsRef.current = [userHomeChannel, productItemsChannel, joinRequestsChannel];
+        channelsRef.current = [
+          userHomeChannel,
+          productsChannel,
+          productItemsChannel,
+          joinRequestsChannel,
+        ];
       } catch (error) {
         console.log("[Realtime] setup error:", error);
       }
@@ -157,7 +233,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       });
       channelsRef.current = [];
     };
-  }, [bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion]);
+  }, [bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion, bumpAllInventoryVersions]);
 
   const value = useMemo(
     () => ({

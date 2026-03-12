@@ -8,9 +8,7 @@ export function useRealtimeInventoryRefresh(
   const { inventoryVersionByHome } = useRealtimeContext();
   const firstRunRef = useRef(true);
 
-  const currentVersion = homeId
-    ? (inventoryVersionByHome[homeId] ?? 0)
-    : 0;
+  const currentVersion = homeId ? (inventoryVersionByHome[homeId] ?? 0) : 0;
 
   useEffect(() => {
     if (!homeId) return;
@@ -22,6 +20,6 @@ export function useRealtimeInventoryRefresh(
       return;
     }
 
-    refreshInventory();
+    void refreshInventory();
   }, [homeId, currentVersion, refreshInventory]);
 }

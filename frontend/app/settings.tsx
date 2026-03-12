@@ -16,48 +16,62 @@ import {
 } from "@/src/components/settings/SettingsModals";
 
 import { getHomeJoinCode, getJoinRequests } from "@/src/api/homes";
+import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 export default function SettingsScreen() {
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
-  const { state, actions } = useHomeSettings(homeId);
+  const currentHomeId = homeId ? String(homeId) : undefined;
 
+  // הפעלת ההגנה: זריקה מהמסך אם המשתמש הוסר מהבית
+  useMembershipGuard(currentHomeId);
+
+  const { state, actions } = useHomeSettings(currentHomeId);
+
+  // 1. נחלץ את הפונקציה הספציפית כדי שה-useCallback יהיה יציב יותר
+  const { setJoinRequests } = actions;
 
   const handleOpenCode = async () => {
+    if (!currentHomeId) return;
     actions.setHomeCodeOpen(true);
     actions.setLoadingHomeCode(true);
     try {
-      const res = await getHomeJoinCode(homeId!);
+      const res = await getHomeJoinCode(currentHomeId);
       actions.setHomeInviteCode(res.data?.join_code || "");
     } catch (e) { Alert.alert("שגיאה", "טעינת קוד נכשלה"); }
     finally { actions.setLoadingHomeCode(false); }
   };
 
   const handleOpenJoinRequests = async () => {
+    if (!currentHomeId) return;
     actions.setJoinRequestsOpen(true);
     actions.setLoadingJoinRequests(true);
     try {
-      const res = await getJoinRequests(homeId!);
+      const res = await getJoinRequests(currentHomeId);
       const requests = Object.entries(res.data || {}).map(([id, name]) => ({ user_id: id, name }));
-      actions.setJoinRequests(requests);
+      setJoinRequests(requests);
     } catch (e) { Alert.alert("שגיאה", "טעינת בקשות נכשלה"); }
     finally { actions.setLoadingJoinRequests(false); }
   };
   
+  // 2. תיקון ה-useCallback: תלות רק ב-homeId ובפונקציית הסטייט הספציפית
   const refreshJoinRequests = useCallback(async () => {
-    if (!homeId) return;
+    if (!currentHomeId) return;
 
     try {
-      const res = await getJoinRequests(homeId);
+      console.log("[SettingsScreen] Refreshing join requests via realtime...");
+      const res = await getJoinRequests(currentHomeId);
       const requests = Object.entries(res.data || {}).map(([id, name]) => ({
         user_id: id,
         name,
       }));
-      actions.setJoinRequests(requests);
+      setJoinRequests(requests);
     } catch (e) {
       console.log("[JoinRequests] refresh failed", e);
     }
-  }, [homeId, actions]);
-  useRealtimeJoinRequestsRefresh(homeId, refreshJoinRequests);
+  }, [currentHomeId, setJoinRequests]); 
+
+  // 3. קריאה ל-Hook הרילטיים
+  useRealtimeJoinRequestsRefresh(currentHomeId, refreshJoinRequests);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -67,6 +81,7 @@ export default function SettingsScreen() {
         <ScreenHeader title="הגדרות" onBack={() => router.replace("/home/home")} />
         
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+          
           <Section title="התראות">
             <SettingsRow icon="notifications-outline" title="התראות כלליות" subtitle="התראות מערכת ועדכונים" right={<Switch value={state.notificationsEnabled} onValueChange={actions.setNotificationsEnabled} trackColor={{ true: "#0284C7" }} />} />
             <Divider />
@@ -101,6 +116,7 @@ export default function SettingsScreen() {
         <BottomNavBar activeTab="settings" />
       </View>
 
+      {/* Modals */}
       <ExpiryDaysModal visible={state.daysModalOpen} onClose={() => actions.setDaysModalOpen(false)} days={state.expiryLeadDays} setDays={actions.setExpiryLeadDays} onSave={actions.handleSaveExpiration} loading={state.savingDays} clamp={actions.clampDays} />
       <HomeCodeModal visible={state.homeCodeOpen} onClose={() => actions.setHomeCodeOpen(false)} code={state.homeInviteCode} loading={state.loadingHomeCode} onCopy={() => { Clipboard.setStringAsync(state.homeInviteCode); Alert.alert("הועתק"); }} />
       <JoinRequestsModal visible={state.joinRequestsOpen} onClose={() => actions.setJoinRequestsOpen(false)} requests={state.joinRequests} loading={state.loadingJoinRequests} onAnswer={actions.handleAnswerJoinRequest} processingId={state.processingRequestId} />
