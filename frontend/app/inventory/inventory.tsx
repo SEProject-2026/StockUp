@@ -13,6 +13,8 @@ import { EditItemModal } from "@/src/components/inventory/EditItemModal";
 
 import type { locationKey } from "@/src/components/inventory/inventory.utils";
 import { useInventoryData } from "@/src/hooks/useInventoryData";
+import { useRealtimeInventoryRefresh } from "@/src/hooks/useRealtimeInventoryRefresh";
+import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 export function InventoryScreenBase({
   initiallocation = "all",
@@ -26,16 +28,21 @@ export function InventoryScreenBase({
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
   const currentHomeId = homeId ? String(homeId) : undefined;
 
+  // הפעלת ההגנה: זריקה מהמסך אם המשתמש הוסר מהבית
+  useMembershipGuard(currentHomeId);
+
   const inv = useInventoryData({
     homeId: currentHomeId,
     initiallocation,
     hideTabs,
   });
 
-    useFocusEffect(
+  useRealtimeInventoryRefresh(currentHomeId, () => inv.loadInventory("soft"));
+
+  useFocusEffect(
     useCallback(() => {
       if (!currentHomeId) return;
-      inv.loadInventory("soft");
+      void inv.loadInventory("soft");
     }, [currentHomeId, inv.loadInventory])
   );
 

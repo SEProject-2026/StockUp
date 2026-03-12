@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useRealtimeHomesRefresh } from "@/src/hooks/useRealtimeHomesRefresh";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // UI Components
@@ -40,6 +41,7 @@ export default function HomesScreen() {
     loadHomes(); 
   }, [loadHomes]);
 
+  useRealtimeHomesRefresh(loadHomes);
   // ארגון נתוני הגריד (כולל ה-Spacer לאיזון עמודות)
   const gridData = useMemo(() => {
     // מיון אלפביתי כפי שהופיע ב-Main
