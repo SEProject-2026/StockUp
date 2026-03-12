@@ -47,6 +47,7 @@ class UserService:
         
         # Validate password
         if not user or not PasswordEncoder.validate(password, user.hashed_password):
+            app_logger.warning(f"Login failed: User not found with email ({email})") if not user else None
             app_logger.warning(f"Login failed: Invalid credentials for email ({email})")
             raise ValueError("Invalid email or password")
             

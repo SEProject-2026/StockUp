@@ -17,8 +17,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
-import { register } from "@/src/api/auth";
+import { register, login } from "@/src/api/auth";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
@@ -45,19 +46,24 @@ export default function SignupScreen() {
 
     try {
       setLoading(true);
-
+      const cleanEmail = email.trim().toLowerCase();
       await register({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       name: name.trim(),
       password,
       password_confirm: confirm,
     });
 
-    registerForPushNotificationsAsync().catch(console.error);
+    const loginRes = await login({ email: cleanEmail, password });
     
-    Alert.alert("נרשמת בהצלחה", "אפשר להתחבר עכשיו", [
-        { text: "להתחברות", onPress: () => router.replace("/login") },
+    await AsyncStorage.setItem("userToken", loginRes.access_token);
+
+    registerForPushNotificationsAsync().catch(console.error);
+
+    Alert.alert("נרשמת בהצלחה!", "ברוך הבא! החשבון שלך מוכן.", [
+      { text: "המשך", onPress: () => router.replace("/home/home") },
       ]);
+
     } catch (e: any) {
       Alert.alert("הרשמה נכשלה", e?.message ?? "נסה/י שוב");
     } finally {
