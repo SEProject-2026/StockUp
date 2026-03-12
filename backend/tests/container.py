@@ -56,7 +56,7 @@ class TestingContainer:
     def _configure_services_and_overrides(self):
         """Reloads services with current repositories."""
         self.user_service = UserService(user_repo=self.user_repo, auth_provider=self.auth_provider)
-        self.stock_service = StockService(home_repository=self.home_repo, product_repository=self.stock_repo, catalog_provider=self.catalog_provider)
+        self.stock_service = StockService(home_repository=self.home_repo, product_repository=self.stock_repo, catalog_provider=self.catalog_provider, user_repository=self.user_repo)
         self.management_service = ManagementService(home_repository=self.home_repo,user_repository=self.user_repo)
 
         app.dependency_overrides[get_user_service] = lambda: self.user_service

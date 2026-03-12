@@ -1,6 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from src.repositories.i_home_repository import IHomeRepository
 from src.domain.smart_home.home import Home
 from src.infrastructure.db.models import HomeModel, UserModel
@@ -109,3 +109,21 @@ class DbHomeRepository(IHomeRepository):
         home._join_requests = {UUID(u.id) for u in db_home.join_requests}
         
         return home
+    
+    async def get_homes_batch(self, limit: int = 100, offset: int = 0) -> List[Home]:
+        db_homes = (
+            self.db.query(HomeModel)
+            .options(
+                selectinload(HomeModel.users),
+                selectinload(HomeModel.join_requests)
+            )
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+        
+        domain_homes = []
+        for db_home in db_homes:
+            domain_homes.append(self._to_domain(db_home))
+            
+        return domain_homes

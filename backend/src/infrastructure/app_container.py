@@ -100,7 +100,8 @@ class AppContainer:
             return StockService(
                 home_repository=DbHomeRepository(db),
                 product_repository=DbProductRepository(db),
-                catalog_provider=catalog
+                catalog_provider=catalog,
+                user_repository=DbUserRepository(db)
             )
 
         # Testing (In-Memory)
@@ -108,7 +109,8 @@ class AppContainer:
             AppContainer._stock_service_instance = StockService(
                 home_repository=InMemoryHomeRepository(),
                 product_repository=InMemoryProductRepository(),
-                catalog_provider=catalog
+                catalog_provider=catalog,
+                user_repository=InMemoryUserRepository()
             )
         
         return AppContainer._stock_service_instance

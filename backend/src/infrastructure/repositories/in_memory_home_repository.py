@@ -39,3 +39,7 @@ class InMemoryHomeRepository(IHomeRepository):
             if home.is_member(user_id):
                 result.append(home)
         return result
+    
+    async def get_homes_batch(self, limit: int = 100, offset: int = 0) -> List[Home]:
+        homes = list(self._storage.values())
+        return homes[offset:offset + limit]
