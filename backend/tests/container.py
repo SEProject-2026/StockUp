@@ -11,16 +11,19 @@ from src.infrastructure.db.database import get_db, Base
 from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
+from src.infrastructure.repositories.in_memory_shopping_list_repository import InMemoryShoppingListRepository
 
 # DB Repos
 from src.infrastructure.repositories.db_user_repository import DbUserRepository
 from src.infrastructure.repositories.db_product_repository import DbProductRepository
 from src.infrastructure.repositories.db_home_repository import DbHomeRepository
+from src.infrastructure.repositories.db_shopping_list_repository import DbShoppingListRepository
 
 # Services & Auth
 from src.services.user_service import UserService
 from src.services.stock_service import StockService
 from src.services.management_service import ManagementService
+from src.services.shopping_list_service import ShoppingListService
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 
 # Route Dependencies
@@ -30,8 +33,8 @@ from src.api.routes.management_routes import get_management_service
 
 load_dotenv()
 
-# Updated default fallback to port 5433 and stockup_test to match Docker config
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:password@localhost:5433/stockup_test")
+
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
 class MockCatalogProvider:
     async def get_item_by_barcode(self, barcode, chain_name=None):
@@ -58,6 +61,7 @@ class TestingContainer:
         self.user_service = UserService(user_repo=self.user_repo, auth_provider=self.auth_provider)
         self.stock_service = StockService(home_repository=self.home_repo, product_repository=self.stock_repo, catalog_provider=self.catalog_provider)
         self.management_service = ManagementService(home_repository=self.home_repo,user_repository=self.user_repo)
+        self.shopping_list_service = ShoppingListService(shopping_repo=self.shopping_list_repo)
 
         app.dependency_overrides[get_user_service] = lambda: self.user_service
         app.dependency_overrides[get_stock_service] = lambda: self.stock_service
@@ -80,6 +84,7 @@ class TestingContainer:
         self.user_repo = InMemoryUserRepository()
         self.stock_repo = InMemoryProductRepository()
         self.home_repo = InMemoryHomeRepository()
+        self.shopping_list_repo = InMemoryShoppingListRepository()
         
         app.dependency_overrides[get_db] = lambda: None
         self._configure_services_and_overrides()
@@ -102,6 +107,7 @@ class TestingContainer:
         self.user_repo = DbUserRepository(self.db_session)
         self.stock_repo = DbProductRepository(self.db_session)
         self.home_repo = DbHomeRepository(self.db_session)
+        self.shopping_list_repo = DbShoppingListRepository(self.db_session)
 
         app.dependency_overrides[get_db] = lambda: self.db_session
         self._configure_services_and_overrides()
@@ -148,7 +154,7 @@ class TestingContainer:
             self.user_repo = DbUserRepository(self.db_session)
             self.stock_repo = DbProductRepository(self.db_session)
             self.home_repo = DbHomeRepository(self.db_session)
-            
+            self.shopping_list_repo = DbShoppingListRepository(self.db_session)
             # 6. Update FastAPI Override and Services
             app.dependency_overrides[get_db] = lambda: self.db_session
             self._configure_services_and_overrides()
@@ -158,5 +164,6 @@ class TestingContainer:
             self.user_repo.users.clear()
             self.stock_repo._products_db.clear()
             self.home_repo._storage.clear()
+            self.shopping_list_repo._lists.clear()
 
 testing_container = TestingContainer()

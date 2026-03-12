@@ -1,28 +1,40 @@
-from uuid import UUID
-from typing import List
-from pydantic import BaseModel
+from datetime import datetime
+from uuid import UUID, uuid4
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+from src.domain.enums import LocationType
 
 class ShoppingListItem(BaseModel):
     item_name: str
     quantity: int
     is_bought: bool = False
+    location: Optional[LocationType] = LocationType.OTHER
 
 class ShoppingList(BaseModel):
+    id: UUID= Field(default_factory=uuid4)
+    name: str
     home_id: UUID
     is_active_shopping_mode: bool = False
     items: List[ShoppingListItem] = []
+    updated_at: datetime = Field(default_factory=datetime.now)
 
-    def add_item(self, item_name: str, quantity: int) -> None:
+    def _refresh_timestamp(self):
+        self.updated_at = datetime.now()
+
+    def add_item(self, item_name: str, quantity: int, location: Optional[LocationType] = LocationType.OTHER) -> None:
         for item in self.items:
             if item.item_name == item_name:
                 item.quantity += quantity
                 return
-        self.items.append(ShoppingListItem(item_name=item_name, quantity=quantity))
+        self.items.append(ShoppingListItem(item_name=item_name, quantity=quantity, location=location))
+        self._refresh_timestamp()
 
     def remove_item(self, item_name: str) -> None:
         for i, item in enumerate(self.items):
             if item.item_name == item_name:
                 del self.items[i]
+                self._refresh_timestamp()
                 return
 
     def update_quantity(self, item_name: str, new_quantity: int) -> None:
@@ -30,6 +42,7 @@ class ShoppingList(BaseModel):
         for item in self.items:
             if item.item_name == item_name:
                 item.quantity = new_quantity
+                self._refresh_timestamp()
                 return
     
     def enter_shopping_mode(self) -> None:
@@ -39,12 +52,17 @@ class ShoppingList(BaseModel):
         for item in self.items:
             if item.item_name == item_name:
                 item.is_bought = True
+                self._refresh_timestamp()
                 return
 
-    def exit_shopping_mode(self) -> None:
+    def exit_shopping_mode(self, clear: bool = False) -> None:
+        """
+        Deactivates shopping mode. 
+        If clear is True, removes the items that were marked as bought.
+        """
         self.is_active_shopping_mode = False
-        for i, item in enumerate(self.items):
-            if item.is_bought or item.quantity == 0:
-                del self.items[i]
-                return
-                
+        
+        if clear:
+            self.items = [item for item in self.items if not item.is_bought]
+            
+        self._refresh_timestamp()
