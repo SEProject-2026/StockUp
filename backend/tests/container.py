@@ -30,6 +30,7 @@ from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 from src.api.routes.auth_routes import get_user_service
 from src.api.routes.stock_routes import get_stock_service
 from src.api.routes.management_routes import get_management_service
+from src.api.routes.shopping_routes import get_shopping_list_service
 
 load_dotenv()
 
@@ -66,6 +67,7 @@ class TestingContainer:
         app.dependency_overrides[get_user_service] = lambda: self.user_service
         app.dependency_overrides[get_stock_service] = lambda: self.stock_service
         app.dependency_overrides[get_management_service] = lambda: self.management_service
+        app.dependency_overrides[get_shopping_list_service] = lambda: self.shopping_list_service
 
     def _close_db_resources(self):
         """Force close session and dispose engine to prevent locks."""
@@ -136,8 +138,8 @@ class TestingContainer:
             try:
                 # 3. TRUNCATE ... CASCADE
                 cleanup_session.execute(text("""
-                    TRUNCATE TABLE products, product_items, homes, users 
-                    RESTART IDENTITY CASCADE;
+                TRUNCATE TABLE products, product_items, homes, users, shopping_lists 
+                RESTART IDENTITY CASCADE;
                 """))
                 cleanup_session.commit()
             except Exception as e:

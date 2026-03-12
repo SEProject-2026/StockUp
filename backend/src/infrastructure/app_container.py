@@ -3,6 +3,9 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 # --- Services ---
+from src.infrastructure.repositories.db_shopping_list_repository import DbShoppingListRepository
+from src.infrastructure.repositories.in_memory_shopping_list_repository import InMemoryShoppingListRepository
+from src.services.shopping_list_service import ShoppingListService
 from src.services.user_service import UserService
 from src.services.stock_service import StockService
 from src.services.management_service import ManagementService
@@ -36,6 +39,7 @@ class AppContainer:
     _management_service_instance = None
     _auth_provider_instance = None
     _catalog_provider_instance = None
+    _shopping_list_service_instance = None
 
     @staticmethod
     def get_auth_provider():
@@ -127,3 +131,17 @@ class AppContainer:
             )
             
         return AppContainer._management_service_instance
+    
+    @staticmethod
+    def get_shopping_list_service(db: Optional[Session] = None):
+        # Production (DB)
+        if db:
+            return ShoppingListService(shopping_repo=DbShoppingListRepository(db))
+        
+        # Testing (In-Memory)
+        if AppContainer._shopping_list_service_instance is None:
+            AppContainer._shopping_list_service_instance = ShoppingListService(
+                shopping_repo=InMemoryShoppingListRepository()
+            )
+            
+        return AppContainer._shopping_list_service_instance
