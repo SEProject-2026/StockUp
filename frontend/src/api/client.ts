@@ -76,7 +76,6 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     (k) => k.toLowerCase() === "content-type"
   );
 
-  // ✅ לא להוסיף Content-Type כשזה FormData
   if (!isFormData && !hasContentType) {
     headers["Content-Type"] = "application/json";
   }
@@ -102,7 +101,13 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     throw new Error(message);
   }
 
+  // חשוב ל-204 No Content
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   const contentType = res.headers.get("content-type") || "";
+
   if (!contentType.includes("application/json")) {
     return (await res.text()) as unknown as T;
   }

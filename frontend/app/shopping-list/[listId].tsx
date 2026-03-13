@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -117,9 +117,11 @@ function SummaryCard({
 function ShoppingToggle({
   enabled,
   onToggle,
+  disabled,
 }: {
   enabled: boolean;
   onToggle: () => void;
+  disabled?: boolean;
 }) {
   return (
     <View style={styles.toggleCard}>
@@ -133,7 +135,12 @@ function ShoppingToggle({
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={onToggle}
-        style={[styles.switchRoot, enabled && styles.switchRootActive]}
+        disabled={disabled}
+        style={[
+          styles.switchRoot,
+          enabled && styles.switchRootActive,
+          disabled && styles.switchRootDisabled,
+        ]}
       >
         <View style={[styles.switchThumb, enabled && styles.switchThumbActive]} />
       </TouchableOpacity>
@@ -301,69 +308,69 @@ function NotebookRow(props: {
   const showPickedStyle = props.isPicked;
 
   return (
-   <View style={[styles.noteRow, showPickedStyle && styles.noteRowPicked]}>
-    <View style={styles.noteActions}>
+    <View style={[styles.noteRow, showPickedStyle && styles.noteRowPicked]}>
+      <View style={styles.noteActions}>
         {props.mode === "SHOPPING" ? (
-        <View style={styles.noteQtyPill}>
+          <View style={styles.noteQtyPill}>
             <Text style={styles.noteQtyText}>{qty}</Text>
-        </View>
+          </View>
         ) : (
-        <>
+          <>
             <TouchableOpacity
-            onPress={props.onRemove}
-            style={styles.noteIconBtn}
-            activeOpacity={0.85}
+              onPress={props.onRemove}
+              style={styles.noteIconBtn}
+              activeOpacity={0.85}
             >
-            <Ionicons name="trash-outline" size={16} color={BRAND.DANGER} />
+              <Ionicons name="trash-outline" size={16} color={BRAND.DANGER} />
             </TouchableOpacity>
 
             <TouchableOpacity
-            onPress={props.onDecrease}
-            style={styles.noteIconBtn}
-            activeOpacity={0.85}
+              onPress={props.onDecrease}
+              style={styles.noteIconBtn}
+              activeOpacity={0.85}
             >
-            <Ionicons name="remove" size={16} color={BRAND.PRIMARY} />
+              <Ionicons name="remove" size={16} color={BRAND.PRIMARY} />
             </TouchableOpacity>
 
             <View style={styles.noteQtyPill}>
-            <Text style={styles.noteQtyText}>{qty}</Text>
+              <Text style={styles.noteQtyText}>{qty}</Text>
             </View>
 
             <TouchableOpacity
-            onPress={props.onIncrease}
-            style={styles.noteIconBtn}
-            activeOpacity={0.85}
+              onPress={props.onIncrease}
+              style={styles.noteIconBtn}
+              activeOpacity={0.85}
             >
-            <Ionicons name="add" size={16} color={BRAND.PRIMARY} />
+              <Ionicons name="add" size={16} color={BRAND.PRIMARY} />
             </TouchableOpacity>
-        </>
+          </>
         )}
-    </View>
+      </View>
 
-    <View style={styles.noteTextWrap}>
+      <View style={styles.noteTextWrap}>
         <View style={styles.noteTitleRow}>
-        {props.mode === "SHOPPING" && (
+          {props.mode === "SHOPPING" && (
             <TouchableOpacity
-            onPress={props.onToggle}
-            style={[styles.pickBtn, props.isPicked && styles.pickBtnActive]}
-            activeOpacity={0.85}
+              onPress={props.onToggle}
+              style={[styles.pickBtn, props.isPicked && styles.pickBtnActive]}
+              activeOpacity={0.85}
             >
-            <Ionicons
+              <Ionicons
                 name={props.isPicked ? "checkmark" : "ellipse-outline"}
                 size={16}
                 color={props.isPicked ? "#fff" : BRAND.PRIMARY}
-            />
+              />
             </TouchableOpacity>
-        )}
+          )}
 
-        <Text
+          <Text
             style={[styles.noteTitle, showPickedStyle && styles.noteTitlePicked]}
             numberOfLines={1}
-        >
+          >
             {props.item?.name ?? "ללא שם"}
-        </Text>
+          </Text>
         </View>
-    </View>
+      </View>
     </View>
   );
 }
@@ -404,7 +411,6 @@ export default function ShoppingListScreen() {
 
   const {
     mode,
-    setMode,
     items,
     filteredItems,
     loading,
@@ -416,16 +422,12 @@ export default function ShoppingListScreen() {
     removeItem,
     finishShopping,
     updateQuantity,
+    enterShoppingMode,
+    modeSubmitting,
   } = useShoppingList({
     homeId: homeId ?? "",
     listId: listId ?? "",
   });
-
-  useEffect(() => {
-    if (mode !== "EDIT") {
-      setMode("EDIT");
-    }
-  }, []);
 
   const isShoppingMode = mode === "SHOPPING";
 
@@ -469,12 +471,20 @@ export default function ShoppingListScreen() {
     return [...orderedKnown, ...unsorted];
   }, [filteredItems]);
 
-  function handleToggleShoppingMode() {
-    if (isShoppingMode) {
-      setMode("EDIT");
-      return;
+  async function handleToggleShoppingMode() {
+    try {
+      if (isShoppingMode) {
+        await finishShopping(false);
+        return;
+      }
+
+      await enterShoppingMode();
+    } catch (e: any) {
+      Alert.alert(
+        "שגיאה",
+        e?.message || "לא ניתן לעדכן את מצב הקנייה כרגע"
+      );
     }
-    setMode("SHOPPING");
   }
 
   function handleShoppingDone() {
@@ -488,12 +498,12 @@ export default function ShoppingListScreen() {
         },
         {
           text: "כבה מצב קנייה",
-          onPress: () => setMode("EDIT"),
+          onPress: () => finishShopping(false),
         },
         {
           text: "רוקן פריטים שנקנו",
           style: "destructive",
-          onPress: () => finishShopping(),
+          onPress: () => finishShopping(true),
         },
       ]
     );
@@ -550,6 +560,7 @@ export default function ShoppingListScreen() {
               <ShoppingToggle
                 enabled={isShoppingMode}
                 onToggle={handleToggleShoppingMode}
+                disabled={modeSubmitting}
               />
 
               <View style={styles.summaryRow}>
@@ -632,7 +643,8 @@ export default function ShoppingListScreen() {
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={handleShoppingDone}
-                style={styles.secondaryBtn}
+                disabled={modeSubmitting}
+                style={[styles.secondaryBtn, modeSubmitting && styles.disabledBtn]}
               >
                 <Ionicons name="checkmark-done-outline" size={18} color={BRAND.TEXT} />
                 <Text style={styles.secondaryBtnText}>סיום מצב קנייה</Text>
@@ -724,31 +736,35 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
+  switchRoot: {
+    width: 54,
+    height: 32,
+    borderRadius: 999,
+    backgroundColor: "#D1D5DB",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    overflow: "hidden",
+  },
+
   switchRootActive: {
     backgroundColor: BRAND.PRIMARY,
   },
 
-switchRoot: {
-  width: 54,
-  height: 32,
-  borderRadius: 999,
-  backgroundColor: "#D1D5DB",
-  justifyContent: "center",
-  paddingHorizontal: 4,
-  overflow: "hidden",
-},
+  switchRootDisabled: {
+    opacity: 0.6,
+  },
 
-switchThumb: {
-  width: 24,
-  height: 24,
-  borderRadius: 999,
-  backgroundColor: "#FFFFFF",
-  transform: [{ translateX: 0 }],
-},
+  switchThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    transform: [{ translateX: 0 }],
+  },
 
-switchThumbActive: {
-  transform: [{ translateX: 20 }],
-},
+  switchThumbActive: {
+    transform: [{ translateX: 20 }],
+  },
 
   summaryRow: {
     flexDirection: "row-reverse",
@@ -920,11 +936,13 @@ switchThumbActive: {
     borderWidth: 1,
     borderColor: "#E7EDF5",
   },
-    noteTitleRow: {
+
+  noteTitleRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 8,
-    },
+  },
+
   noteQtyText: {
     fontSize: 12,
     fontWeight: "900",
@@ -1041,6 +1059,10 @@ switchThumbActive: {
     color: BRAND.TEXT,
     fontWeight: "900",
     fontSize: 14,
+  },
+
+  disabledBtn: {
+    opacity: 0.6,
   },
 
   bottomBar: {

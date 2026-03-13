@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,11 +11,16 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
+import {
+  getHomeShoppingLists,
+  createShoppingList,
+  type ShoppingListDTO,
+} from "@/src/api/shoppingLists";
 
 const BRAND = {
   BG: "#F4F4F4",
@@ -36,45 +41,88 @@ type ShoppingListSummary = {
   updatedAt: string;
 };
 
+function formatUpdatedAt(dateString: string): string {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return "עודכן לאחרונה";
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) return "עודכן עכשיו";
+  if (diffHours < 24) return `עודכן לפני ${diffHours} שעות`;
+  if (diffDays === 1) return "עודכן אתמול";
+  if (diffDays < 7) return `עודכן לפני ${diffDays} ימים`;
+
+  return `עודכן ב־${date.toLocaleDateString("he-IL")}`;
+}
+
+function mapDtoToSummary(dto: ShoppingListDTO): ShoppingListSummary {
+  const itemsCount = dto.items.length;
+  const pickedCount = dto.items.filter((item) => item.is_bought).length;
+
+  return {
+    id: dto.id,
+    name: dto.name,
+    itemsCount,
+    pickedCount,
+    updatedAt: formatUpdatedAt(dto.updated_at),
+  };
+}
+
 export default function ShoppingListsScreen() {
   const insets = useSafeAreaInsets();
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [lists, setLists] = useState<ShoppingListSummary[]>([]);
 
-  // TODO: להחליף בדאטה אמיתי מהשרת / hook
-  const [lists, setLists] = useState<ShoppingListSummary[]>([
-    {
-      id: "1",
-      name: "קניות שבועיות",
-      itemsCount: 12,
-      pickedCount: 4,
-      updatedAt: "עודכן היום",
-    },
-    {
-      id: "2",
-      name: "ניקיון",
-      itemsCount: 5,
-      pickedCount: 1,
-      updatedAt: "עודכן אתמול",
-    },
-    {
-      id: "3",
-      name: "פארם",
-      itemsCount: 7,
-      pickedCount: 0,
-      updatedAt: "עודכן לפני יומיים",
-    },
-  ]);
+  const loadLists = useCallback(async () => {
+    if (!homeId) {
+      setLists([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await getHomeShoppingLists(homeId);
+      setLists(data.map(mapDtoToSummary));
+    } catch (e) {
+      Alert.alert(
+        "שגיאה",
+        e instanceof Error ? e.message : "לא הצלחנו לטעון את רשימות הקניות."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [homeId]);
+
+  useEffect(() => {
+    loadLists();
+  }, [loadLists]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadLists();
+    }, [loadLists])
+  );
 
   const sortedLists = useMemo(() => {
     return [...lists].sort((a, b) => a.name.localeCompare(b.name, "he"));
   }, [lists]);
 
   const handleOpenList = (list: ShoppingListSummary) => {
-    if (!homeId) return;
+    if (!homeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
 
     router.push({
       pathname: "/shopping-list/[listId]",
@@ -89,6 +137,11 @@ export default function ShoppingListsScreen() {
   const handleCreateList = async () => {
     const trimmed = newListName.trim();
 
+    if (!homeId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה בית.");
+      return;
+    }
+
     if (!trimmed) {
       Alert.alert("שם חסר", "צריך להזין שם לרשימה.");
       return;
@@ -97,19 +150,20 @@ export default function ShoppingListsScreen() {
     try {
       setCreating(true);
 
-      // TODO: כאן לחבר קריאת API אמיתית
-      const newList: ShoppingListSummary = {
-        id: Date.now().toString(),
+      const created = await createShoppingList({
+        home_id: homeId,
         name: trimmed,
-        itemsCount: 0,
-        pickedCount: 0,
-        updatedAt: "עודכן עכשיו",
-      };
+      });
 
-      setLists((prev) => [newList, ...prev]);
+      const mapped = mapDtoToSummary(created);
+
+      setLists((prev) => [mapped, ...prev]);
       setNewListName("");
-    } catch {
-      Alert.alert("שגיאה", "לא הצלחנו ליצור רשימה חדשה.");
+    } catch (e) {
+      Alert.alert(
+        "שגיאה",
+        e instanceof Error ? e.message : "לא הצלחנו ליצור רשימה חדשה."
+      );
     } finally {
       setCreating(false);
     }
@@ -223,7 +277,11 @@ export default function ShoppingListsScreen() {
                 </View>
 
                 <View style={styles.statPill}>
-                  <Ionicons name="checkmark-done-outline" size={14} color={BRAND.SUCCESS} />
+                  <Ionicons
+                    name="checkmark-done-outline"
+                    size={14}
+                    color={BRAND.SUCCESS}
+                  />
                   <Text style={styles.statText}>{item.pickedCount} סומנו</Text>
                 </View>
 
