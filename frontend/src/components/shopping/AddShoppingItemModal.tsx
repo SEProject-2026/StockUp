@@ -1,41 +1,65 @@
 import React, { useState } from "react";
-import { Modal, View, Text, TextInput, TouchableOpacity, Pressable, KeyboardAvoidingView, Platform, Alert, StyleSheet } from "react-native";
+import { Modal, View, Text, TextInput, TouchableOpacity, Pressable, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LOCATIONS, locationLabel, locationIcon } from "@/src/hooks/useBaseMode";
+import { styles, BRAND } from "./styles";
+import { type LocationKey } from "@/src/hooks/useShoppingList";
 
-const BRAND = { PRIMARY: "#0284C7", TEXT: "#111827", MUTED: "#6B7280", BORDER: "#E5E7EB", CARD: "#FFFFFF" };
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (payload: { name: string; qty: number; location: LocationKey }) => Promise<void> | void;
+};
 
-export default function AddShoppingItemModal({ open, onClose, onAdd }: any) {
+export function AddShoppingItemModal({ open, onClose, onAdd }: Props) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
-  const [loc, setLoc] = useState<any>("FRIDGE");
+  const [loc, setLoc] = useState<LocationKey>("FRIDGE");
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async () => {
-    if (!name.trim()) return Alert.alert("חסר שם מוצר");
-    setSubmitting(true);
-    await onAdd({ name: name.trim(), qty: Number(qty), location: loc });
-    setSubmitting(false);
-    setName(""); setQty("1"); onClose();
-  };
+  async function submit() {
+    if (!name.trim()) return Alert.alert("שגיאה", "נא להזין שם מוצר");
+    try {
+      setSubmitting(true);
+      await onAdd({ name: name.trim(), qty: Number(qty) || 1, location: loc });
+      setName(""); setQty("1"); onClose();
+    } finally { setSubmitting(false); }
+  }
 
   return (
-    <Modal visible={open} transparent animationType="slide">
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={styles.card} onPress={e => e.stopPropagation()}>
-            <Text style={styles.title}>הוספת פריט</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="שם מוצר" textAlign="right" />
-            <TextInput style={styles.input} value={qty} onChangeText={setQty} keyboardType="numeric" textAlign="right" />
-            <View style={styles.locGrid}>
-              {LOCATIONS.map((l: any) => (
-                <TouchableOpacity key={l} onPress={() => setLoc(l)} style={[styles.locBtn, loc === l && styles.locBtnActive]}>
-                  <Text style={{ color: loc === l ? BRAND.PRIMARY : BRAND.MUTED }}>{locationLabel(l)}</Text>
+        <Pressable style={styles.modalBackdrop} onPress={onClose}>
+          <Pressable style={styles.modalCard} onPress={e => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>הוספת פריט חדש</Text>
+            
+            <View style={styles.field}>
+              <Text style={styles.label}>שם מוצר</Text>
+              <TextInput value={name} onChangeText={setName} style={styles.input} textAlign="right" />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>כמות</Text>
+              <TextInput value={qty} onChangeText={setQty} keyboardType="numeric" style={styles.input} textAlign="right" />
+            </View>
+
+            <Text style={styles.label}>מיקום</Text>
+            <View style={styles.locationWrap}>
+              {LOCATIONS.map((l) => (
+                <TouchableOpacity 
+                  key={l} 
+                  onPress={() => setLoc(l as LocationKey)} 
+                  style={[styles.locationOption, loc === l && styles.locationOptionActive]}
+                >
+                  <Ionicons name={locationIcon(l as any) as any} size={14} color={loc === l ? BRAND.PRIMARY : BRAND.MUTED} />
+                  <Text style={[styles.locationOptionText, loc === l && styles.locationOptionTextActive]}>{locationLabel(l as any)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.submitBtn} onPress={submit} disabled={submitting}>
-              <Text style={styles.submitText}>{submitting ? "מוסיף..." : "הוסף פריט"}</Text>
+
+            <TouchableOpacity style={styles.primaryBtn} onPress={submit} disabled={submitting}>
+              <Text style={styles.primaryBtnText}>{submitting ? "שומר..." : "הוסף לרשימה"}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -43,15 +67,3 @@ export default function AddShoppingItemModal({ open, onClose, onAdd }: any) {
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end", padding: 10 },
-  card: { backgroundColor: BRAND.CARD, borderRadius: 20, padding: 20 },
-  title: { fontSize: 18, fontWeight: "900", textAlign: "right", marginBottom: 15 },
-  input: { backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BRAND.BORDER, borderRadius: 12, padding: 12, marginBottom: 10 },
-  locGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8, marginBottom: 20 },
-  locBtn: { padding: 8, borderRadius: 20, borderWidth: 1, borderColor: BRAND.BORDER },
-  locBtnActive: { borderColor: BRAND.PRIMARY, backgroundColor: "#F0F9FF" },
-  submitBtn: { backgroundColor: BRAND.PRIMARY, padding: 15, borderRadius: 12, alignItems: "center" },
-  submitText: { color: "#fff", fontWeight: "900" }
-});
