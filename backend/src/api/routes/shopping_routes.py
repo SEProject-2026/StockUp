@@ -108,6 +108,27 @@ async def update_quantity(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+@router.post("/{list_id}/enter-mode", response_model=GeneralResponse)
+async def enter_shopping_mode(
+    list_id: UUID, 
+    service: ShoppingServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Activates shopping mode for the specified list.
+    """
+    app_logger.info(f"User {user_id} is entering shopping mode for list {list_id}")
+    try:
+        updated_list = await service.enter_shopping_mode(list_id)
+        return GeneralResponse(
+            status="success", 
+            message="Shopping mode activated",
+            data=ShoppingListDTO.model_validate(updated_list)
+        )
+    except ValueError as e:
+        app_logger.warning(f"Failed to enter shopping mode for list {list_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
 @router.patch("/{list_id}/items/{item_name}/check", response_model=GeneralResponse)
 async def check_bought(
     list_id: UUID, 
