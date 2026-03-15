@@ -33,7 +33,7 @@ export default function ShoppingListsScreen() {
         name: dto.name,
         itemsCount: dto.items.length,
         pickedCount: dto.items.filter((i: any) => i.is_bought).length,
-        updatedAt: "עודכן לאחרונה" // כאן תוכל להשתמש ב-formatUpdatedAt שלך
+        updatedAt: "עודכן לאחרונה" 
       })));
     } catch (e) {
       Alert.alert("שגיאה", "טעינת הרשימות נכשלה");
@@ -82,7 +82,7 @@ export default function ShoppingListsScreen() {
           renderItem={({ item }) => (
             <ShoppingListCard 
               item={item} 
-              onDelete={handleDeleteList} // <--- הוספנו כאן בתוך ה-return
+              onDelete={handleDeleteList} 
               onPress={(l: any) => router.push({
                 pathname: "/shopping-list/[listId]",
                 params: { homeId, listId: l.id, listName: l.name }

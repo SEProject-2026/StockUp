@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Alert } from "react-native";
 
-export type BaseLocation = "FRIDGE" | "FREEZER" | "PANTRY" | "CLEANING_SUPPLIES" | "OTHER";
+export type BaseLocation = "FRIDGE" | "FREEZER" | "PANTRY" | "CLEANING" | "OTHER";
 
 export type BaseItem = {
   id: string;
@@ -11,7 +11,7 @@ export type BaseItem = {
   location: BaseLocation;
 };
 
-export const LOCATIONS: BaseLocation[] = ["FRIDGE", "FREEZER", "PANTRY", "CLEANING_SUPPLIES", "OTHER"];
+export const LOCATIONS: BaseLocation[] = ["FRIDGE", "FREEZER", "PANTRY", "CLEANING", "OTHER"];
 
 // --- API Placeholders (שמורים במלואם) ---
 async function apiGetBaseMode(): Promise<BaseItem[]> {
@@ -23,8 +23,8 @@ async function apiGetBaseMode(): Promise<BaseItem[]> {
     { id: "b5", name: "אפונה קפואה", targetQty: 2, unit: "יח׳", location: "FREEZER" },
     { id: "b6", name: "אורז", targetQty: 1, unit: "יח׳", location: "PANTRY" },
     { id: "b7", name: "פסטה", targetQty: 2, unit: "יח׳", location: "PANTRY" },
-    { id: "b8", name: "נייר טואלט", targetQty: 2, unit: "חבילות", location: "CLEANING_SUPPLIES" },
-    { id: "b9", name: "סבון כלים", targetQty: 1, unit: "יח׳", location: "CLEANING_SUPPLIES" },
+    { id: "b8", name: "נייר טואלט", targetQty: 2, unit: "חבילות", location: "CLEANING" },
+    { id: "b9", name: "סבון כלים", targetQty: 1, unit: "יח׳", location: "CLEANING" },
   ];
 }
 async function apiCreateBaseItem(item: Omit<BaseItem, "id">): Promise<BaseItem> {
@@ -40,7 +40,7 @@ export function locationLabel(loc: BaseLocation) {
     case "FRIDGE": return "מקרר";
     case "FREEZER": return "מקפיא";
     case "PANTRY": return "מזווה";
-    case "CLEANING_SUPPLIES": return "ניקיון";
+    case "CLEANING": return "ניקיון";
     default: return "אחר";
   }
 }
@@ -49,7 +49,7 @@ export function locationIcon(loc: BaseLocation) {
     case "FRIDGE": return "snow-outline";
     case "FREEZER": return "snow";
     case "PANTRY": return "cube-outline";
-    case "CLEANING_SUPPLIES": return "sparkles-outline";
+    case "CLEANING": return "sparkles-outline";
     default: return "ellipsis-horizontal";
   }
 }
