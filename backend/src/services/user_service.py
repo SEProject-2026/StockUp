@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import Tuple
 from src.authentication.auth_provider import IAuthProvider
 from src.authentication.password_encoder import PasswordEncoder
-from src.domain.user import User
+from src.domain.user.user import User
 from src.repositories.user_repository import IUserRepository
 from src.infrastructure.logger import app_logger
 

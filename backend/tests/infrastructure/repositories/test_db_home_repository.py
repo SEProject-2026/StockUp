@@ -1,8 +1,8 @@
 import pytest
 from uuid import uuid4
 from tests.container import testing_container
-from src.domain.smart_home.home import Home
-from src.domain.user import User
+from src.domain.home.home import Home
+from src.domain.user.user import User
 
 # --- Helpers ---
 

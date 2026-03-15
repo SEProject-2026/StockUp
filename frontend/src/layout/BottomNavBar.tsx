@@ -53,11 +53,11 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
       case "shopping-list":
         if (currentHomeId) {
           router.replace({
-            pathname: "/shopping-list",
+            pathname: "/shopping-list/shopping-list",
             params: { homeId: currentHomeId },
           });
         } else {
-        router.replace("/shopping-list");
+        router.replace("/shopping-list/shopping-list");
         }
         break;
       case "settings":

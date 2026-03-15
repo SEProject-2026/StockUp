@@ -1,11 +1,31 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Alert } from "react-native";
+import { LOCATIONS, locationLabel } from "@/src/hooks/useBaseMode";
+import {
+  getShoppingList,
+  addItemToShoppingList,
+  updateShoppingListItemQuantity,
+  checkShoppingListItemAsBought,
+  enterShoppingMode as enterShoppingModeApi,
+  exitShoppingMode as exitShoppingModeApi,
+  type ShoppingListDTO,
+  type LocationType,
+} from "@/src/api/shoppingLists";
+
+export type LocationKey =
+  | "FRIDGE"
+  | "FREEZER"
+  | "PANTRY"
+  | "CLEANING"
+  | "OTHER";
 
 export type ShoppingItem = {
   id: string;
   name: string;
   quantity?: number;
   source?: "manual" | "suggestion" | "baseline_sync";
+  location?: LocationKey;
+  isBought?: boolean;
 };
 
 export type SuggestionItem = {
@@ -14,108 +34,271 @@ export type SuggestionItem = {
   reason?: string;
 };
 
-export function useShoppingList() {
+type UseShoppingListParams = {
+  homeId: string;
+  listId: string;
+};
+
+function normalizeLocation(value?: string | null): LocationKey {
+  switch (value) {
+    case "FRIDGE":
+    case "FREEZER":
+    case "PANTRY":
+    case "CLEANING":
+    case "OTHER":
+      return value;
+    default:
+      return "OTHER";
+  }
+}
+
+function mapDtoToItems(dto: ShoppingListDTO): ShoppingItem[] {
+  return dto.items.map((item) => ({
+    id: item.item_name,
+    name: item.item_name,
+    quantity: item.quantity,
+    source: "manual",
+    location: normalizeLocation(item.location),
+    isBought: item.is_bought,
+  }));
+}
+
+export function useShoppingSections(filteredItems: any[]) {
+  const groupedSections = useMemo(() => {
+    const groups = new Map<string, any[]>();
+
+    for (const item of filteredItems) {
+      const loc = item?.location || "UNSORTED";
+      if (!groups.has(loc)) groups.set(loc, []);
+      groups.get(loc)!.push(item);
+    }
+
+    const orderedKnown = LOCATIONS.filter((loc) => groups.has(loc)).map((loc) => ({
+      location: loc,
+      title: locationLabel(loc as any),
+      items: groups.get(loc) || [],
+    }));
+
+    const unsorted = groups.has("UNSORTED")
+      ? [{ location: "UNSORTED", title: "ללא מיקום", items: groups.get("UNSORTED") }]
+      : [];
+
+    return [...orderedKnown, ...unsorted];
+  }, [filteredItems]);
+
+  return groupedSections;
+}
+
+export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   const [mode, setMode] = useState<"EDIT" | "SHOPPING">("EDIT");
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
-  const [syncing, setSyncing] = useState(false);
+  const [modeSubmitting, setModeSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        // api
-        const list = [
-          { id: "1", name: "חלב 3%", quantity: 2, source: "manual" },
-          { id: "2", name: "לחם", quantity: 1, source: "manual" },
-        ] as ShoppingItem[];
-        const sugg = [
-          { id: "s1", name: "ביצים", reason: "נרכש לעיתים קרובות" },
-          { id: "s2", name: "גבינה צהובה", reason: "חסר לפי הרגלי צריכה" },
-        ] as SuggestionItem[];
-        
-        setItems(list);
-        setSuggestions(sugg);
-      } catch (e) {
-        Alert.alert("שגיאה", "לא הצלחתי לטעון את הרשימה");
-      } finally {
-        setLoading(false);
-      }
+  const syncFromDto = useCallback((dto: ShoppingListDTO) => {
+    const mappedItems = mapDtoToItems(dto);
+    setItems(mappedItems);
+    setMode(dto.is_active_shopping_mode ? "SHOPPING" : "EDIT");
+
+    const nextPicked: Record<string, boolean> = {};
+    for (const item of mappedItems) {
+      nextPicked[item.id] = !!item.isBought;
     }
-    loadData();
+    setPicked(nextPicked);
   }, []);
 
-  const existingNamesSet = useMemo(() => 
-    new Set(items.map(it => it.name.trim().toLowerCase())), [items]
-  );
-
-  const filteredItems = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? items.filter(it => it.name.toLowerCase().includes(q)) : items;
-  }, [items, query]);
-
-  const addItem = (name: string, quantity?: number, source: ShoppingItem["source"] = "manual") => {
-    const cleanName = name.trim();
-    if (!cleanName) return;
-    if (existingNamesSet.has(cleanName.toLowerCase())) {
-      Alert.alert("כבר קיים", "המוצר כבר נמצא ברשימה.");
+  const loadData = useCallback(async () => {
+    if (!homeId || !listId) {
+      setItems([]);
+      setSuggestions([]);
+      setPicked({});
+      setLoading(false);
       return;
     }
 
-    const newItem: ShoppingItem = {
-      id: `item_${Math.random().toString(16).slice(2)}`,
-      name: cleanName,
-      quantity,
-      source,
-    };
-    setItems(prev => [newItem, ...prev]);
-  };
+    try {
+      setLoading(true);
 
-  const removeItem = (id: string) => {
-    setItems(prev => prev.filter(x => x.id !== id));
-    setPicked(prev => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
-  };
-  const updateQuantity = (id: string, delta: number) => {
-    setItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const currentQty = item.quantity || 1;
-        const newQty = Math.max(1, currentQty + delta); 
-        return { ...item, quantity: newQty };
+      const dto = await getShoppingList(listId);
+      syncFromDto(dto);
+
+      setSuggestions([]);
+    } catch (e) {
+      Alert.alert(
+        "שגיאה",
+        e instanceof Error ? e.message : "לא הצלחתי לטעון את הרשימה"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [homeId, listId, syncFromDto]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const existingNamesSet = useMemo(() => {
+    return new Set(items.map((it) => it.name.trim().toLowerCase()));
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? items.filter((it) => it.name.toLowerCase().includes(q)) : items;
+  }, [items, query]);
+
+  const addItem = useCallback(
+    async (
+      name: string,
+      quantity?: number,
+      source: ShoppingItem["source"] = "manual",
+      location?: LocationKey
+    ) => {
+      const cleanName = name.trim();
+
+      if (!cleanName || !listId) return;
+
+      if (existingNamesSet.has(cleanName.toLowerCase())) {
+        Alert.alert("כבר קיים", "המוצר כבר נמצא ברשימה.");
+        return;
       }
-      return item;
-    }));
-  };
-  const togglePick = (id: string) => {
-    setPicked(prev => ({ ...prev, [id]: !prev[id] }));
-  };
 
-  const finishShopping = async () => {
-    const purchasedIds = Object.keys(picked).filter(id => picked[id]);
-    if (purchasedIds.length === 0) return;
+      try {
+        const dto = await addItemToShoppingList(listId, {
+          item_name: cleanName,
+          quantity: quantity ?? 1,
+          location: (location ?? "OTHER") as LocationType,
+        });
 
-    setItems(prev => prev.filter(it => !purchasedIds.includes(it.id)));
-    setPicked({});
-    setMode("EDIT");
-  };
+        syncFromDto(dto);
+      } catch (e) {
+        Alert.alert(
+          "שגיאה",
+          e instanceof Error ? e.message : "לא הצלחתי להוסיף את המוצר"
+        );
+      }
+    },
+    [existingNamesSet, listId, syncFromDto]
+  );
+
+  const removeItem = useCallback(
+    async (id: string) => {
+      const current = items.find((x) => x.id === id);
+      if (!current || !listId) return;
+
+      try {
+        const dto = await updateShoppingListItemQuantity(listId, current.name, 0);
+        syncFromDto(dto);
+      } catch (e) {
+        Alert.alert(
+          "שגיאה",
+          e instanceof Error ? e.message : "לא הצלחתי להסיר את המוצר"
+        );
+      }
+    },
+    [items, listId, syncFromDto]
+  );
+
+  const updateQuantity = useCallback(
+    async (id: string, delta: number) => {
+      const current = items.find((item) => item.id === id);
+      if (!current || !listId) return;
+
+      try {
+        const currentQty = current.quantity ?? 1;
+        const newQty = Math.max(0, currentQty + delta);
+
+        const dto = await updateShoppingListItemQuantity(
+          listId,
+          current.name,
+          newQty
+        );
+
+        syncFromDto(dto);
+      } catch (e) {
+        Alert.alert(
+          "שגיאה",
+          e instanceof Error ? e.message : "לא הצלחתי לעדכן כמות"
+        );
+      }
+    },
+    [items, listId, syncFromDto]
+  );
+
+  const togglePick = useCallback(
+    async (id: string) => {
+      const current = items.find((item) => item.id === id);
+      if (!current || !listId) return;
+
+      try {
+        const dto = await checkShoppingListItemAsBought(listId, current.name);
+        syncFromDto(dto);
+      } catch (e) {
+        Alert.alert(
+          "שגיאה",
+          e instanceof Error ? e.message : "לא הצלחתי לעדכן את סימון המוצר"
+        );
+      }
+    },
+    [items, listId, syncFromDto]
+  );
+
+  const enterShoppingMode = useCallback(async () => {
+    if (!listId) return;
+
+    try {
+      setModeSubmitting(true);
+      const dto = await enterShoppingModeApi(listId);
+      syncFromDto(dto);
+      return dto;
+    } catch (e) {
+      Alert.alert(
+        "שגיאה",
+        e instanceof Error ? e.message : "לא הצלחתי להפעיל את מצב הקנייה"
+      );
+    } finally {
+      setModeSubmitting(false);
+    }
+  }, [listId, syncFromDto]);
+
+  const finishShopping = useCallback(
+    async (clear = true) => {
+      if (!listId) return;
+
+      try {
+        setModeSubmitting(true);
+        const dto = await exitShoppingModeApi(listId, { clear });
+        syncFromDto(dto);
+        return dto;
+      } catch (e) {
+        Alert.alert(
+          "שגיאה",
+          e instanceof Error ? e.message : "לא הצלחתי לסיים את מצב הקנייה"
+        );
+      } finally {
+        setModeSubmitting(false);
+      }
+    },
+    [listId, syncFromDto]
+  );
 
   return {
-    mode, setMode,
-    items, filteredItems,
-    suggestions,
+    mode,
+    setMode,
+    items,
+    filteredItems,
     loading,
-    picked, togglePick,
-    query, setQuery,
-    addItem, removeItem,
+    picked,
+    togglePick,
+    query,
+    setQuery,
+    addItem,
+    removeItem,
     finishShopping,
-    syncing, setSyncing,
-    existingNamesSet,
     updateQuantity,
+    enterShoppingMode,
+    modeSubmitting,
   };
 }
