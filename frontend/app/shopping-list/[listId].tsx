@@ -107,7 +107,6 @@ return (
         {/* הכפתור הדינמי בתחתית המסך */}
         <View style={[styles.bottomActions, { paddingBottom: 16 + insets.bottom }]}>
           {mode === "SHOPPING" ? (
-            // כפתור סיום קנייה (מופיע רק במצב קנייה)
             <TouchableOpacity 
               style={[styles.primaryBottomBtnFull, { backgroundColor: BRAND.SUCCESS }]} 
               onPress={() => {
@@ -125,7 +124,6 @@ return (
               <Text style={styles.primaryBottomBtnText}>סיום קנייה ומחיקת פריטים</Text>
             </TouchableOpacity>
           ) : (
-            // כפתור הוספת פריט (מופיע במצב עריכה רגיל)
             <TouchableOpacity 
               style={styles.primaryBottomBtnFull} 
               onPress={() => setAddOpen(true)}
