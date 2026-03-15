@@ -10,6 +10,7 @@ import {
   exitShoppingMode as exitShoppingModeApi,
   type ShoppingListDTO,
   type LocationType,
+  deleteShoppingListItem,
 } from "@/src/api/shoppingLists";
 
 export type LocationKey =
@@ -189,13 +190,12 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       if (!current || !listId) return;
 
       try {
-        const dto = await updateShoppingListItemQuantity(listId, current.name, 0);
+        const dto = await deleteShoppingListItem(listId, current.name);
         syncFromDto(dto);
       } catch (e) {
-        Alert.alert(
-          "שגיאה",
-          e instanceof Error ? e.message : "לא הצלחתי להסיר את המוצר"
-        );
+        console.error("Full Error Object:", e); // זה ידפיס ללוג של ה-VSCode/Terminal
+        Alert.alert("שגיאה", "לא הצלחתי למחוק את הפריט");
+        
       }
     },
     [items, listId, syncFromDto]
@@ -206,25 +206,22 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       const current = items.find((item) => item.id === id);
       if (!current || !listId) return;
 
+      const currentQty = current.quantity ?? 1;
+      const newQty = currentQty + delta;
+
+      if (newQty <= 0) {
+        await removeItem(id);
+        return;
+      }
+
       try {
-        const currentQty = current.quantity ?? 1;
-        const newQty = Math.max(0, currentQty + delta);
-
-        const dto = await updateShoppingListItemQuantity(
-          listId,
-          current.name,
-          newQty
-        );
-
+        const dto = await updateShoppingListItemQuantity(listId, current.name, newQty);
         syncFromDto(dto);
       } catch (e) {
-        Alert.alert(
-          "שגיאה",
-          e instanceof Error ? e.message : "לא הצלחתי לעדכן כמות"
-        );
+        Alert.alert("שגיאה", "עדכון הכמות נכשל");
       }
     },
-    [items, listId, syncFromDto]
+    [items, listId, syncFromDto, removeItem]
   );
 
   const togglePick = useCallback(

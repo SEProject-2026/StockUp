@@ -92,6 +92,23 @@ async def add_item(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
+@router.delete("/{list_id}/items/{item_name}", response_model=GeneralResponse)
+async def remove_item(
+    list_id: UUID, 
+    item_name: str, 
+    service: ShoppingServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    app_logger.info(f"User {user_id} removing item '{item_name}' from list {list_id}")
+    try:
+        updated = await service.remove_item_from_list(list_id, item_name)
+        return GeneralResponse(
+            status="success", 
+            message="Item removed",
+            data=ShoppingListDTO.model_validate(updated)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 @router.patch("/{list_id}/items/{item_name}/quantity", response_model=GeneralResponse)
 async def update_quantity(

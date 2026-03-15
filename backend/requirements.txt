@@ -85,3 +85,4 @@ tzlocal==5.3.1
 urllib3==2.6.3
 uvicorn==0.38.0
 win32_setctime==1.2.0
+exponent-server-sdk==2.0.0

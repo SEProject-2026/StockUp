@@ -114,12 +114,16 @@ export function InventoryScreenBase({
         )}
       </View>
 
-      <EditItemModal
-        visible={!!inv.itemToEdit}
-        item={inv.itemToEdit}
-        onClose={() => inv.setItemToEdit(null)}
-        onSave={inv.saveEdit}
-      />
+    <EditItemModal
+      visible={!!inv.itemToEdit}
+      item={inv.itemToEdit}
+      onClose={() => inv.setItemToEdit(null)}
+      onSave={(values) => {
+        if (inv.itemToEdit) {
+          inv.saveEdit(inv.itemToEdit.itemId, values);
+        }
+      }}
+    />
     </SafeAreaView>
   );
 }
