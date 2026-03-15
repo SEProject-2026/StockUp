@@ -15,12 +15,16 @@ import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 // Hooks & Logic
 import { useHomeData } from "@/src/hooks/useHomeData";
 import { setSelectedHomeId } from "@/src/utils/selected-home";
+import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- הוספת ה-Import
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
 export default function HomeDashboardScreen() {
   const { homeId } = useLocalSearchParams<{ homeId: string }>();
   const currentHomeId = String(homeId);
+
+  // הפעלת ההגנה: אם המשתמש יוסר מהבית הזה, הוא ייזרק החוצה אוטומטית
+  useMembershipGuard(currentHomeId);
 
   const { stats, expiringSoon, loadData, isLoading } = useHomeData(currentHomeId);
 
