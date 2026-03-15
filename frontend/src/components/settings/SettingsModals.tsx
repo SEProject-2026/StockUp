@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, Modal, Pressable, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 
 const BRAND_PRIMARY = "#0284C7";
 const BORDER = "#E5E7EB";
@@ -30,28 +31,53 @@ export const ExpiryDaysModal = ({ visible, onClose, days, setDays, onSave, loadi
   </Modal>
 );
 
-export const HomeCodeModal = ({ visible, onClose, code, loading, onCopy }: any) => (
-  <Modal visible={visible} transparent animationType="fade">
-    <View style={styles.modalRoot}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose} />
-      <View style={styles.modalCard}>
-        <View style={styles.modalHeader}>
-           <Text style={styles.modalTitle}>קוד הצטרפות לבית</Text>
-           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={20} color={MUTED}/></TouchableOpacity>
+export const HomeCodeModal = ({ visible, onClose, code, loading }: any) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(code);
+    setCopied(true);
+    
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeader}>
+             <Text style={styles.modalTitle}>קוד הצטרפות לבית</Text>
+             <TouchableOpacity onPress={onClose}><Ionicons name="close" size={20} color={MUTED}/></TouchableOpacity>
+          </View>
+          
+          <View style={styles.codeContainer}>
+            {loading ? <ActivityIndicator color={BRAND_PRIMARY} /> : (
+              <>
+                <Text style={styles.codeText}>{code}</Text>
+                <TouchableOpacity 
+                  style={[styles.copyBtn, copied && { borderColor: "#16A34A" }]} 
+                  onPress={handleCopy}
+                >
+                  <Ionicons 
+                    name={copied ? "checkmark-circle" : "copy-outline"} 
+                    size={20} 
+                    color={copied ? "#16A34A" : BRAND_PRIMARY} 
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+          <Text style={styles.codeHint}>
+            {copied ? "הקוד הועתק בהצלחה!" : "שתף את הקוד עם בני הבית כדי שיוכלו להצטרף"}
+          </Text>
         </View>
-        <View style={styles.codeContainer}>
-          {loading ? <ActivityIndicator color={BRAND_PRIMARY} /> : (
-            <>
-              <Text style={styles.codeText}>{code}</Text>
-              <TouchableOpacity style={styles.copyBtn} onPress={onCopy}><Ionicons name="copy-outline" size={20} color={BRAND_PRIMARY}/></TouchableOpacity>
-            </>
-          )}
-        </View>
-        <Text style={styles.codeHint}>שתף את הקוד עם בני הבית כדי שיוכלו להצטרף</Text>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 export const JoinRequestsModal = ({ visible, onClose, requests, loading, onAnswer, processingId }: any) => (
   <Modal visible={visible} transparent animationType="slide">

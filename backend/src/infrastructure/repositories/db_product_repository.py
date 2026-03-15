@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.repositories.i_product_repository import IProductRepository
-from src.domain.smart_home.product import Product, ProductItem
-from src.domain.smart_home.enums import LocationType
+from src.domain.product.product import Product, ProductItem
+from src.domain.enums import LocationType
 from src.infrastructure.db.models import ProductModel, ProductItemModel
 
 class DbProductRepository(IProductRepository):

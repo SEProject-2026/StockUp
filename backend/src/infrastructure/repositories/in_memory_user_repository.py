@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import UUID
-from src.domain.user import User
+from src.domain.user.user import User
 from src.repositories.user_repository import IUserRepository
 
 

@@ -2,10 +2,10 @@ import pytest
 from datetime import date, timedelta
 from uuid import uuid4
 from tests.container import testing_container
-from src.domain.smart_home.product import Product
-from src.domain.smart_home.enums import LocationType
-from src.domain.smart_home.home import Home
-from src.domain.user import User
+from src.domain.product.product import Product
+from src.domain.enums import LocationType
+from src.domain.home.home import Home
+from src.domain.user.user import User
 
 # --- Helpers ---
 

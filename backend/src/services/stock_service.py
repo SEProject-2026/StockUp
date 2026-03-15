@@ -5,14 +5,14 @@ from typing import Any, Callable, List, Optional, Dict
 from datetime import date
 
 from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
-from src.domain.smart_home.product import Product
+from src.domain.product.product import Product
 from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
-from src.domain.smart_home.enums import ExpirationType, LocationType, UnitType
+from src.domain.enums import ExpirationType, LocationType, UnitType
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
-from src.domain.receipt import ReceiptItemDTO, ReceiptDTO
+from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
 from src.repositories.user_repository import IUserRepository
 from src.services.notification_service import send_push_notification
@@ -548,58 +548,3 @@ class StockService:
             raise ValueError("User is not a member of the home")
         return home.get_expiration_range()
     
-
-    
-    # ==========================================
-    # 3. Shopping List (Active & Base Mode)
-    # ==========================================
-
-    async def trigger_shopping_list_update(self, home_id: UUID):
-        """Triggers a real-time update (WebSocket/Push) to all home members."""
-        raise NotImplementedError("Not implemented yet")
-
-    # --- Base Mode (Configuration) ---
-
-    async def add_item_to_base_stock(self, head_user_id: UUID, home_id: UUID, 
-                                     product_name: str, ideal_quantity: int) -> Dict:
-        """Adds an item to the 'Base Mode' (ideal stock) configuration."""
-        raise NotImplementedError("Not implemented yet")
-
-    async def remove_item_from_base_stock(self, head_user_id: UUID, base_product_id: UUID) -> bool:
-        """Removes an item from the 'Base Mode' configuration."""
-        raise NotImplementedError("Not implemented yet")
-
-    async def update_base_stock_quantity(self, head_user_id: UUID, base_product_id: UUID, new_quantity: int) -> Dict:
-        """Updates the ideal quantity for a Base Mode item."""
-        raise NotImplementedError("Not implemented yet")
-
-    # --- Active Shopping List ---
-
-    async def add_shopping_item(self, user_id: UUID, home_id: UUID, product_name: str, quantity: int) -> Dict:
-        """Manually adds an item to the shopping list."""
-        raise NotImplementedError("Not implemented yet")
-
-    async def remove_shopping_item(self, user_id: UUID, list_product_id: UUID) -> bool:
-        """Removes an item from the shopping list."""
-        raise NotImplementedError("Not implemented yet")
-
-    async def update_shopping_item_quantity(self, user_id: UUID, list_product_id: UUID, new_quantity: int) -> Dict:
-        """Updates the quantity of an item in the shopping list."""
-        raise NotImplementedError("Not implemented yet")
-
-    # --- Shopping Mode ---
-
-    async def enter_shopping_mode(self, user_id: UUID, home_id: UUID) -> bool:
-        """Enters 'Shopping Mode' (locks external edits, prepares for checklist)."""
-        raise NotImplementedError("Not implemented yet")
-
-    async def mark_shopping_item(self, user_id: UUID, list_product_id: UUID, is_checked: bool) -> Dict:
-        """Marks an item as 'in cart' (checked/unchecked)."""
-        raise NotImplementedError("Not implemented yet")
-
-    async def exit_shopping_mode(self, user_id: UUID, home_id: UUID, complete_purchase: bool) -> Dict:
-        """
-        Exits 'Shopping Mode'. 
-        If complete_purchase is True, moves checked items to Inventory and clears them from the list.
-        """
-        raise NotImplementedError("Not implemented yet")

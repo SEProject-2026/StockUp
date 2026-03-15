@@ -14,7 +14,7 @@ import pdfplumber
 import pytesseract
 from pytesseract import Output
 from pdf2image import convert_from_path
-from src.domain.smart_home.enums import OCRMode
+from src.domain.enums import OCRMode
 
 class ReceiptScanner:
     def __init__(self):

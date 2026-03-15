@@ -1,8 +1,8 @@
 import pytest
 from uuid import uuid4
 from datetime import date, timedelta
-from src.domain.smart_home.product import Product, ProductItem
-from src.domain.smart_home.enums import LocationType, ExpirationType
+from src.domain.product.product import Product, ProductItem
+from src.domain.enums import LocationType, ExpirationType
 
 # ==========================================
 # Fixtures

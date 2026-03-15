@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query, File
 from sqlalchemy.orm import Session
 
-from src.domain.receipt import ReceiptDTO, ReceiptItemDTO
+from src.domain.receipt.receipt import ReceiptDTO, ReceiptItemDTO
 from src.infrastructure.db.database import get_db
 from src.services.stock_service import StockService
 from src.api.schemas.product_schemas import (
@@ -17,7 +17,7 @@ from src.api.schemas.product_schemas import (
     UpdateProductNicknameRequest
 )
 from src.api.schemas.common import GeneralResponse
-from src.domain.smart_home.enums import LocationType, ExpirationType
+from src.domain.enums import LocationType, ExpirationType
 from src.infrastructure.app_container import AppContainer
 from src.api.security import get_current_user_id
 from src.infrastructure.logger import app_logger

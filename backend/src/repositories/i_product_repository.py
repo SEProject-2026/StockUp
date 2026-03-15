@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from src.domain.smart_home.enums import ExpirationType
-from src.domain.smart_home.product import Product
+from src.domain.enums import ExpirationType
+from src.domain.product.product import Product
 from uuid import UUID
 
 class IProductRepository(ABC):

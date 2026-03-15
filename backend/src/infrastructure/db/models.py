@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, String, Integer, Date, ForeignKey, Table
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, String, Integer, Date, ForeignKey, Table, func
 from sqlalchemy.orm import relationship
 from src.infrastructure.db.database import Base
 
@@ -48,6 +48,7 @@ class HomeModel(Base):
     
     # Cascade delete is important: If Home is deleted, delete all Products
     products = relationship("ProductModel", back_populates="home", cascade="all, delete-orphan")
+    shopping_lists = relationship("ShoppingListModel", back_populates="home", cascade="all, delete-orphan")
 
 
 # --- Products & Items (Refactored) ---
@@ -98,3 +99,32 @@ class CatalogItemModel(Base):
     location = Column("SuggestedStorageCategory", String, default="OTHER")
     avg_weight = Column("AverageWeight", Float, default=0.0)
     sample_size = Column("SampleSize", Integer, default=0)
+
+
+class ShoppingListModel(Base):
+    __tablename__ = "shopping_lists"
+
+    # Unique identifier for each shopping list
+    id = Column(String, primary_key=True, index=True)
+    
+    # Link to the home - allows multiple lists per home (One-to-Many)
+    home_id = Column(String, ForeignKey("homes.id"), index=True, nullable=False)
+    
+    # Descriptive name of the list (e.g., "Weekly Groceries")
+    name = Column(String, default="New Shopping List")
+    
+    # Flag to indicate if the user is currently at the store using this list
+    is_active_shopping_mode = Column(Boolean, default=False)
+    
+    # List items stored as a JSON array of objects
+    # Format: [{"item_name": str, "quantity": int, "is_bought": bool}]
+    items = Column(JSON, default=list)
+
+    # Automatically set on row creation
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Automatically updated by the database on every row modification
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationship back to the HomeModel
+    home = relationship("HomeModel", back_populates="shopping_lists")

@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
 from src.repositories.user_repository import IUserRepository
-from src.domain.user import User
+from src.domain.user.user import User
 from src.infrastructure.db.models import UserModel
 
 class DbUserRepository(IUserRepository):
