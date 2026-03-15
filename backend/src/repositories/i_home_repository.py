@@ -32,3 +32,7 @@ class IHomeRepository(ABC):
     @abstractmethod
     async def get_homes_by_user_id(self, user_id: UUID) -> List[Home]:
         pass
+
+    @abstractmethod
+    async def get_homes_batch(self, limit: int = 100, offset: int = 0) -> List[Home]:
+        pass

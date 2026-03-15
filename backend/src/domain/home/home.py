@@ -63,6 +63,8 @@ class Home:
     def add_join_request(self, user_id: UUID) -> None:
         if self.has_request_from(user_id):
             raise ValueError("User has already requested to join.")
+        if self.is_member(user_id):
+            raise ValueError("User is already a member of the home.")
         self._join_requests.add(user_id)
 
     def answer_join_request(self, head_user_id: UUID, user_id: UUID, approved: bool) -> None:

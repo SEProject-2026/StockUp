@@ -74,3 +74,11 @@ export async function changePassword(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+
+export async function updatePushToken(token: string) {
+  return authFetch<GeneralResponse>("/auth/me/push-token", {
+    method: "PATCH",
+    body: JSON.stringify({ push_token: token }),
+  });
+}

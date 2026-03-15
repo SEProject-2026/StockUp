@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, {useCallback, useEffect} from "react";
 import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,13 +18,18 @@ import { getHomeJoinCode, getJoinRequests } from "@/src/api/homes";
 import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; 
 
 export default function SettingsScreen() {
+  const { homeId, openRequests } = useLocalSearchParams<{ homeId?: string; openRequests?: string }>();
+  const { state, actions } = useHomeSettings(homeId);
+
+  useEffect(() => {
+    if (openRequests === 'true') {
+      handleOpenJoinRequests();
+    }
+  }, [openRequests]);
   const insets = useSafeAreaInsets(); // לקבלת מימדי ה-Safe Area של המכשיר
-  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
   const currentHomeId = homeId ? String(homeId) : undefined;
 
   useMembershipGuard(currentHomeId);
-
-  const { state, actions } = useHomeSettings(currentHomeId);
   const { setJoinRequests } = actions;
 
   const handleOpenCode = async () => {

@@ -2,19 +2,12 @@ from fastapi import FastAPI
 from src.infrastructure.db.database import engine
 from fastapi.middleware.cors import CORSMiddleware
 from src.infrastructure.db import models
-from src.api.routes import auth_routes, management_routes, stock_routes,shopping_routes
-from contextlib import asynccontextmanager
+from src.api.routes import auth_routes, management_routes, stock_routes, shopping_routes
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    models.Base.metadata.create_all(bind=engine)
-    yield
+models.Base.metadata.create_all(bind=engine)
+app = FastAPI(title="StockUp API", version="1.0.0")
 
-app = FastAPI(
-    title="StockUp API", 
-    version="1.0.0",
-    lifespan=lifespan
-)
+
 
 app.add_middleware(
     CORSMiddleware,
