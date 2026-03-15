@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
 // UI Components
@@ -23,6 +23,7 @@ import { setLastAddItemReturnDrafts } from "@/src/context/add-item-return-store"
 // Custom Hooks & Utils
 import { useBatchAddItems } from "@/src/hooks/useBatchAddItems";
 import { normalizeCatalogList, normalizeCatalogOne } from "@/src/utils/batch-add-utils";
+import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 const BRAND_BG = "#F4F4F4";
 
@@ -36,6 +37,10 @@ export default function BatchAddItemsScreen() {
 
   const isReceiptReviewMode = mode === "receipt-review";
   const currentHomeId = homeId ? String(homeId) : "";
+
+  // הפעלת ההגנה: אם המשתמש הוסר מהבית בזמן שהוא מוסיף מוצרים, הוא ייזרק החוצה
+  useMembershipGuard(currentHomeId);
+
   const initialLocation = useMemo(() => routeTolocation(locationParam), [locationParam]);
 
   const { draft, setters, pending, actions } = useBatchAddItems(initialLocation);
@@ -47,9 +52,8 @@ export default function BatchAddItemsScreen() {
   const debouncedName = useDebouncedValue(draft.name.trim(), 250);
   const debouncedBarcode = useDebouncedValue(draft.barcode.trim(), 300);
 
-  // --- search in catalog---
+  // --- search in catalog (הלוגיקה הקיימת שלך) ---
   
-  // by barcode
   useEffect(() => {
     if (draft.editingId || debouncedBarcode.length < 8) return;
     
@@ -67,7 +71,6 @@ export default function BatchAddItemsScreen() {
     })();
   }, [debouncedBarcode, draft.editingId]);
 
-  // by name
   useEffect(() => {
     if (draft.editingId || draft.selectedCatalogItem || debouncedName.length < 2) {
       setSuggestions([]);
@@ -126,6 +129,7 @@ export default function BatchAddItemsScreen() {
       Alert.alert("שגיאה", "משהו השתבש בתהליך השמירה.");
     }
   };
+
   const canAdd = (draft.name.trim().length > 0 || draft.selectedCatalogItem !== null) && 
                 (draft.quantity.length > 0 && parseInt(draft.quantity) > 0);
 
