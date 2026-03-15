@@ -38,6 +38,8 @@ export async function registerForPushNotificationsAsync() {
       console.log("Expo Push Token:", token);
       
       await updatePushToken(token);
+
+      await setupNotificationCategories();
       
     } catch (e) {
       console.error("Error getting or sending push token:", e);
@@ -56,4 +58,22 @@ export async function registerForPushNotificationsAsync() {
   }
 
   return token;
+}
+
+export async function setupNotificationCategories() {
+  await Notifications.setNotificationCategoryAsync('join_request_category', [
+    {
+      identifier: 'APPROVE',
+      buttonTitle: 'אשר הצטרפות',
+      options: { opensAppToForeground: true },
+    },
+    {
+      identifier: 'REJECT',
+      buttonTitle: 'דחה',
+      options: { 
+        isDestructive: true,
+        opensAppToForeground: true 
+      },
+    },
+  ]);
 }

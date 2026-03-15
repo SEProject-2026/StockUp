@@ -4,43 +4,62 @@ import { Stack, useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { InventoryProvider } from "../src/context/inventory-context";
 import * as Notifications from 'expo-notifications';
+import { approveJoinRequest, rejectJoinRequest } from "@/src/api/homes";
 
 export default function RootLayout() {
   const router = useRouter();
-  const response = Notifications.useLastNotificationResponse();
+
   useEffect(() => {
-    if (response) {
+    // הפונקציה המרכזית שעושה את העבודה, לא משנה מאיפה ההתראה הגיעה
+    const handleNotification = (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data;
+      const actionId = response.actionIdentifier;
       const action = data?.action;
 
-      console.log("User tapped on notification with action:", action);
-
-      switch (action) {
-        case 'join_request':
-          const targetHomeId = data.home_id as string;
-
-          router.push({
-            pathname: '/settings', 
-            params: { 
-              homeId: targetHomeId,
-              openRequests: 'true'
-            }
-          });
-          break;
-          
-        case 'receipt_added':
-          router.push('/home/home'); 
-          break;
-          
-        case 'expiration_alert':
-          router.push('/home/home');
-          break;
-          
-        default:
-          console.log("Unknown notification action");
+      // טיפול בכפתור אישור
+      if (actionId === 'APPROVE') {
+        if (data?.home_id && data?.user_id) {
+          console.log("✅ שולח לאישור. בית:", data.home_id, "משתמש:", data.user_id);
+          approveJoinRequest(data.home_id as string, data.user_id as string )
+            .catch(e => console.error("❌ שגיאה באישור:", e));
+        }
+      } 
+      // טיפול בכפתור דחייה
+      else if (actionId === 'REJECT') {
+        if (data?.home_id && data?.user_id) {
+          console.log("🗑️ שולח לדחייה...");
+          rejectJoinRequest(data.home_id as string, data.user_id as string)
+            .catch(e => console.error("❌ שגיאה בדחייה:", e));
+        }
+      } 
+      // טיפול בלחיצה רגילה על ההתראה (כדי להיכנס אליה)
+      else if (actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+        if (action === 'join_request') {
+          setTimeout(() => {
+            router.push({
+              pathname: '/settings',
+              params: { homeId: data.home_id as string, openRequests: 'true' }
+            });
+          }, 500);
+        }
       }
-    }
-  }, [response]);
+    };
+
+    // --- רשת הביטחון הכפולה שלנו --- //
+
+    // 1. תופס לחיצות כשהאפליקציה פתוחה או נמצאת ברקע (Background)
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotification);
+
+    // 2. תופס לחיצות כשהאפליקציה הייתה סגורה לגמרי והרגע נדלקה (Cold Start)
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        handleNotification(response);
+      }
+    });
+
+    // ניקוי כשהקומפוננטה יורדת
+    return () => subscription.remove();
+  }, []);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <InventoryProvider>

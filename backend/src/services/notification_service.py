@@ -5,7 +5,7 @@ from exponent_server_sdk import (
 )
 from src.infrastructure.logger import app_logger
 
-def send_push_notification(token: str, title: str, message: str, data: dict = None):
+def send_push_notification(token: str, title: str, message: str, data: dict = None, category_id: str = None):
     """
     Send a push notification to a specific device using Expo's Push API.
     """
@@ -15,7 +15,8 @@ def send_push_notification(token: str, title: str, message: str, data: dict = No
                 to=token,
                 title=title,
                 body=message,
-                data=data
+                data=data,
+                category=category_id
             )
         )
         app_logger.info(f"Push notification sent successfully to {token}")

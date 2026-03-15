@@ -64,7 +64,8 @@ class ManagementService:
                     token=owner.push_token,
                     title="בקשת הצטרפות חדשה! 🏠",
                     message=f"{requester_name} מבקש להצטרף לבית שלך. היכנסו כדי לאשר.",
-                    data={"action": "join_request", "home_id": str(home.get_id())} 
+                    data={"action": "join_request", "home_id": str(home.get_id()), "user_id": str(user_id)},
+                    category_id="join_request_category"
                 )
                 app_logger.info(f"Join request push notification sent to home owner {owner_id}")
                 
