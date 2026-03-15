@@ -17,7 +17,15 @@ export default function RootLayout() {
 
       switch (action) {
         case 'join_request':
-          router.push(`/home/${data.home_id}`);
+          const targetHomeId = data.home_id as string;
+
+          router.push({
+            pathname: '/settings', 
+            params: { 
+              homeId: targetHomeId,
+              openRequests: 'true'
+            }
+          });
           break;
           
         case 'receipt_added':

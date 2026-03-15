@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useEffect} from "react";
 import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,9 +18,14 @@ import {
 import { getHomeJoinCode, getJoinRequests } from "@/src/api/homes";
 
 export default function SettingsScreen() {
-  const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+  const { homeId, openRequests } = useLocalSearchParams<{ homeId?: string; openRequests?: string }>();
   const { state, actions } = useHomeSettings(homeId);
 
+  useEffect(() => {
+    if (openRequests === 'true') {
+      handleOpenJoinRequests();
+    }
+  }, [openRequests]);
 
   const handleOpenCode = async () => {
     actions.setHomeCodeOpen(true);
