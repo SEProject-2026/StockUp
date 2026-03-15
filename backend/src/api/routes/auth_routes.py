@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from sqlalchemy.orm import Session 
 
-from src.domain.user import User
+from src.domain.user.user import User
 from src.infrastructure import app_container
 from src.infrastructure.logger import app_logger
 from pydantic import BaseModel
