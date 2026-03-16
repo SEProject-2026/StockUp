@@ -2,6 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 from src.domain.enums import LocationType
 from src.domain.shopping_list.shopping_list import ShoppingList
+from src.infrastructure.logger import app_logger
 
 class ShoppingListService:
     def __init__(self, shopping_repo):#, product_repo, analytics_repo):
@@ -58,12 +59,14 @@ class ShoppingListService:
         """
         Removes an item from the active shopping list.
         """
+        app_logger.info(f"Attempting to remove item '{item_name}' from list {id}")
         list = await self.shopping_repo.get_by_id(id)
         if not list:
             raise ValueError(f"Shopping list not found: {id}")
         list.remove_item(item_name)
         await self.shopping_repo.save(list)
         return list
+    
 
     async def update_item_quantity(self, id: UUID, item_name: str, new_quantity: int) -> ShoppingList:
         """
