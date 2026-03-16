@@ -1,6 +1,11 @@
-import { supabase } from "@/src/lib/supabase";
+import { authFetch } from "@/src/api/client";
 
-// --- Types ---
+export type GeneralResponse<T = unknown> = {
+  status: "success" | "error";
+  message?: string;
+  data?: T;
+};
+
 export type LocationType =
   | "FRIDGE"
   | "FREEZER"
@@ -11,9 +16,7 @@ export type LocationType =
   | "OTHER";
 
 export type ShoppingListItemDTO = {
-  id?: string; // הוספתי אופציונלי לתאימות
   item_name: string;
-  name?: string; // לתאימות עם ה-Hook החדש
   quantity: number;
   is_bought: boolean;
   location: LocationType;
@@ -28,87 +31,160 @@ export type ShoppingListDTO = {
   updated_at: string;
 };
 
-// --- API Functions (Supabase) ---
+export type CreateShoppingListRequest = {
+  home_id: string;
+  name: string;
+};
 
-/**
- * טעינת כל רשימות הקניות של הבית
- */
+export type AddItemRequest = {
+  item_name: string;
+  quantity: number;
+  location?: LocationType;
+};
+
+export type UpdateQuantityRequest = {
+  new_quantity: number;
+};
+
+export type ExitModeRequest = {
+  clear?: boolean;
+};
+
+const BASE = "/shopping-lists";
+
+function unwrapResponse<T>(response: GeneralResponse<T>): T {
+  if (response.status !== "success") {
+    throw new Error(response.message || "Request failed");
+  }
+
+  if (response.data === undefined) {
+    throw new Error("Response data is missing");
+  }
+
+  return response.data;
+}
+
+export async function createShoppingList(
+  payload: CreateShoppingListRequest
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(`${BASE}/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return unwrapResponse(response);
+}
+
 export async function getHomeShoppingLists(
   homeId: string
 ): Promise<ShoppingListDTO[]> {
-  const { data, error } = await supabase
-    .from("shopping_lists")
-    .select("*")
-    .eq("home_id", homeId)
-    .order("created_at", { ascending: false });
+  const response = await authFetch<GeneralResponse<ShoppingListDTO[]>>(
+    `${BASE}/home/${homeId}`,
+    { method: "GET" }
+  );
 
-  if (error) {
-    console.error("❌ Error fetching home lists:", error.message);
-    throw error;
-  }
-
-  return (data || []) as ShoppingListDTO[];
+  return unwrapResponse(response);
 }
 
-/**
- * טעינת רשימה ספציפית לפי ID
- */
 export async function getShoppingList(
   listId: string
 ): Promise<ShoppingListDTO> {
-  const { data, error } = await supabase
-    .from("shopping_lists")
-    .select("*")
-    .eq("id", listId)
-    .single();
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}`,
+    { method: "GET" }
+  );
 
-  if (error) {
-    console.error("❌ Error fetching list:", error.message);
-    throw error;
-  }
-
-  return data as ShoppingListDTO;
+  return unwrapResponse(response);
 }
 
-/**
- * יצירת רשימה חדשה בבית
- */
-export async function createShoppingList(payload: {
-  home_id: string;
-  name: string;
-}): Promise<ShoppingListDTO> {
-  const { data, error } = await supabase
-    .from("shopping_lists")
-    .insert([
-      {
-        home_id: payload.home_id,
-        name: payload.name,
-        items: [],
-        is_active_shopping_mode: false,
-      },
-    ])
-    .select()
-    .single();
+export async function addItemToShoppingList(
+  listId: string,
+  payload: AddItemRequest
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/items`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 
-  if (error) {
-    console.error("❌ Error creating list:", error.message);
-    throw error;
-  }
-
-  return data as ShoppingListDTO;
+  return unwrapResponse(response);
 }
 
-/**
- * מחיקת רשימת קניות שלמה
- */
+export async function deleteShoppingListItem(
+  listId: string,
+  itemName: string
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/items/${encodeURIComponent(itemName)}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  return unwrapResponse(response);
+}
+
+export async function updateShoppingListItemQuantity(
+  listId: string,
+  itemName: string,
+  newQuantity: number
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/items/${encodeURIComponent(itemName)}/quantity`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ new_quantity: newQuantity }),
+    }
+  );
+
+  return unwrapResponse(response);
+}
+
+export async function checkShoppingListItemAsBought(
+  listId: string,
+  itemName: string
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/items/${encodeURIComponent(itemName)}/check`,
+    {
+      method: "PATCH",
+    }
+  );
+
+  return unwrapResponse(response);
+}
+export async function enterShoppingMode(
+  listId: string
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/enter-mode`,
+    {
+      method: "POST",
+    }
+  );
+
+  return unwrapResponse(response);
+}
+
+export async function exitShoppingMode(
+  listId: string,
+  payload: ExitModeRequest = { clear: false }
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/exit-mode`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+
+  return unwrapResponse(response);
+}
+
 export async function deleteShoppingList(listId: string): Promise<void> {
-  const { error } = await supabase
-    .from("shopping_lists")
-    .delete()
-    .eq("id", listId);
-
-  if (error) {
-    console.error("❌ Error deleting list:", error.message);
-    throw error;
-  }
+  await authFetch<void>(`${BASE}/${listId}`, {
+    method: "DELETE",
+  });
 }

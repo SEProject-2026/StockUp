@@ -1,17 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, Alert, StyleSheet } from "react-native";
+import { View, Text, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-// ייבוא ה-Hook והפונקציה לעיבוד הסקשנים
-import { useShoppingList, useShoppingSections, type ShoppingItem, type LocationKey } from "@/src/hooks/useShoppingList";
-import { locationIcon } from "@/src/hooks/useBaseMode";
+import { useShoppingList, type ShoppingItem, type LocationKey } from "@/src/hooks/useShoppingList";
+import { LOCATIONS, locationLabel, locationIcon } from "@/src/hooks/useBaseMode";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 
-import { styles, BRAND } from "@/src/components/shopping/styles";
+import { styles, BRAND, type SectionLocation } from "@/src/components/shopping/styles";
 import { ShoppingItemRow } from "@/src/components/shopping/ShoppingItemRow";
 import { ShoppingHeader } from "@/src/components/shopping/ShoppingHeader";
 import { AddShoppingItemModal } from "@/src/components/shopping/AddShoppingItemModal";
@@ -19,19 +18,37 @@ import { AddShoppingItemModal } from "@/src/components/shopping/AddShoppingItemM
 export default function ShoppingListScreen() {
   const insets = useSafeAreaInsets();
   const [addOpen, setAddOpen] = useState(false);
-  
   const { homeId, listId, listName } = useLocalSearchParams<{ homeId: string; listId: string; listName: string }>();
 
-  // שימוש ב-Hook החדש
   const {
     mode, items, filteredItems, loading, picked, query, setQuery,
     addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick
   } = useShoppingList({ homeId: homeId ?? "", listId: listId ?? "" });
 
-  // שימוש בפונקציית הסקשנים החדשה שהעברנו לתוך ה-Hook
-  const groupedSections = useShoppingSections(filteredItems);
-
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
+
+  const groupedSections = useMemo(() => {
+    const groups = new Map<SectionLocation, ShoppingItem[]>();
+    
+    filteredItems.forEach((it) => {
+      const loc = (it.location as SectionLocation) || "UNSORTED";
+      if (!groups.has(loc)) groups.set(loc, []);
+      groups.get(loc)!.push(it);
+    });
+
+    const sections = (LOCATIONS as LocationKey[])
+      .filter(l => groups.has(l as SectionLocation))
+      .map(l => ({
+        location: l as SectionLocation,
+        title: locationLabel(l as any),
+        items: groups.get(l as SectionLocation)!
+      }));
+
+    if (groups.has("UNSORTED")) {
+      sections.push({ location: "UNSORTED", title: "ללא מיקום", items: groups.get("UNSORTED")! });
+    }
+    return sections;
+  }, [filteredItems]);
 
   if (loading) return (
     <SafeAreaView style={styles.safeArea}>
@@ -40,7 +57,7 @@ export default function ShoppingListScreen() {
     </SafeAreaView>
   );
 
-  return (
+return (
     <View style={{ flex: 1 }}>
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient colors={["#E5F3FF", BRAND.BG]} style={StyleSheet.absoluteFill} />
@@ -49,15 +66,11 @@ export default function ShoppingListScreen() {
         <FlatList
           data={groupedSections}
           keyExtractor={s => s.location}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }} // צמצמתי מרווח תחתון
           ListHeaderComponent={
             <ShoppingHeader 
-              isShoppingMode={mode === "SHOPPING"} 
-              totalCount={items.length} 
-              pickedCount={pickedCount}
-              query={query} 
-              setQuery={setQuery} 
-              modeSubmitting={modeSubmitting}
+              isShoppingMode={mode === "SHOPPING"} totalCount={items.length} pickedCount={pickedCount}
+              query={query} setQuery={setQuery} modeSubmitting={modeSubmitting}
               onToggleMode={() => mode === "SHOPPING" ? finishShopping(false) : enterShoppingMode()}
             />
           }
@@ -68,10 +81,8 @@ export default function ShoppingListScreen() {
                   <View style={styles.locationHeaderLine} />
                   <View style={styles.locationHeaderChip}>
                     <Ionicons 
-                      // אם זה OTHER, אפשר להשתמש באייקון גנרי
-                      name={locationIcon(section.location as any) as any} 
-                      size={14} 
-                      color={BRAND.PRIMARY} 
+                      name={(section.location === "UNSORTED" ? "albums-outline" : locationIcon(section.location as any)) as any} 
+                      size={14} color={BRAND.PRIMARY} 
                     />
                     <Text style={styles.locationHeaderText}>{section.title}</Text>
                   </View>
@@ -81,16 +92,11 @@ export default function ShoppingListScreen() {
                 {section.items.map((it, i) => (
                   <View key={it.id}>
                     <ShoppingItemRow 
-                      item={it} 
-                      mode={mode} 
-                      isPicked={!!picked[it.id]} 
+                      item={it} mode={mode} isPicked={!!picked[it.id]} 
                       onToggle={() => togglePick(it.id)} 
                       onIncrease={() => updateQuantity(it.id, 1)} 
                       onDecrease={() => updateQuantity(it.id, -1)} 
-                      onRemove={() => {
-                        console.log("Remove clicked for ID:", it.id);
-                        removeItem(it.id);
-                      }} 
+                      onRemove={() => removeItem(it.id)} 
                     />
                     {i < section.items.length - 1 && <View style={styles.separator} />}
                   </View>
@@ -100,6 +106,7 @@ export default function ShoppingListScreen() {
           )}
         />
 
+        {/* הכפתור הדינמי בתחתית המסך */}
         <View style={[styles.bottomActions, { paddingBottom: 16 + insets.bottom }]}>
           {mode === "SHOPPING" ? (
             <TouchableOpacity 
@@ -129,19 +136,8 @@ export default function ShoppingListScreen() {
           )}
         </View>
 
-        <AddShoppingItemModal 
-          open={addOpen} 
-          onClose={() => setAddOpen(false)} 
-          onAdd={(p) => {
-            console.log("Adding item:", p.name);
-            addItem(p.name, p.qty, "manual", p.location);
-          }} 
-        />
-        
-        <View style={[styles.bottomBar, { paddingBottom: 10 + insets.bottom }]}>
-          <BottomNavBar activeTab="shopping-list" />
-        </View>
+        <AddShoppingItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={(p) => addItem(p.name, p.qty, "manual", p.location)} />
+        <View style={[styles.bottomBar, { paddingBottom: 10 + insets.bottom }]}><BottomNavBar activeTab="shopping-list" /></View>
       </SafeAreaView>
     </View>
-  );
-}
+  );}
