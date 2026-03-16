@@ -17,28 +17,32 @@ export const ShoppingListsHeader = ({ newListName, setNewListName, onCreate, cre
         <Ionicons name="basket-outline" size={22} color={BRAND.PRIMARY} />
       </View>
       <View style={styles.heroTextWrap}>
-        <Text style={styles.heroTitle}>כל רשימות הקניות של הבית</Text>
         <Text style={styles.heroSubtitle}>אפשר ליצור כמה רשימות נפרדות ולנהל כל אחת בנפרד</Text>
       </View>
     </View>
 
     <View style={styles.createCard}>
       <Text style={styles.createTitle}>יצירת רשימה חדשה</Text>
-      <View style={styles.inputRow}>
+      {/* ה-inputRow הופך להיות ה"מעטפת" שנראית כמו שדה טקסט */}
+      <View style={styles.inputContainer}>
         <TextInput
           value={newListName}
           onChangeText={setNewListName}
-          placeholder="למשל: סופר, ניקיון, פארם..."
+          placeholder="שם הרשימה..."
           placeholderTextColor={BRAND.MUTED}
-          style={styles.input}
+          style={styles.innerInput}
           textAlign="right"
         />
         <TouchableOpacity 
-          style={[styles.addButton, creating && { opacity: 0.7 }]} 
+          style={[styles.inlineAddButton, creating && { opacity: 0.7 }]} 
           onPress={onCreate} 
           disabled={creating}
         >
-          {creating ? <ActivityIndicator size="small" color="#FFF" /> : <Ionicons name="add" size={20} color="#FFF" />}
+          {creating ? (
+            <ActivityIndicator size="small" color={BRAND.PRIMARY} />
+          ) : (
+            <Ionicons name="add-circle" size={28} color={BRAND.PRIMARY} />
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -56,7 +60,6 @@ const styles = StyleSheet.create({
   heroTextWrap: { flex: 1 },
   heroTitle: { textAlign: "right", color: BRAND.TEXT, fontWeight: "900", fontSize: 17 },
   heroSubtitle: { marginTop: 4, textAlign: "right", color: BRAND.MUTED, fontWeight: "600", fontSize: 13, lineHeight: 18 },
-  createCard: { backgroundColor: BRAND.CARD, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: BRAND.BORDER, marginBottom: 16 },
   createTitle: { textAlign: "right", color: BRAND.TEXT, fontSize: 15, fontWeight: "900", marginBottom: 10 },
   inputRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   input: { flex: 1, height: 46, borderRadius: 14, backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BRAND.BORDER, paddingHorizontal: 14, color: BRAND.TEXT, fontSize: 14, fontWeight: "700" },
@@ -64,4 +67,37 @@ const styles = StyleSheet.create({
   sectionHeader: { marginBottom: 10, flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { color: BRAND.TEXT, fontSize: 16, fontWeight: "900" },
   sectionMeta: { color: BRAND.MUTED, fontSize: 13, fontWeight: "700" },
+  createCard: { 
+    backgroundColor: BRAND.CARD, 
+    borderRadius: 20, 
+    padding: 16, 
+    borderWidth: 1, 
+    borderColor: BRAND.BORDER, 
+    marginBottom: 16 
+  },
+  inputContainer: {
+    flexDirection: "row-reverse", 
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND.BORDER,
+    height: 52,
+    paddingLeft: 8,
+  },
+  innerInput: {
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: 14,
+    color: BRAND.TEXT,
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  inlineAddButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

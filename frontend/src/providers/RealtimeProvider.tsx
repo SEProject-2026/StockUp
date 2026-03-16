@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { supabase } from "@/src/lib/supabase";
 import { getCurrentUserId } from "@/src/auth/token";
-import { router } from "expo-router"; // ייבוא הראוטר לצורך ניתוב מחדש
+import { router } from "expo-router"; 
 
 type RealtimeContextValue = {
   homesVersion: number;
@@ -72,7 +72,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // 1. User Home Channel - אחראי על רשימת הבתים והוצאה מהבית
+        // 1. User Home Channel - Responsible for the list of houses and removal from the house
         const userHomeChannel = supabase
           .channel(`rt-user-home-${userId}`)
           .on(
@@ -90,14 +90,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               const rowUserId = next?.user_id ?? oldRow?.user_id;
 
               if (rowUserId === userId) {
-                // בדיקה אם המשתמש הוסר מהבית (DELETE)
+                // Checking if the user has been removed from the home
                 if (payload.eventType === "DELETE") {
                   console.log("[Realtime] User was removed from home, redirecting to home list...");
                   router.replace("/home/home"); 
                   return;
                 }
                 
-                // במקרה של עדכון או הוספה, פשוט מרעננים את רשימת הבתים
+                // In case of an update or addition, simply refresh the list of houses.
                 bumpHomesVersion();
               }
             }
