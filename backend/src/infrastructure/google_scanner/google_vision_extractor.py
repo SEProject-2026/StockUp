@@ -17,6 +17,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
+    
     pass
 
 # Initialize global client if possible

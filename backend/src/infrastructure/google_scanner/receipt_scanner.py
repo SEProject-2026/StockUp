@@ -33,8 +33,16 @@ class ReceiptScanner:
             
             # Logic for integer vs float (as you requested before)
             # If the service logic needs to know if it's KG or UNIT:
+            #should be decided in the parser
             unit_str = "UNIT" if isinstance(qty, int) or qty.is_integer() else "KG"
-            
-            scanned_items[barcode] = (qty, unit_str)
+            if(scanned_items.get(barcode)):
+                # If the barcode already exists, we sum the quantities
+                existing_qty, existing_unit = scanned_items[barcode]
+                if existing_unit != unit_str:
+                    # Handle unit mismatch if needed (e.g., convert KG to UNIT or vice versa)
+                    pass  # For now, we assume they are consistent
+                scanned_items[barcode] = (existing_qty + qty, unit_str)
+            else:
+                scanned_items[barcode] = (qty, unit_str)
             
         return chain_name, scanned_items

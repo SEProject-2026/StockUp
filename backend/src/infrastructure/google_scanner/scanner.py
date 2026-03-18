@@ -76,7 +76,6 @@ def scan_receipt(file_path: str) -> dict:
     end_time = time.time()
     elapsed = end_time - start_time
     logger.info(f"[{source_name}] Scan completed in {elapsed:.2f} seconds.")
-        
     return result
 
 def merge_receipts(receipts: list) -> dict:
@@ -86,35 +85,21 @@ def merge_receipts(receipts: list) -> dict:
     """
     if not receipts:
         return {"chain": "Unknown", "products": []}
-    
     # Extract the first valid chain name found across all slices
-    final_chain = "Unknown"
+    final_chain = "Unknown Chain"
     for r in receipts:
-        if r.get("chain", "Unknown") != "Unknown":
+        if r.get("chain", "Unknown Chain") != "Unknown Chain":
             final_chain = r["chain"]
             break
             
-    # Overlap Sequence Matcher (Panorama Stitching)
+    
     merged_products = receipts[0].get("products", [])
     
     for next_receipt in receipts[1:]:
         next_products = next_receipt.get("products", [])
         if not next_products:
             continue
-            
-        max_overlap_idx = 0
-        min_len = min(len(merged_products), len(next_products))
-        
-        # Test overlaps starting from the largest possible overlap sequence (min_len) down to 1
-        for overlap_size in range(min_len, 0, -1):
-            tail = [p['barcode'] for p in merged_products[-overlap_size:]]
-            head = [p['barcode'] for p in next_products[:overlap_size]]
-            if tail == head:
-                max_overlap_idx = overlap_size
-                break
-                
-        # Stitch by completely dropping the duplicated overlap sequence from the start of the next picture
-        merged_products = merged_products + next_products[max_overlap_idx:]
+        merged_products.extend(next_products)
         
     return {"chain": final_chain, "products": merged_products}
 
