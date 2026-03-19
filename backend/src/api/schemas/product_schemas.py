@@ -102,11 +102,11 @@ class UpdateItemExpirationRequest(BaseModel):
     )
 
 class UpdateProductNicknameRequest(BaseModel):
-    nickname: str = Field(
-        ..., 
+    nickname: Optional[str] = Field(
+        default=None, 
         min_length=2, 
         max_length=50, 
-        description="New nickname cannot be empty"
+        description="New nickname (min 2 chars), or null to remove the nickname"
     )
 
 class UpdateItemLocationRequest(BaseModel):

@@ -147,7 +147,7 @@ export function useInventoryData(params: {
     await changeQty(itemId, -item.quantity);
   }, [rows, changeQty]);
 
-const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: string, quantity?: number, expirationDate?: string }) => {
+const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: string | null, quantity?: number, expirationDate?: string | null }) => {
   if (!homeId) return;
   const current = rows.find(r => r.itemId === itemId);
   if (!current) return;
@@ -155,8 +155,9 @@ const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: 
   try {
     // 1. עדכון כינוי - אם המשתמש רוקן את השדה, נשלח "" כדי לאפס
     if (updatedValues.nickname !== undefined && updatedValues.nickname !== current.name) {
+      const cleanNickname = updatedValues.nickname === null ? null : updatedValues.nickname.trim();
       await updateProductNickname(homeId, current.productId, { 
-        nickname: updatedValues.nickname.trim() || "" // אם ריק, יחזור לשם המקורי
+        nickname: cleanNickname // אם ריק, יחזור לשם המקורי
       });
     }
 
@@ -173,8 +174,9 @@ const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: 
 
     // 3. עדכון תוקף
     if (updatedValues.expirationDate !== undefined && updatedValues.expirationDate !== current.expirationDate) {
+      const cleanDate = updatedValues.expirationDate === null ? null : updatedValues.expirationDate.trim();
       await updateItemExpiration(homeId, current.productId, itemId, {
-        new_date: updatedValues.expirationDate.trim() || null
+        new_date: cleanDate
       });
     }
 
