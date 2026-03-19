@@ -1,6 +1,9 @@
 import json
+import os
 import re
 from typing import Dict, List, Any, Optional, Union
+
+from numpy import trace
 
 
 CHAIN_HPS = {
@@ -73,81 +76,98 @@ def clean_ocr_artifacts(line: str) -> str:
     line_clean = re.sub(r'_(\d+)\b', r' \1', line_clean)
     return line_clean
 
-def get_best_barcode(line_clean: str) -> str:
-    # First, strip common weight/quantity descriptors so they aren't confused as barcodes
-    # We restrict this to 1-4 digit numbers to avoid stripping valid 13-digit Israeli barcodes!
+def get_best_barcode(line_clean: str, trace: Optional[List[str]] = None) -> str:
+    """Finds the most likely barcode and logs why others were skipped."""
     units = r'(?:מל|מ"ל|מי"ל|גר|גרם|ק"ג|קג|L|ML|KG|%)'
     
+    # Cleaning descriptors for barcode search
     line_for_bcode = re.sub(rf'\b\d{{1,4}}(?:\.\d+)?\s*{units}\b', '', line_clean, flags=re.IGNORECASE)
     line_for_bcode = re.sub(rf'\b{units}\s*\d{{1,4}}(?:\.\d+)?\b', '', line_for_bcode, flags=re.IGNORECASE)
-    # Also catch `ג 750` (which implies grams) while preserving `116 ג` (which implies 'Large')
     line_for_bcode = re.sub(r'\b[ג]\s*\d{1,4}(?:\.\d+)?\b', '', line_for_bcode, flags=re.IGNORECASE)
 
-    # Israeli barcodes are typically 13 digits starting with 729
+    # 1. Look for Israeli 729 barcodes
     israeli = re.findall(r'(729\d{10})', line_for_bcode)
-    if israeli: 
-        return max(israeli, key=len)
+    if israeli:
+        bcode = max(israeli, key=len)
+        if trace is not None: trace.append(f"Selected high-priority Israeli barcode: {bcode}")
+        return bcode
         
+    # 2. General numbers
     normal = re.findall(r'(?<!\.)\b(\d{3,15})\b(?!\.)', line_for_bcode)
     prices = re.findall(r'\b\d+\.\d{2}\b', line_for_bcode)
     
-    # Exclude parts of prices or obvious non-barcodes
     valid_normal = [n for n in normal if n not in prices and len(n) >= 3]
     
     if valid_normal:
-        return max(valid_normal, key=len)
+        bcode = max(valid_normal, key=len)
+        if trace is not None:
+            skipped = [n for n in normal if n != bcode]
+            if skipped: trace.append(f"Selected barcode {bcode}. Skipped potential candidates: {skipped}")
+            else: trace.append(f"Selected lone barcode candidate: {bcode}")
+        return bcode
+
+    if trace is not None and normal:
+        trace.append(f"Numbers found but rejected as barcodes (likely prices or too short): {normal}")
     return ""
 
-def _extract_quantity_from_line(line: str) -> Optional[Union[float, int]]:
-    """
-    Strictly extracts quantity ONLY when associated with a multiplier symbol (*, x, X, ×).
-    This prevents product descriptions (like '40 gram') from being misidentified as quantities.
-    """
-    
+def _extract_quantity_from_line(line: str, trace: Optional[List[str]] = None) -> Optional[Union[float, int]]:
+    """Strictly extracts quantity with multiplier logic and logs decision steps."""
     def is_price_format(val_str: str) -> bool:
-        """Checks if a numeric string follows the currency/price format (x.xx)."""
         if '.' in val_str:
             parts = val_str.split('.')
             return len(parts[1]) == 2
         return False
 
     def cast_to_numeric(val_str: str) -> Optional[Union[float, int]]:
-        """Converts string to the most appropriate numeric type."""
         try:
             f_val = float(val_str)
             return int(f_val) if f_val.is_integer() else f_val
-        except ValueError:
-            return None
+        except ValueError: return None
 
-    # 1. Multiplier detection (Checking both sides of the symbol)
-    # Pattern: [Number] [Symbol] [Number]
+    #Absolute Priority: High-precision weight (x.xxx)
+    #If this format exists, we assume it's a weight regardless of other symbols
+    weight_match = re.search(r'\b\d{1,2}\.\d{3}\b', line)
+    if weight_match:
+        val_str = weight_match.group(0)
+        if trace is not None:
+            trace.append(f"High-precision weight detected (x.xxx): {val_str}. Returning immediately.")
+        return float(val_str)
+    
+    # Multiplier detection
     mult_match = re.search(r'(\d+(?:\.\d+)?)\s*[\*xX×]\s*(\d+(?:\.\d+)?)', line)
     if mult_match:
         side_a, side_b = mult_match.group(1), mult_match.group(2)
-        val_a = cast_to_numeric(side_a)
-        val_b = cast_to_numeric(side_b)
+        val_a, val_b = cast_to_numeric(side_a), cast_to_numeric(side_b)
         
-        # Priority: If one side is a price (x.xx) and the other is not, take the other
+        if trace is not None: trace.append(f"Multiplier pattern detected: {side_a} and {side_b}")
+
         if is_price_format(side_a) and not is_price_format(side_b):
+            if trace is not None: trace.append(f"Selecting {side_b} (quantity) over {side_a} (price format)")
             return val_b
         if is_price_format(side_b) and not is_price_format(side_a):
+            if trace is not None: trace.append(f"Selecting {side_a} (quantity) over {side_b} (price format)")
             return val_a
             
-        # Fallback for weighted items (x.xxx) or integers
-        if '.' in side_a and len(side_a.split('.')[1]) == 3: return val_a
-        if '.' in side_b and len(side_b.split('.')[1]) == 3: return val_b
+        # Weight precision logic (x.xxx)
+        if '.' in side_a and len(side_a.split('.')[1]) == 3:
+            if trace is not None: trace.append(f"Selecting {side_a} as high-precision weight (x.xxx)")
+            return val_a
         
+        if trace is not None: trace.append(f"Defaulting to integer/second value: {val_b}")
         return val_b if isinstance(val_b, int) else val_a
 
-    # 2. Single-sided multiplier (e.g., "2 *")
-    # Only returns if the number is NOT in price format (x.xx)
+    # Single-sided multiplier
     single_mult = re.search(r'\b(\d+(?:\.\d+)?)\s*[\*xX×]', line)
     if single_mult:
         val_str = single_mult.group(1)
         if not is_price_format(val_str):
+            if trace is not None: trace.append(f"Single multiplier found: Using {val_str}")
             return cast_to_numeric(val_str)
+        elif trace is not None:
+            trace.append(f"Single multiplier found but {val_str} is in price format. Skipping.")
 
     return None
+
 
 def is_end_of_receipt(line: str) -> bool:
     """Checks if the line contains a keyword indicating the end of the receipt footprint."""
@@ -155,11 +175,9 @@ def is_end_of_receipt(line: str) -> bool:
     return any(word in line for word in end_words)
 
 def parse_receipt_google(text: str) -> Dict[str, Any]:
-    """
-    Parses Google Vision output. Now includes logic to extract quantities from discount lines
-    before skipping them, and strictly enforces multiplier-based quantity extraction.
-    """
+    """Parses receipt and writes a 'parsing_decisions.log' to the debug folder."""
     chain = identify_chain(text)
+    decision_log = [f"=== Receipt Parse Start | Chain: {chain} ==="]
     
     try:
         lines_data = json.loads(text)
@@ -170,62 +188,81 @@ def parse_receipt_google(text: str) -> Dict[str, Any]:
     current_barcode = None
     pending_barcode = None
     
-    for row in lines_data:
+    for index, row in enumerate(lines_data):
         line_text = row.get("text", "")
         if not line_text.strip(): continue
-        if is_end_of_receipt(line_text): break
+        
+        line_trace = []
+        
+        if is_end_of_receipt(line_text):
+            decision_log.append(f"Line {index}: '{line_text}' -> END OF RECEIPT DETECTED.")
+            break
+            
         if is_ignored_line(line_text):
-            payment_words = ["סה\"כ", "סה''כ", "תשלום", "אשראי", "TOTAL", "Total"]
-            if any(w in line_text for w in payment_words):
-                current_barcode = None
-                pending_barcode = None
+            decision_log.append(f"Line {index}: '{line_text}' -> IGNORED (Metadata/Summary)")
+            if any(w in line_text for w in ["סה\"כ", "תשלום", "TOTAL"]):
+                current_barcode = pending_barcode = None
             continue
             
         line_clean = clean_ocr_artifacts(line_text)
-        bcode = get_best_barcode(line_clean)
+        bcode = get_best_barcode(line_clean, trace=line_trace)
+        qty_from_line = _extract_quantity_from_line(line_clean, trace=line_trace)
         has_price = bool(re.search(r'\d+\.\d{2}', line_clean))
+        is_discount = bool(re.search(r'-\d|\d-|\bהנחה\b|\bמבצע\b', line_clean))
         
-        # Identify if this is a discount/promotion line
-        is_discount = bool(re.search(r'-\d|\d-|\bהנחה\b|\bמוגבל\b|\bזיכוי\b|\bמבצע\b', line_clean))
-        
-        # NEW STRATEGY: Try to extract quantity even from discount lines
-        qty_from_line = _extract_quantity_from_line(line_clean)
+        # State tracking for logging
+        current_action = "Processing"
 
         if is_discount:
-            # If we have an active product and found a quantity on the discount line, update it
+            current_action = "Discount Logic"
             if current_barcode and qty_from_line is not None:
                 if products[-1]["quantity"] == 1.0:
+                    line_trace.append(f"Updated quantity for product {current_barcode} using discount line data.")
                     products[-1]["quantity"] = qty_from_line
-            
-            # Skip processing this line further as a new product unless it has a solid barcode
             if not bcode or (len(bcode) < 8 and not bcode.startswith('729')):
+                decision_log.append(f"Line {index}: '{line_text}' [{current_action}]\n    -> " + "\n    -> ".join(line_trace))
                 continue
-        
-        # Standard product processing
+
         if bcode:
             qty = qty_from_line or 1.0
             if has_price:
                 products.append({"barcode": bcode, "quantity": qty})
-                current_barcode = bcode
-                pending_barcode = None
+                current_barcode, pending_barcode = bcode, None
+                line_trace.append(f"Committed product: {bcode} (qty: {qty})")
             else:
                 pending_barcode = bcode
+                line_trace.append(f"Pending price for barcode: {bcode}")
         else:
             if has_price:
                 if pending_barcode:
                     qty = qty_from_line or 1.0
                     products.append({"barcode": pending_barcode, "quantity": qty})
-                    current_barcode = pending_barcode
-                    pending_barcode = None
+                    line_trace.append(f"Price found. Committed pending product: {pending_barcode} (qty: {qty})")
+                    current_barcode, pending_barcode = pending_barcode, None
                 elif current_barcode and qty_from_line is not None:
                     if products[-1]["quantity"] == 1.0:
+                        line_trace.append(f"Late quantity found. Updating {current_barcode}.")
                         products[-1]["quantity"] = qty_from_line
                         current_barcode = None
             elif current_barcode and qty_from_line is not None:
-                # Handle cases where quantity is on a standalone line (e.g., "2 *")
                 if products[-1]["quantity"] == 1.0:
+                    line_trace.append(f"Late standalone quantity found for {current_barcode}.")
                     products[-1]["quantity"] = qty_from_line
                 current_barcode = None
-                
+
+        # Add line data to master log
+        log_entry = f"Line {index}: '{line_text}' [{current_action}]"
+        if line_trace:
+            log_entry += "\n    -> " + "\n    -> ".join(line_trace)
+        decision_log.append(log_entry)
+
+    # Save to debug folder
+    _write_debug_log(decision_log)
     return {"chain": chain, "products": products}
+
+def _write_debug_log(logs: List[str]) -> None:
+    debug_dir = os.path.join(os.getcwd(), "debug")
+    if not os.path.exists(debug_dir): os.makedirs(debug_dir)
+    with open(os.path.join(debug_dir, "parsing_decisions.log"), "w", encoding="utf-8") as f:
+        f.write("\n\n".join(logs))
 
