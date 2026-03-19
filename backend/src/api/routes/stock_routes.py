@@ -21,6 +21,7 @@ from src.domain.enums import LocationType, ExpirationType
 from src.infrastructure.app_container import AppContainer
 from src.api.security import get_current_user_id
 from src.infrastructure.logger import app_logger
+from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/stock", tags=["Stock Management"])
 
@@ -58,7 +59,8 @@ async def add_product(
         )
     except ValueError as e:
         app_logger.warning(f"Failed to add product for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.patch("/{product_id}/items/{item_id}/quantity", response_model=GeneralResponse)
@@ -90,7 +92,8 @@ async def update_item_quantity(
         )
     except ValueError as e:
         app_logger.warning(f"Quantity update failed for item {item_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.patch("/{product_id}/items/{item_id}/expiration", response_model=GeneralResponse)
@@ -118,7 +121,8 @@ async def update_item_expiration(
         )
     except ValueError as e:
         app_logger.warning(f"Expiration update failed for item {item_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.patch("/{product_id}/items/{item_id}/location", response_model=GeneralResponse)
@@ -146,7 +150,8 @@ async def update_item_location(
         )
     except ValueError as e:
         app_logger.warning(f"Location update failed for item {item_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.patch("/{product_id}/nickname", response_model=GeneralResponse)
@@ -172,7 +177,8 @@ async def update_nickname(
         )
     except ValueError as e:
         app_logger.warning(f"Nickname update failed for product {product_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.delete("/{product_id}/items/{item_id}", response_model=GeneralResponse)
@@ -200,7 +206,8 @@ async def remove_item(
         
     except ValueError as e:
         app_logger.warning(f"Item removal failed for item {item_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 # --- Search & Filter Routes ---
@@ -218,7 +225,8 @@ async def filter_by_location(
         return GeneralResponse(status="success", data=results)
     except ValueError as e:
         app_logger.warning(f"Filter by location failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.get("/filter/expiration", response_model=GeneralResponse)
@@ -234,7 +242,8 @@ async def filter_by_expiration(
         return GeneralResponse(status="success", data=results)
     except ValueError as e:
         app_logger.warning(f"Filter by expiration failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.get("/search", response_model=GeneralResponse)
@@ -251,8 +260,8 @@ async def search_products(
         return GeneralResponse(status="success", data=dtos)
     except ValueError as e:
         app_logger.warning(f"Search products failed for query '{query}' - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.get("/all", response_model=GeneralResponse)
 async def get_all_products(
@@ -270,8 +279,8 @@ async def get_all_products(
         )
     except ValueError as e:
         app_logger.warning(f"Get all products failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.get("/catalog/search", response_model=GeneralResponse)
 async def search_global_catalog_by_name(
@@ -295,7 +304,8 @@ async def search_global_catalog_by_name(
         )
     except ValueError as e:
         app_logger.warning(f"Global catalog search failed for query '{query}' - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.get("/catalog/barcode/{barcode}", response_model=GeneralResponse)
@@ -330,8 +340,8 @@ async def get_global_product_by_barcode(
         )
     except ValueError as e:
         app_logger.warning(f"Barcode lookup failed for '{barcode}' - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.post("/scan", response_model=GeneralResponse)
 async def scan_receipt(
@@ -371,9 +381,10 @@ async def scan_receipt(
     except Exception as e:
         # Unexpected server error during scanning process
         app_logger.error(f"Receipt scanning process failed critically - Error: {str(e)}")
+        translated_message = translate_error(str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Scanning failed: {str(e)}",
+            detail=f"Scanning failed: {translated_message}",
         )
     finally:
         for p in tmp_paths:
@@ -426,10 +437,12 @@ async def add_receipt(
         
     except ValueError as e:
         app_logger.warning(f"Invalid receipt data submitted by user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
     except Exception as e:
         app_logger.error(f"Critical error while processing receipt for user {user_id} - Error: {str(e)}")
+        translated_message = translate_error(str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail=f"An error occurred while processing the receipt: {str(e)}"
+            detail=f"An error occurred while processing the receipt: {translated_message}"
         )
