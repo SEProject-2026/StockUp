@@ -120,7 +120,7 @@ export function useHomeSettings(currentHomeId?: string) {
       setDaysModalOpen(false);
       await loadHomeData();
     } catch (e) { 
-      const message = (e instanceof Error /*&& /[\u0590-\u05FF]/.test(e.message)*/) ? e.message : "העדכון נכשל";
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "העדכון נכשל";
       Alert.alert("שגיאה", message); 
     }
     finally { setSavingDays(false); }
