@@ -55,14 +55,19 @@ def _preprocess_image(image_bytes: bytes) -> bytes:
         # 1. Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         
-        # 2. Apply adaptive thresholding to bring out the dark text blocks
-        # block size 21, C=15 helps wipe out light gray artifacts (the reflections)
-        thresh = cv2.adaptiveThreshold(
-            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 15
-        )
+        # 2. Estimate the background illumination (to handle uneven lighting/shadows)
+        # Dilate removes the dark text, leaving only the background and reflections
+        bg_dilate = cv2.dilate(gray, np.ones((7,7), np.uint8))
+        bg = cv2.medianBlur(bg_dilate, 21)
         
-        # 3. Median blur to remove tiny noise/salt-and-pepper after thresholding
-        denoised = cv2.medianBlur(thresh, 3)
+        # 3. Flatten the lighting by dividing the original gray by the background
+        # This makes dark text stand out equally everywhere, and washes out faint reflections
+        # which are close to the background color.
+        diff = 255 - cv2.absdiff(gray, bg)
+        
+        # 4. Enhance contrast gently without hard-clipping edges (which deletes numbers)
+        # Normalizes the flattened image to stretch contrast back across 0-255
+        denoised = cv2.normalize(diff, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
         # Convert back to bytes
         is_success, buffer = cv2.imencode(".jpg", denoised)
@@ -73,6 +78,7 @@ def _preprocess_image(image_bytes: bytes) -> bytes:
         print(f"Warning: Image pre-processing failed, falling back to original. {e}")
         
     return image_bytes
+
 
 def _reconstruct_vision_text(response):
     """
