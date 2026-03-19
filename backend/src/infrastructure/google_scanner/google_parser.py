@@ -171,7 +171,7 @@ def _extract_quantity_from_line(line: str, trace: Optional[List[str]] = None) ->
 
 def is_end_of_receipt(line: str) -> bool:
     """Checks if the line contains a keyword indicating the end of the receipt footprint."""
-    end_words = ["אמצעי", "מע\"מ", "ישרכארט", "כאל", "כ.אשראי", "ויזה"]
+    end_words = ["אמצעי", "ישרכארט", "כאל", "כ.אשראי", "ויזה"]
     return any(word in line for word in end_words)
 
 def parse_receipt_google(text: str) -> Dict[str, Any]:
@@ -249,12 +249,14 @@ def parse_receipt_google(text: str) -> Dict[str, Any]:
                     line_trace.append(f"Late standalone quantity found for {current_barcode}.")
                     products[-1]["quantity"] = qty_from_line
                 current_barcode = None
-
         # Add line data to master log
         log_entry = f"Line {index}: '{line_text}' [{current_action}]"
         if line_trace:
             log_entry += "\n    -> " + "\n    -> ".join(line_trace)
         decision_log.append(log_entry)
+    for product in products:
+        qty = product["quantity"]
+        product["unit"] = "UNIT" if isinstance(qty, int) or qty.is_integer() else "KG"
 
     # Save to debug folder
     _write_debug_log(decision_log)

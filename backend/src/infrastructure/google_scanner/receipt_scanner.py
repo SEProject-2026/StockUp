@@ -30,17 +30,10 @@ class ReceiptScanner:
         for product in final_data.get("products", []):
             barcode = product.get("barcode")
             qty = product.get("quantity", 1.0)
-            
-            # Logic for integer vs float (as you requested before)
-            # If the service logic needs to know if it's KG or UNIT:
-            #should be decided in the parser
-            unit_str = "UNIT" if isinstance(qty, int) or qty.is_integer() else "KG"
+            unit_str = product.get("unit", "UNIT")
             if(scanned_items.get(barcode)):
                 # If the barcode already exists, we sum the quantities
-                existing_qty, existing_unit = scanned_items[barcode]
-                if existing_unit != unit_str:
-                    # Handle unit mismatch if needed (e.g., convert KG to UNIT or vice versa)
-                    pass  # For now, we assume they are consistent
+                existing_qty = scanned_items[barcode][0]
                 scanned_items[barcode] = (existing_qty + qty, unit_str)
             else:
                 scanned_items[barcode] = (qty, unit_str)

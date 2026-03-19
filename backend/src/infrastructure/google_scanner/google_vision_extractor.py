@@ -2,156 +2,126 @@ import os
 import io
 import json
 import glob
+import platform
 import numpy as np
 import cv2
 from pdf2image import convert_from_path
+from src.infrastructure.logger import app_logger
 
 try:
     from google.cloud import vision
 except ImportError:
     vision = None
-    print("Warning: google-cloud-vision not installed.")
+    app_logger.warning("Warning: google-cloud-vision not installed.")
 
-# Try to load from .env file if it exists
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    
     pass
 
-# Initialize global client if possible
 try:
     if vision:
         api_key = os.environ.get("GOOGLE_VISION_API_KEY")
         if api_key:
-            # Use API Key
             from google.api_core.client_options import ClientOptions
             client_options = ClientOptions(api_key=api_key)
             client = vision.ImageAnnotatorClient(client_options=client_options)
         else:
-            # Assumes GOOGLE_APPLICATION_CREDENTIALS environment variable is set
             client = vision.ImageAnnotatorClient()
     else:
         client = None
 except Exception as e:
     client = None
-    print(f"Warning: Could not initialize Google Vision API client. Check GOOGLE_VISION_API_KEY or GOOGLE_APPLICATION_CREDENTIALS. {e}")
+    app_logger.warning(f"Warning: Could not initialize Google Vision API client. {e}")
+
+
+def _get_poppler_path():
+    """
+    Dynamically finds Poppler path based on the Operating System.
+    """
+    current_os = platform.system()
+    
+    if current_os == "Windows":
+        user_appdata = os.environ.get('LOCALAPPDATA')
+        if user_appdata:
+            search_pattern = os.path.join(
+                user_appdata, 'Microsoft', 'WinGet', 'Packages', 
+                'oschwartz10612.Poppler*', 'poppler-*', 'Library', 'bin'
+            )
+            results = glob.glob(search_pattern)
+            if results:
+                return results[0]
+                
+    elif current_os == "Darwin":  # macOS
+        brew_path = "/opt/homebrew/bin"
+        if os.path.exists(os.path.join(brew_path, "pdftoppm")):
+            return brew_path
+            
+    # For Linux (Render/Docker), returns None to use global PATH
+    return None
 
 
 def _preprocess_image(image_bytes: bytes) -> bytes:
-    """
-    Pre-processes an image to remove faint text reflections from the back of the page.
-    Applies grayscale, thresholding, and morphology to sharpen dark text and erase faint text.
-    """
     try:
-        # Convert bytes to numpy array then to cv2 image
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         if img is None:
-            return image_bytes # Fallback if decode fails
+            return image_bytes
             
-        # 1. Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # 2. Estimate the background illumination (to handle uneven lighting/shadows)
-        # Dilate removes the dark text, leaving only the background and reflections
         bg_dilate = cv2.dilate(gray, np.ones((7,7), np.uint8))
         bg = cv2.medianBlur(bg_dilate, 21)
-        
-        # 3. Flatten the lighting by dividing the original gray by the background
-        # This makes dark text stand out equally everywhere, and washes out faint reflections
-        # which are close to the background color.
         diff = 255 - cv2.absdiff(gray, bg)
-        
-        # 4. Enhance contrast gently without hard-clipping edges (which deletes numbers)
-        # Normalizes the flattened image to stretch contrast back across 0-255
         denoised = cv2.normalize(diff, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
-        # Convert back to bytes
         is_success, buffer = cv2.imencode(".jpg", denoised)
         if is_success:
             return buffer.tobytes()
-            
     except Exception as e:
-        print(f"Warning: Image pre-processing failed, falling back to original. {e}")
-        
+        app_logger.warning(f"Image preprocessing failed: {e}")
     return image_bytes
 
 
 def _reconstruct_vision_text(response):
-    """
-    Reconstructs text from Google Vision API response in the same format as PaddleOCR.
-    PaddleOCR format: JSON string of list of lines:
-    [
-        {
-            "text": "line text",
-            "words": [
-                {"text": "word", "conf": 0.99}
-            ]
-        }
-    ]
-    """
     if not response or not response.full_text_annotation or not response.full_text_annotation.pages:
         return "[]"
         
     items = []
-    
     for page in response.full_text_annotation.pages:
         for block in page.blocks:
             for paragraph in block.paragraphs:
                 for word in paragraph.words:
                     word_text = "".join([symbol.text for symbol in word.symbols])
-                    # Get average confidence of the word
                     conf = sum([symbol.confidence for symbol in word.symbols]) / len(word.symbols) if word.symbols else 0.0
-                    
-                    # Calculate center coordinates to sort and group lines
                     vertices = word.bounding_box.vertices
-                    # Sometimes vertices might be missing some coordinates in rare cases
                     xs = [v.x for v in vertices if hasattr(v, 'x')]
                     ys = [v.y for v in vertices if hasattr(v, 'y')]
-                    
                     if not xs or not ys:
                         continue
-                        
-                    x_center = sum(xs) / len(xs)
-                    y_center = sum(ys) / len(ys)
-                    
-                    # Also need full box for height estimation
-                    box = [[v.x, v.y] for v in vertices]
-                    
                     items.append({
                         'text': word_text, 
                         'conf': conf, 
-                        'x': x_center, 
-                        'y': y_center, 
-                        'box': box
+                        'x': sum(xs) / len(xs), 
+                        'y': sum(ys) / len(ys), 
+                        'box': [[v.x, v.y] for v in vertices]
                     })
                     
+    if not items:
+        return "[]"
+
     items.sort(key=lambda item: item['y'])
-    
     lines = []
     current_line = []
     current_y = None
     
-    if not items:
-        return "[]"
-        
-    # Calculate median height
     heights = []
     for item in items:
-        box = item['box']
-        if len(box) >= 4:
-            h1 = box[3][1] - box[0][1]
-            h2 = box[2][1] - box[1][1]
-            heights.append((h1 + h2) / 2)
+        if len(item['box']) >= 4:
+            heights.append(((item['box'][3][1] - item['box'][0][1]) + (item['box'][2][1] - item['box'][1][1])) / 2)
             
-    if heights:
-        median_height = sorted(heights)[len(heights)//2]
-    else:
-        median_height = 20 # Fallback
-        
+    median_height = sorted(heights)[len(heights)//2] if heights else 20
     y_threshold = max(median_height * 0.4, 10)
     
     for item in items:
@@ -180,152 +150,96 @@ def _reconstruct_vision_text(response):
     return json.dumps(lines, ensure_ascii=False)
 
 
-def _save_debug_text(image_path: str, text_json: str) -> None:
-    """
-    Saves the reconstructed text to a 'debug' folder in the current execution directory.
-    If the folder doesn't exist, it creates it.
-    """
+def _save_debug_text(image_path: str, text_json: str, pdf_page_index: int = 0) -> None:
     try:
-        # 1. Define and create the debug directory in the current working directory
         debug_dir = os.path.join(os.getcwd(), "debug")
         if not os.path.exists(debug_dir):
             os.makedirs(debug_dir)
-            print(f"Created debug directory at: {debug_dir}")
 
-        # 2. Extract the original filename without extension to use for the .txt file
         file_name = os.path.basename(image_path)
         name_without_ext = os.path.splitext(file_name)[0]
-        debug_file_path = os.path.join(debug_dir, f"{name_without_ext}_ocr_debug.txt")
+        debug_file_path = os.path.join(debug_dir, f"{name_without_ext}_ocr_debug_{pdf_page_index}.txt")
         
-        # 3. Parse JSON to extract only the text lines for readability
         data = json.loads(text_json)
         readable_text = "\n".join([line["text"] for line in data])
         
-        # 4. Save to the debug folder
         with open(debug_file_path, "w", encoding="utf-8") as f:
             f.write(readable_text)
-            
-        print(f"Successfully saved OCR debug output to: {debug_file_path}")
-
     except Exception as e:
-        print(f"Warning: Failed to save debug text to {debug_dir}. Error: {e}")
+        app_logger.warning(f"Warning: Failed to save debug text. {e}")
+
 
 def extract_text_from_image(image_path: str) -> str:
-    """
-    Extracts text from an image file using Google Cloud Vision and saves debug output.
-    """
     if not client:
-        print("Google Vision client not initialized. Cannot extract text.")
         return "[]"
-        
     try:
         with io.open(image_path, 'rb') as image_file:
             content = image_file.read()
-            
-        # Process the image to remove reflections
         processed_content = _preprocess_image(content)
-            
         image = vision.Image(content=processed_content)
-        # Using document_text_detection for dense text like receipts
         response = client.document_text_detection(image=image)
-        
         if response.error.message:
             raise Exception(f"{response.error.message}")
-            
-        # Reconstruct lines
         reconstructed_json = _reconstruct_vision_text(response)
-        
-        # --- NEW: Save the result to a text file for debugging ---
         _save_debug_text(image_path, reconstructed_json)
-        # ---------------------------------------------------------
-        
         return reconstructed_json
-        
     except Exception as e:
-        print(f"Google Vision Error on {image_path}: {e}")
+        app_logger.warning(f"Google Vision Error on {image_path}: {e}")
         return "[]"
 
+
 def extract_text_from_image_pdf(pdf_path: str) -> str:
-    """
-    Converts an image-based PDF to images, then runs Google Vision on each page.
-    """
     if not client:
-        print("Google Vision client not initialized. Cannot extract text.")
         return "[]"
-        
     text_content = []
     try:
-        poppler_search = glob.glob(r'C:\Users\User\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler*\poppler-*\Library\bin')
-        poppler_path = poppler_search[0] if poppler_search else None
-        
+        poppler_path = _get_poppler_path()
         images = convert_from_path(pdf_path, poppler_path=poppler_path)
-        for img in images:
-            # Convert PIL image to bytes
+        for idx, img in enumerate(images):
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='JPEG')
             content = img_byte_arr.getvalue()
-            
-            # Process the image to remove reflections
             processed_content = _preprocess_image(content)
-            
             image = vision.Image(content=processed_content)
             response = client.document_text_detection(image=image)
             
             if response.error.message:
-                print(f"API Error: {response.error.message}")
                 continue
                 
             page_data = json.loads(_reconstruct_vision_text(response))
             text_content.extend(page_data)
+            _save_debug_text(pdf_path, json.dumps(page_data, ensure_ascii=False), pdf_page_index=idx)
             
     except Exception as e:
-        print(f"Error processing image PDF {pdf_path}: {e}")
-        
+        app_logger.warning(f"Error processing image PDF {pdf_path}: {e}")
     return json.dumps(text_content, ensure_ascii=False)
 
 
 def extract_first_page_image_text(pdf_path: str) -> str:
-    """
-    Converts only the first page of a PDF to an image and runs Google Vision.
-    Crops to the top 25% like the PaddleOCR version to save cost/time.
-    """
     if not client:
-        print("Google Vision client not initialized. Cannot extract text.")
         return "[]"
-        
     try:
-        poppler_search = glob.glob(r'C:\Users\User\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler*\poppler-*\Library\bin')
-        poppler_path = poppler_search[0] if poppler_search else None
-        
+        poppler_path = _get_poppler_path()
         images = convert_from_path(pdf_path, poppler_path=poppler_path, first_page=1, last_page=1)
         if images:
-            # Convert PIL Image to OpenCV format to crop it
             open_cv_image = np.array(images[0])
-            open_cv_image = open_cv_image[:, :, ::-1].copy()
-            
-            # Crop top 25%
+            open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2BGR)
             height = open_cv_image.shape[0]
             cropped_image = open_cv_image[0:int(height * 0.25), :]
             
-            # Convert back to bytes for Google Vision
             is_success, buffer = cv2.imencode(".jpg", cropped_image)
             if not is_success:
-                raise Exception("Failed to encode cropped image.")
+                return "[]"
                 
             content = buffer.tobytes()
-            
-            # Process the image to remove reflections
             processed_content = _preprocess_image(content)
-            
             image = vision.Image(content=processed_content)
             response = client.document_text_detection(image=image)
             
             if response.error.message:
-                raise Exception(f"{response.error.message}")
+                return "[]"
                 
             return _reconstruct_vision_text(response)
-            
     except Exception as e:
-        print(f"Error processing first page of PDF {pdf_path}: {e}")
-        
+        app_logger.warning(f"Error processing first page of PDF {pdf_path}: {e}")
     return "[]"
