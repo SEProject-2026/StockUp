@@ -1,15 +1,12 @@
 import os
 import re
 import json
-import logging
 import time
 
 from src.infrastructure.google_scanner.pdf_extractor import extract_text_from_pdf, is_text_pdf
 from src.infrastructure.google_scanner.google_vision_extractor import extract_text_from_image, extract_text_from_image_pdf, extract_first_page_image_text
 from src.infrastructure.google_scanner.google_parser import parse_receipt_google
 
-# Configure logging for integration into larger apps
-logger = logging.getLogger(__name__)
 
 def scan_receipt(file_path: str) -> dict:
     """
@@ -25,9 +22,7 @@ def scan_receipt(file_path: str) -> dict:
     start_time = time.time()
     
     if ext == '.pdf':
-        logger.info(f"[{os.path.basename(file_path)}] Processing PDF...")
         if is_text_pdf(file_path):
-            logger.info("Detected natively digital text PDF.")
             text = extract_text_from_pdf(file_path)
             
             # Check if pdfplumber already natively extracted a valid Company ID
@@ -37,27 +32,20 @@ def scan_receipt(file_path: str) -> dict:
             
             if not hp_matches:
                 # Only OCR the first page as a fallback to capture image-based logos
-                logger.info("No native Company ID found. Running OCR fallback on the first page...")
                 first_page_ocr = extract_first_page_image_text(file_path)
                 image_matches = re.findall(r'(?<!\d)(5[12]\d{7})(?!\d)', first_page_ocr)
                 if image_matches:
                     image_chain_text = " ".join(image_matches)
                     text = f"Chain ID from Logo: {image_chain_text}\n" + text
-            else:
-                logger.info("Company ID found natively! Bypassing OCR fallback.")
         else:
-            logger.info("Detected image-based PDF. Running OCR...")
             text = extract_text_from_image_pdf(file_path)
             
     elif ext in ['.jpeg', '.jpg', '.png']:
-        logger.info(f"[{os.path.basename(file_path)}] Processing Image via OCR...")
         text = extract_text_from_image(file_path)
     else:
-        logger.error(f"Unsupported file format: {ext}")
         return {"chain": "Unknown", "products": [], "raw_text": ""}
         
     if not text.strip():
-        logger.warning(f"No text extracted from {file_path}")
         return {"chain": "Unknown", "products": [], "raw_text": ""}
         
     # We only use the PDF parser if it was a native digital PDF
@@ -73,9 +61,6 @@ def scan_receipt(file_path: str) -> dict:
     for p in result.get("products", []):
         p["source"] = source_name
         
-    end_time = time.time()
-    elapsed = end_time - start_time
-    logger.info(f"[{source_name}] Scan completed in {elapsed:.2f} seconds.")
     return result
 
 def merge_receipts(receipts: list) -> dict:
@@ -120,14 +105,12 @@ def scan_receipt_to_json(file_path: str, output_dir: str) -> str:
     with open(out_file, 'w', encoding='utf-8') as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
         
-    logger.info(f"Results successfully saved to: {out_file}")
     return out_file
 
 if __name__ == "__main__":
     import sys
     
     # Basic console configuration when run as a standalone script
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     
     if len(sys.argv) > 1:
         input_paths = sys.argv[1:]
@@ -148,7 +131,6 @@ if __name__ == "__main__":
         files = sorted(list(set(files))) # Sort alphanumerically to ensure correct panorama ordering
         
         if not files:
-            logger.error("No valid image or pdf files found.")
             sys.exit(1)
             
         parsed_slices = []
@@ -169,7 +151,4 @@ if __name__ == "__main__":
             with open(out_file, 'w', encoding='utf-8') as f:
                 json.dump(final_receipt, f, indent=2, ensure_ascii=False)
                 
-            logger.info(f"Batched results successfully merged and saved to: {out_file}")
             print(f"\nFinal Merged Document:\n{json.dumps(final_receipt, indent=2, ensure_ascii=False)}")
-    else:
-        logger.error("Please provide at least one receipt file path or directory.")
