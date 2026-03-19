@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   Dimensions,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -45,15 +46,19 @@ export default function ReceiptCameraScreen() {
     if (!cameraRef.current || isCapturing) return;
     try {
       setIsCapturing(true);
+
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         skipMetadata: true, 
+        exif: false,     
       });
+
       if (photo?.uri) {
         setImages((prev) => [photo.uri, ...prev]);
       }
     } catch (e) {
-      console.warn(e);
+      console.warn("Capture error:", e);
+      Alert.alert("שגיאה", "לא ניתן היה לצלם את התמונה");
     } finally {
       setIsCapturing(false);
     }
@@ -69,7 +74,7 @@ export default function ReceiptCameraScreen() {
       {/* קונטיינר המצלמה - תמיד בגובה המקסימלי של תמונה אחת */}
       <View style={[styles.cameraContainer, { height: FULL_CAMERA_HEIGHT }]}>
         
-        {/* 1. שכבת בצל - עכשיו היא תופסת מקום פיזי מעל המצלמה ולא "צפה" */}
+{/* 1. שכבת בצל - עם כותרת מוזזת הצידה */}
         {images.length > 0 && (
           <View style={[styles.onionSkinStatic, { height: ONION_SKIN_HEIGHT }]}>
             <Image 
@@ -77,10 +82,15 @@ export default function ReceiptCameraScreen() {
               style={[styles.onionSkinImage, { height: FULL_CAMERA_HEIGHT }]} 
               resizeMode="stretch" 
             />
-            <View style={styles.dividerLine} />
-            <View style={styles.onionLabel}>
-              <Text style={styles.onionText}>סוף תמונה קודמת</Text>
+            
+            {/* כותרת מוזזת לפינה השמאלית העליונה */}
+            <View style={styles.onionLabelTop}>
+              <Ionicons name="link-outline" size={10} color="#FFF" style={{ marginRight: 4 }} />
+              <Text style={styles.onionText}>סוף חלק קודם</Text>
             </View>
+
+            {/* קו מפריד דק ונקי בתחתית */}
+            <View style={styles.dividerLine} />
           </View>
         )}
 
@@ -152,12 +162,12 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'column' 
   },
-  
   onionSkinStatic: {
     width: '100%',
     backgroundColor: '#000',
     overflow: 'hidden',
-    zIndex: 10
+    zIndex: 10,
+    position: 'relative', // חשוב לצורך מיקום הכותרת
   },
   onionSkinImage: {
     width: '100%',
@@ -171,17 +181,31 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#0284C7'
-  },
-  onionLabel: {
-    position: 'absolute',
-    bottom: 4,
-    alignSelf: 'center',
     backgroundColor: '#0284C7',
-    paddingHorizontal: 8,
-    borderRadius: 8
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
   },
-  onionText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' },
+  // העיצוב החדש של הכותרת - בצד למעלה
+  onionLabelTop: {
+    position: 'absolute',
+    top: 6,
+    left: 8,
+    backgroundColor: 'rgba(2, 132, 199, 0.85)', // כחול שקוף מעט
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 11,
+  },
+  onionText: { 
+    color: '#FFF', 
+    fontSize: 9, 
+    fontWeight: '700',
+    letterSpacing: 0.2
+  },
 
   cameraOverlay: { 
     position: 'absolute', 
