@@ -29,9 +29,9 @@ export default function ReceiptCameraScreen() {
   const cameraRef = useRef<any>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [isRotating, setIsRotating] = useState<string | null>(null); // מעקב אחרי תמונה בסיבוב
+  const [isRotating, setIsRotating] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([]); // נשמר בסדר: [ראשון, שני, שלישי...]
 
   useEffect(() => {
     (async () => {
@@ -42,7 +42,6 @@ export default function ReceiptCameraScreen() {
     return () => { ScreenOrientation.unlockAsync(); };
   }, []);
 
-  // צילום פשוט ומהיר
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing) return;
     try {
@@ -53,7 +52,7 @@ export default function ReceiptCameraScreen() {
       });
 
       if (photo?.uri) {
-        setImages((prev) => [photo.uri, ...prev]);
+        setImages((prev) => [...prev, photo.uri]);
       }
     } catch (e) {
       console.warn("Capture error:", e);
@@ -62,7 +61,6 @@ export default function ReceiptCameraScreen() {
     }
   };
 
-  // פונקציית סיבוב ידנית
   const rotateImage = async (uri: string) => {
     try {
       setIsRotating(uri);
@@ -71,7 +69,6 @@ export default function ReceiptCameraScreen() {
         [{ rotate: 90 }],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
-
       setImages((prev) => prev.map(img => img === uri ? result.uri : img));
     } catch (e) {
       Alert.alert("שגיאה", "לא ניתן לסובב את התמונה");
@@ -88,11 +85,12 @@ export default function ReceiptCameraScreen() {
       <ScreenHeader title="צילום קבלה" onBack={() => router.back()} />
 
       <View style={[styles.cameraContainer, { height: FULL_CAMERA_HEIGHT }]}>
-        {/* Onion Skin */}
+        
+        {/* Onion Skin - מציג את התמונה האחרונה שצולמה */}
         {images.length > 0 && (
           <View style={[styles.onionSkinStatic, { height: ONION_SKIN_HEIGHT }]}>
             <Image 
-              source={{ uri: images[0] }} 
+              source={{ uri: images[images.length - 1] }} 
               style={[styles.onionSkinImage, { height: FULL_CAMERA_HEIGHT }]} 
               resizeMode="stretch" 
             />
@@ -104,7 +102,6 @@ export default function ReceiptCameraScreen() {
           </View>
         )}
 
-        {/* Camera */}
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <CameraView
             ref={cameraRef}
@@ -125,26 +122,24 @@ export default function ReceiptCameraScreen() {
         </View>
       </View>
 
-      {/* Preview Section עם כפתור סיבוב */}
+      {/* Preview Section - מציג ויזואלית הפוך (החדשה ראשונה), אבל המערך עצמו נשאר מסודר */}
       <View style={styles.thumbnailSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbScroll}>
-          {images.map((uri) => (
+          {[...images].reverse().map((uri) => (
             <View key={uri} style={[styles.thumbWrapper, { width: 70, height: 70 * ASPECT_RATIO }]}>
               <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
               
-              {/* כפתור מחיקה */}
               <TouchableOpacity style={styles.removeBtn} onPress={() => setImages(prev => prev.filter(u => u !== uri))}>
                 <Ionicons name="close-circle" size={20} color="#EF4444" />
               </TouchableOpacity>
 
-              {/* כפתור סיבוב ידני */}
               <TouchableOpacity 
                 style={styles.rotateBtn} 
                 onPress={() => rotateImage(uri)}
                 disabled={isRotating === uri}
               >
                 {isRotating === uri ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <ActivityIndicator size="small" color="#0284C7" />
                 ) : (
                   <Ionicons name="refresh-circle" size={22} color="#0284C7" />
                 )}
@@ -157,7 +152,10 @@ export default function ReceiptCameraScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.mainAction, images.length === 0 && styles.disabledBtn]}
-          onPress={() => router.push({ pathname: "./processing", params: { imageUris: JSON.stringify(images) } })}
+          onPress={() => {
+            // כאן המערך 'images' נשלח בסדר הכרונולוגי המקורי שלו
+            router.push({ pathname: "./processing", params: { imageUris: JSON.stringify(images) } });
+          }}
           disabled={images.length === 0}
         >
           <Text style={styles.mainActionText}>המשך ({images.length})</Text>
@@ -190,7 +188,7 @@ const styles = StyleSheet.create({
   thumbWrapper: { borderRadius: 10, overflow: 'hidden', backgroundColor: '#000', position: 'relative' },
   thumb: { width: '100%', height: '100%' },
   removeBtn: { position: 'absolute', top: 0, right: 0, zIndex: 10 },
-  rotateBtn: { position: 'absolute', bottom: 2, right: 2, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 12 },
+  rotateBtn: { position: 'absolute', bottom: 2, right: 2, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 12 },
   footer: { flexDirection: 'row', padding: 20, alignItems: 'center', gap: 15, paddingBottom: 40 },
   mainAction: { flex: 1, height: 55, backgroundColor: '#0284C7', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   mainActionText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
