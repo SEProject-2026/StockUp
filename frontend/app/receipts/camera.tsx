@@ -48,18 +48,31 @@ const handleCapture = async () => {
   try {
     setIsCapturing(true);
 
-    // 1. צילום התמונה הגולמית
+    // 1. צילום התמונה
     const photo = await cameraRef.current.takePictureAsync({
       quality: 0.8,
       skipMetadata: true,
     });
 
     if (photo?.uri) {
-      // 2. תיקון סיבוב אקטיבי (Force Portrait)
-      // אנחנו אומרים למניפולטור: "לא משנה מה כתוב ב-EXIF, תוודא שהתמונה מאונכת"
+      let rotation = 0;
+
+      // 2. לוגיקת זיהוי: אם הרוחב גדול מהגובה, סימן שהתמונה "שוכבת"
+      // אנחנו רוצים שהגובה תמיד יהיה גדול מהרוחב (Portrait)
+      if (photo.width > photo.height) {
+        // התמונה התהפכה לצד - נסובב אותה 90 מעלות חזרה
+        rotation = 90; 
+      }
+
+      // 3. תיקון אקטיבי עם ImageManipulator
+      const actions = [];
+      if (rotation !== 0) {
+        actions.push({ rotate: rotation });
+      }
+
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         photo.uri,
-        [], // אין צורך בטרנספורמציות נוספות, המניפולטור מתקן Orientation אוטומטית כברירת מחדל
+        actions,
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
 
