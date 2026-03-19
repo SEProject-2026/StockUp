@@ -23,14 +23,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const ASPECT_RATIO = 4 / 3;
 const CAMERA_WIDTH = SCREEN_WIDTH - 24;
 const FULL_CAMERA_HEIGHT = CAMERA_WIDTH * ASPECT_RATIO;
-const ONION_SKIN_HEIGHT = 80; // גובה פס הרפרנץ
+const ONION_SKIN_HEIGHT = 80;
 
 export default function ReceiptCameraScreen() {
-  const CameraViewAny = CameraView as any;
   const cameraRef = useRef<any>(null);
-
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isRotating, setIsRotating] = useState<string | null>(null); // מעקב אחרי תמונה בסיבוב
   const [torchOn, setTorchOn] = useState(false);
   const [images, setImages] = useState<string[]>([]);
 
@@ -38,56 +37,50 @@ export default function ReceiptCameraScreen() {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === "granted");
-      // נעילת מסך לפורטרט
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     })();
     return () => { ScreenOrientation.unlockAsync(); };
   }, []);
 
+  // צילום פשוט ומהיר
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing) return;
     try {
       setIsCapturing(true);
-
-      // 1. צילום ראשוני
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
-        skipMetadata: true, // התעלמות מהחיישן בשלב הצילום
+        skipMetadata: true,
       });
 
       if (photo?.uri) {
-        // 2. שלב ראשון: "יישור" הקובץ וניקוי EXIF
-        const firstPass = await ImageManipulator.manipulateAsync(
-          photo.uri,
-          [], 
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-
-        let finalUri = firstPass.uri;
-
-        // 3. שלב שני: בדיקת מידות אקטיבית על הקובץ המעובד
-        // אם הרוחב גדול מהגובה (Landscape), אנחנו מסובבים בכוח לפורטרט
-        if (firstPass.width > firstPass.height) {
-          const fixedImage = await ImageManipulator.manipulateAsync(
-            firstPass.uri,
-            [{ rotate: 90 }],
-            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-          );
-          finalUri = fixedImage.uri;
-        }
-
-        setImages((prev) => [finalUri, ...prev]);
+        setImages((prev) => [photo.uri, ...prev]);
       }
     } catch (e) {
       console.warn("Capture error:", e);
-      Alert.alert("שגיאה", "נכשלנו בצילום התמונה");
     } finally {
       setIsCapturing(false);
     }
   };
 
+  // פונקציית סיבוב ידנית
+  const rotateImage = async (uri: string) => {
+    try {
+      setIsRotating(uri);
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ rotate: 90 }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      setImages((prev) => prev.map(img => img === uri ? result.uri : img));
+    } catch (e) {
+      Alert.alert("שגיאה", "לא ניתן לסובב את התמונה");
+    } finally {
+      setIsRotating(null);
+    }
+  };
+
   if (hasPermission === null) return <SafeAreaView style={styles.safeArea} />;
-  if (hasPermission === false) return <Text>אין הרשאה למצלמה</Text>;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -95,8 +88,7 @@ export default function ReceiptCameraScreen() {
       <ScreenHeader title="צילום קבלה" onBack={() => router.back()} />
 
       <View style={[styles.cameraContainer, { height: FULL_CAMERA_HEIGHT }]}>
-        
-        {/* שכבת בצל (Onion Skin) - אטומה וסטטית מעל המצלמה */}
+        {/* Onion Skin */}
         {images.length > 0 && (
           <View style={[styles.onionSkinStatic, { height: ONION_SKIN_HEIGHT }]}>
             <Image 
@@ -104,29 +96,25 @@ export default function ReceiptCameraScreen() {
               style={[styles.onionSkinImage, { height: FULL_CAMERA_HEIGHT }]} 
               resizeMode="stretch" 
             />
-            
             <View style={styles.onionLabelTop}>
               <Ionicons name="link-outline" size={10} color="#FFF" style={{ marginRight: 4 }} />
               <Text style={styles.onionText}>סוף חלק קודם</Text>
             </View>
-
             <View style={styles.dividerLine} />
           </View>
         )}
 
-        {/* המצלמה החיה */}
+        {/* Camera */}
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <CameraViewAny
+          <CameraView
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
-            facing={"back"}
+            facing="back"
             ratio="4:3"
             enableTorch={torchOn}
-            responsiveOrientationWhenInUse={true}
           />
         </View>
 
-        {/* פלאש ומונה תמונות */}
         <View style={styles.cameraOverlay}>
           <TouchableOpacity style={styles.pill} onPress={() => setTorchOn(!torchOn)}>
             <Ionicons name={torchOn ? "flash" : "flash-outline"} size={16} color={torchOn ? "#FCD34D" : "#FFF"} />
@@ -137,21 +125,35 @@ export default function ReceiptCameraScreen() {
         </View>
       </View>
 
-      {/* רשימת תמונות קטנות (Preview) */}
+      {/* Preview Section עם כפתור סיבוב */}
       <View style={styles.thumbnailSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbScroll}>
           {images.map((uri) => (
             <View key={uri} style={[styles.thumbWrapper, { width: 70, height: 70 * ASPECT_RATIO }]}>
               <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
+              
+              {/* כפתור מחיקה */}
               <TouchableOpacity style={styles.removeBtn} onPress={() => setImages(prev => prev.filter(u => u !== uri))}>
                 <Ionicons name="close-circle" size={20} color="#EF4444" />
+              </TouchableOpacity>
+
+              {/* כפתור סיבוב ידני */}
+              <TouchableOpacity 
+                style={styles.rotateBtn} 
+                onPress={() => rotateImage(uri)}
+                disabled={isRotating === uri}
+              >
+                {isRotating === uri ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Ionicons name="refresh-circle" size={22} color="#0284C7" />
+                )}
               </TouchableOpacity>
             </View>
           ))}
         </ScrollView>
       </View>
 
-      {/* כפתורי פעולה */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.mainAction, images.length === 0 && styles.disabledBtn]}
@@ -174,68 +176,21 @@ export default function ReceiptCameraScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F9FAFB" },
   gradient: { ...StyleSheet.absoluteFillObject },
-  
-  cameraContainer: { 
-    marginHorizontal: 12, 
-    marginTop: 10, 
-    borderRadius: 24, 
-    overflow: 'hidden', 
-    backgroundColor: '#000',
-    display: 'flex',
-    flexDirection: 'column' 
-  },
-  onionSkinStatic: {
-    width: '100%',
-    backgroundColor: '#000',
-    overflow: 'hidden',
-    zIndex: 10,
-    position: 'relative',
-  },
-  onionSkinImage: {
-    width: '100%',
-    position: 'absolute',
-    bottom: 0,
-    opacity: 0.8
-  },
-  dividerLine: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: '#0284C7',
-  },
-  onionLabelTop: {
-    position: 'absolute',
-    top: 6,
-    left: 8,
-    backgroundColor: 'rgba(2, 132, 199, 0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 11,
-  },
+  cameraContainer: { marginHorizontal: 12, marginTop: 10, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000', flexDirection: 'column' },
+  onionSkinStatic: { width: '100%', overflow: 'hidden', zIndex: 10, position: 'relative' },
+  onionSkinImage: { width: '100%', position: 'absolute', bottom: 0, opacity: 0.8 },
+  dividerLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#0284C7' },
+  onionLabelTop: { position: 'absolute', top: 6, left: 8, backgroundColor: 'rgba(2, 132, 199, 0.85)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', zIndex: 11 },
   onionText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
-
-  cameraOverlay: { 
-    position: 'absolute', 
-    bottom: 15, 
-    left: 15, 
-    right: 15, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between' 
-  },
+  cameraOverlay: { position: 'absolute', bottom: 15, left: 15, right: 15, flexDirection: 'row', justifyContent: 'space-between' },
   pill: { backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 },
   pillText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
-
   thumbnailSection: { height: 120, marginTop: 15 },
   thumbScroll: { paddingHorizontal: 15, gap: 12 },
-  thumbWrapper: { borderRadius: 10, overflow: 'hidden', backgroundColor: '#000' },
+  thumbWrapper: { borderRadius: 10, overflow: 'hidden', backgroundColor: '#000', position: 'relative' },
   thumb: { width: '100%', height: '100%' },
-  removeBtn: { position: 'absolute', top: 2, right: 2, zIndex: 10 },
-
+  removeBtn: { position: 'absolute', top: 0, right: 0, zIndex: 10 },
+  rotateBtn: { position: 'absolute', bottom: 2, right: 2, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 12 },
   footer: { flexDirection: 'row', padding: 20, alignItems: 'center', gap: 15, paddingBottom: 40 },
   mainAction: { flex: 1, height: 55, backgroundColor: '#0284C7', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   mainActionText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
