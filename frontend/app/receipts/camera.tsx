@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
+import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -42,27 +43,34 @@ export default function ReceiptCameraScreen() {
     return () => { ScreenOrientation.unlockAsync(); };
   }, []);
 
-  const handleCapture = async () => {
-    if (!cameraRef.current || isCapturing) return;
-    try {
-      setIsCapturing(true);
+const handleCapture = async () => {
+  if (!cameraRef.current || isCapturing) return;
+  try {
+    setIsCapturing(true);
 
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        skipMetadata: true, 
-        exif: false,     
-      });
+    // 1. צילום התמונה הגולמית
+    const photo = await cameraRef.current.takePictureAsync({
+      quality: 0.8,
+      skipMetadata: true,
+    });
 
-      if (photo?.uri) {
-        setImages((prev) => [photo.uri, ...prev]);
-      }
-    } catch (e) {
-      console.warn("Capture error:", e);
-      Alert.alert("שגיאה", "לא ניתן היה לצלם את התמונה");
-    } finally {
-      setIsCapturing(false);
+    if (photo?.uri) {
+      // 2. תיקון סיבוב אקטיבי (Force Portrait)
+      // אנחנו אומרים למניפולטור: "לא משנה מה כתוב ב-EXIF, תוודא שהתמונה מאונכת"
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        photo.uri,
+        [], // אין צורך בטרנספורמציות נוספות, המניפולטור מתקן Orientation אוטומטית כברירת מחדל
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      setImages((prev) => [manipulatedImage.uri, ...prev]);
     }
-  };
+  } catch (e) {
+    console.warn("Capture error:", e);
+  } finally {
+    setIsCapturing(false);
+  }
+};
 
   if (hasPermission === null) return <SafeAreaView style={styles.safeArea} />;
 
@@ -85,7 +93,6 @@ export default function ReceiptCameraScreen() {
             
             {/* כותרת מוזזת לפינה השמאלית העליונה */}
             <View style={styles.onionLabelTop}>
-              <Ionicons name="link-outline" size={10} color="#FFF" style={{ marginRight: 4 }} />
               <Text style={styles.onionText}>סוף חלק קודם</Text>
             </View>
 
