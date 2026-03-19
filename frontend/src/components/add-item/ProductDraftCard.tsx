@@ -70,7 +70,7 @@ export default function ProductDraftCard(props: {
         </TouchableOpacity>
       </View>
 
-      <Field label="שם מוצר (חיפוש)">
+      <Field label="שם מוצר (חיפוש)" required>
         <View style={styles.inputRow}>
           <TextInput
             value={props.name}
@@ -126,7 +126,7 @@ export default function ProductDraftCard(props: {
 
       <View style={styles.row2}>
         <View style={{ flex: 1 }}>
-          <Field label="כמות">
+          <Field label="כמות" required>
             <TextInput
               value={props.quantity}
               onChangeText={props.onChangeQuantity}
@@ -188,10 +188,13 @@ export default function ProductDraftCard(props: {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {required && <Text style={{ color: "#EF4444" }}> *</Text>}
+        </Text>
       {children}
     </View>
   );
