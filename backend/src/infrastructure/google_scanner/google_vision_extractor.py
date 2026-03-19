@@ -180,9 +180,39 @@ def _reconstruct_vision_text(response):
     return json.dumps(lines, ensure_ascii=False)
 
 
+def _save_debug_text(image_path: str, text_json: str) -> None:
+    """
+    Saves the reconstructed text to a 'debug' folder in the current execution directory.
+    If the folder doesn't exist, it creates it.
+    """
+    try:
+        # 1. Define and create the debug directory in the current working directory
+        debug_dir = os.path.join(os.getcwd(), "debug")
+        if not os.path.exists(debug_dir):
+            os.makedirs(debug_dir)
+            print(f"Created debug directory at: {debug_dir}")
+
+        # 2. Extract the original filename without extension to use for the .txt file
+        file_name = os.path.basename(image_path)
+        name_without_ext = os.path.splitext(file_name)[0]
+        debug_file_path = os.path.join(debug_dir, f"{name_without_ext}_ocr_debug.txt")
+        
+        # 3. Parse JSON to extract only the text lines for readability
+        data = json.loads(text_json)
+        readable_text = "\n".join([line["text"] for line in data])
+        
+        # 4. Save to the debug folder
+        with open(debug_file_path, "w", encoding="utf-8") as f:
+            f.write(readable_text)
+            
+        print(f"Successfully saved OCR debug output to: {debug_file_path}")
+
+    except Exception as e:
+        print(f"Warning: Failed to save debug text to {debug_dir}. Error: {e}")
+
 def extract_text_from_image(image_path: str) -> str:
     """
-    Extracts text from an image file using Google Cloud Vision.
+    Extracts text from an image file using Google Cloud Vision and saves debug output.
     """
     if not client:
         print("Google Vision client not initialized. Cannot extract text.")
@@ -202,11 +232,18 @@ def extract_text_from_image(image_path: str) -> str:
         if response.error.message:
             raise Exception(f"{response.error.message}")
             
-        return _reconstruct_vision_text(response)
+        # Reconstruct lines
+        reconstructed_json = _reconstruct_vision_text(response)
+        
+        # --- NEW: Save the result to a text file for debugging ---
+        _save_debug_text(image_path, reconstructed_json)
+        # ---------------------------------------------------------
+        
+        return reconstructed_json
+        
     except Exception as e:
         print(f"Google Vision Error on {image_path}: {e}")
         return "[]"
-
 
 def extract_text_from_image_pdf(pdf_path: str) -> str:
     """

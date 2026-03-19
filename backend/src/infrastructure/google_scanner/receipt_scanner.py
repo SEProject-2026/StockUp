@@ -2,12 +2,12 @@
 from src.infrastructure.google_scanner.scanner import scan_receipt, merge_receipts
 
 class ReceiptScanner:
-    def parse_receipt(self, first_path: str, *rest_paths: str):
+    def parse_receipt(self,all_paths: list) -> tuple[str, dict]:
         """
         Parses one or more receipt images and merges them.
         """
         # Scan all slices
-        all_paths = [first_path] + list(rest_paths)
+        all_paths.reverse() 
         parsed_slices = []
         
         for path in all_paths:

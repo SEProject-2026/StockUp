@@ -87,11 +87,9 @@ class StockService:
 
         scanner = ReceiptScanner()
 
-        first = valid_paths[0]
-        rest = valid_paths[1:]
         
         app_logger.debug("Parsing receipt files through ML scanner...")
-        chain_name, scanned_items = scanner.parse_receipt(first, *rest)
+        chain_name, scanned_items = scanner.parse_receipt(valid_paths)
         print(f"Scanned items: {scanned_items}")
         print(f"Chain name: {chain_name}")
         receipt_items_dto: list[ReceiptItemDTO] = []

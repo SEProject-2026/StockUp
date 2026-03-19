@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Union
 
 
 CHAIN_HPS = {
@@ -19,13 +19,29 @@ CHAIN_HPS = {
 }
 
 def identify_chain(text: str) -> str:
-    """Looks for a 9-digit company ID starting with 51 or 52."""
+    """Looks for a 9-digit company ID starting with 51 or 52, with a fallback to raw text matching."""
     hp_matches = re.findall(r'(?<!\d)(5[12]\d{7})(?!\d)', text)
     if hp_matches:
         for hp in hp_matches:
             if hp in CHAIN_HPS:
                 return CHAIN_HPS[hp]
-        return f"Unknown Chain (ID: {hp_matches[0]})"
+                
+    # Fallback to pure text match if no valid HP is found or matched
+    chain_names = {
+        "רמי לוי": "ramilevi",
+        "שופרסל": "shufersal",
+        "מחסני השוק": "mck",
+        "אושר עד": "osherad",
+        "יוחננוף": "yochananof",
+        "טיב טעם": "tivtaam",
+        "ויקטורי": "victory",
+        "חצי חינם": "hazi-hinam"
+    }
+    
+    for heb_name, eng_id in chain_names.items():
+        if heb_name in text:
+            return eng_id
+            
     return "Unknown Chain"
 
 def is_ignored_line(line: str) -> bool:
@@ -52,7 +68,6 @@ def clean_ocr_artifacts(line: str) -> str:
     line_clean = re.sub(r'\b0\d{1,2}-?\d{7}\b', '', line_clean)
     line_clean = re.sub(r'\b1\d{3}-\d{3}-\d{3}\b', '', line_clean)
     line_clean = re.sub(r'\b5[12]\d{7}\b', '', line_clean)
-    line_clean = re.sub(r'\b(?:2006|52149|1000150|6539930|8456129|6210717|17534|6321|74)\b', '', line_clean)
     line_clean = re.sub(r'\b\d+-\d+\b', '', line_clean)
     line_clean = re.sub(r'\b\d+/\d+(?:/\d+)?\b', '', line_clean)
     line_clean = re.sub(r'_(\d+)\b', r' \1', line_clean)
@@ -83,30 +98,72 @@ def get_best_barcode(line_clean: str) -> str:
         return max(valid_normal, key=len)
     return ""
 
-def _extract_quantity_from_line(line: str) -> float | None:
-    # Look for obvious weight (3 decimal places)
-    match_3dec = re.search(r'\b(\d+\.\d{3})\b', line)
-    if match_3dec:
-        return float(match_3dec.group(1))
+def _extract_quantity_from_line(line: str) -> Optional[Union[float, int]]:
+    """
+    Strictly extracts quantity ONLY when associated with a multiplier symbol (*, x, X, ×).
+    This prevents product descriptions (like '40 gram') from being misidentified as quantities.
+    """
+    
+    def is_price_format(val_str: str) -> bool:
+        """Checks if a numeric string follows the currency/price format (x.xx)."""
+        if '.' in val_str:
+            parts = val_str.split('.')
+            return len(parts[1]) == 2
+        return False
 
-    # Look for explicit quantity followed by a multiplier symbol, matching missing right sides
-    match_x = re.search(r'\b(\d+(?:\.\d+)?)\s*[:]?\s*[\*xXw](?![A-Za-zא-ת])', line)
-    if match_x:
-        return float(match_x.group(1))
+    def cast_to_numeric(val_str: str) -> Optional[Union[float, int]]:
+        """Converts string to the most appropriate numeric type."""
+        try:
+            f_val = float(val_str)
+            return int(f_val) if f_val.is_integer() else f_val
+        except ValueError:
+            return None
+
+    # 1. Multiplier detection (Checking both sides of the symbol)
+    # Pattern: [Number] [Symbol] [Number]
+    mult_match = re.search(r'(\d+(?:\.\d+)?)\s*[\*xX×]\s*(\d+(?:\.\d+)?)', line)
+    if mult_match:
+        side_a, side_b = mult_match.group(1), mult_match.group(2)
+        val_a = cast_to_numeric(side_a)
+        val_b = cast_to_numeric(side_b)
+        
+        # Priority: If one side is a price (x.xx) and the other is not, take the other
+        if is_price_format(side_a) and not is_price_format(side_b):
+            return val_b
+        if is_price_format(side_b) and not is_price_format(side_a):
+            return val_a
+            
+        # Fallback for weighted items (x.xxx) or integers
+        if '.' in side_a and len(side_a.split('.')[1]) == 3: return val_a
+        if '.' in side_b and len(side_b.split('.')[1]) == 3: return val_b
+        
+        return val_b if isinstance(val_b, int) else val_a
+
+    # 2. Single-sided multiplier (e.g., "2 *")
+    # Only returns if the number is NOT in price format (x.xx)
+    single_mult = re.search(r'\b(\d+(?:\.\d+)?)\s*[\*xX×]', line)
+    if single_mult:
+        val_str = single_mult.group(1)
+        if not is_price_format(val_str):
+            return cast_to_numeric(val_str)
 
     return None
 
+def is_end_of_receipt(line: str) -> bool:
+    """Checks if the line contains a keyword indicating the end of the receipt footprint."""
+    end_words = ["אמצעי", "מע\"מ", "ישרכארט", "כאל", "כ.אשראי", "ויזה"]
+    return any(word in line for word in end_words)
+
 def parse_receipt_google(text: str) -> Dict[str, Any]:
     """
-    Parses a Google Vision receipt output, matching barcodes and handling line-by-line quantities.
+    Parses Google Vision output. Now includes logic to extract quantities from discount lines
+    before skipping them, and strictly enforces multiplier-based quantity extraction.
     """
     chain = identify_chain(text)
     
     try:
-        # Google Vision produces a JSON array of line objects
         lines_data = json.loads(text)
     except Exception:
-        # Fallback if raw text
         lines_data = [{"text": line} for line in text.split("\n")]
         
     products = []
@@ -115,13 +172,10 @@ def parse_receipt_google(text: str) -> Dict[str, Any]:
     
     for row in lines_data:
         line_text = row.get("text", "")
-        if not line_text.strip():
-            continue
-            
+        if not line_text.strip(): continue
+        if is_end_of_receipt(line_text): break
         if is_ignored_line(line_text):
-            # Only explicitly clear states if it's a known payment/metadata keyword block.
-            # Do NOT clear it just because a product description line has no numbers!
-            payment_words = ["סה\"כ", "סה''כ", "תשלום", "אשראי", "עסקה", "חברה", "TOTAL", "Total"]
+            payment_words = ["סה\"כ", "סה''כ", "תשלום", "אשראי", "TOTAL", "Total"]
             if any(w in line_text for w in payment_words):
                 current_barcode = None
                 pending_barcode = None
@@ -130,58 +184,48 @@ def parse_receipt_google(text: str) -> Dict[str, Any]:
         line_clean = clean_ocr_artifacts(line_text)
         bcode = get_best_barcode(line_clean)
         has_price = bool(re.search(r'\d+\.\d{2}', line_clean))
+        
+        # Identify if this is a discount/promotion line
         is_discount = bool(re.search(r'-\d|\d-|\bהנחה\b|\bמוגבל\b|\bזיכוי\b|\bמבצע\b', line_clean))
         
-        # If the line looks like a discount or reduction 
+        # NEW STRATEGY: Try to extract quantity even from discount lines
+        qty_from_line = _extract_quantity_from_line(line_clean)
+
         if is_discount:
-            # We skip it UNLESS it contains a full undeniable barcode (13 digits or 729...)
+            # If we have an active product and found a quantity on the discount line, update it
+            if current_barcode and qty_from_line is not None:
+                if products[-1]["quantity"] == 1.0:
+                    products[-1]["quantity"] = qty_from_line
+            
+            # Skip processing this line further as a new product unless it has a solid barcode
             if not bcode or (len(bcode) < 8 and not bcode.startswith('729')):
                 continue
         
+        # Standard product processing
         if bcode:
+            qty = qty_from_line or 1.0
             if has_price:
-                # Complete line containing both a barcode and a price
-                qty = _extract_quantity_from_line(line_clean) or 1.0
                 products.append({"barcode": bcode, "quantity": qty})
                 current_barcode = bcode
                 pending_barcode = None
             else:
-                # Candidate barcode, waiting for a price on subsequent lines
                 pending_barcode = bcode
-                
-        else: # no barcode on this line
+        else:
             if has_price:
                 if pending_barcode:
-                    # We found a price directly following a pending barcode!
-                    qty = _extract_quantity_from_line(line_clean) or 1.0
+                    qty = qty_from_line or 1.0
                     products.append({"barcode": pending_barcode, "quantity": qty})
                     current_barcode = pending_barcode
                     pending_barcode = None
-                else:
-                    # Price line without any pending barcode.
-                    # This could be a discount line, a total summary, or payment detail.
-                    # OR it could be a weight/multiplier line containing a unit price (e.g., "6.90 * 0.435").
-                    if current_barcode:
-                        qty = _extract_quantity_from_line(line_clean)
-                        if qty is not None and products[-1]["quantity"] == 1.0:
-                            products[-1]["quantity"] = qty
-                            current_barcode = None
-            else:
-                # No barcode, no price
-                # Could be a wandering trailing quantity (e.g., "3 X" on its own line without a price)
-                if current_barcode:
-                    qty = _extract_quantity_from_line(line_clean)
-                    if qty is not None:
-                        # Only update if current quantity is exactly 1.0, 
-                        # meaning we haven't already found the true weight/quantity yet.
-                        if products[-1]["quantity"] == 1.0:
-                            products[-1]["quantity"] = qty
-                        # Clear active barcode so we don't accidentally apply more wandering quantities
+                elif current_barcode and qty_from_line is not None:
+                    if products[-1]["quantity"] == 1.0:
+                        products[-1]["quantity"] = qty_from_line
                         current_barcode = None
+            elif current_barcode and qty_from_line is not None:
+                # Handle cases where quantity is on a standalone line (e.g., "2 *")
+                if products[-1]["quantity"] == 1.0:
+                    products[-1]["quantity"] = qty_from_line
+                current_barcode = None
                 
-    return {
-        "chain": chain,
-        "products": products
-    }
-
+    return {"chain": chain, "products": products}
 
