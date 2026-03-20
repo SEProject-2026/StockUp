@@ -11,7 +11,7 @@ def _normalize_unit(unit: str) -> str:
 
 def _extract_pdf_line_data(line: str, index: int, trace: List[str]) -> Optional[Dict[str, Any]]:
     #remove discount lines
-    promo_keywords = ['מבצע:', ':מבצע', ':עצבמ']
+    promo_keywords = ['מבצע:', ':מבצע', ':עצבמ','חולשמ']
     if any(kw in line for kw in promo_keywords):
         trace.append(f"L{index}: REJECTED - Promotion/Discount line detected: '{line[:30]}...'")
         return None
