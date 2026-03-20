@@ -122,7 +122,7 @@ def _reconstruct_vision_text(response):
             heights.append(((item['box'][3][1] - item['box'][0][1]) + (item['box'][2][1] - item['box'][1][1])) / 2)
             
     median_height = sorted(heights)[len(heights)//2] if heights else 20
-    y_threshold = max(median_height * 0.4, 10)
+    y_threshold = max(median_height * 0.6, 12)
     
     for item in items:
         if current_y is None:

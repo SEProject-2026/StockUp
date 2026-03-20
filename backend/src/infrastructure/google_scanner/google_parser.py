@@ -16,7 +16,7 @@ CHAIN_HPS = {
     "514068900": "victory",
     "514068980": "victory",
     "515163657": "mck",
-    "512401618": "tivtaam",
+    "512792714": "tivtaam",
     "510931484": "osherad",
     "511400265": "hazi-hinam",
 }
@@ -129,9 +129,10 @@ def _extract_quantity_from_line(line: str, trace: Optional[List[str]] = None) ->
     weight_match = re.search(r'\b\d{1,2}\.\d{3}\b', line)
     if weight_match:
         val_str = weight_match.group(0)
-        if trace is not None:
-            trace.append(f"High-precision weight detected (x.xxx): {val_str}. Returning immediately.")
-        return float(val_str)
+        if float(val_str) < 20.000:  # Sanity check to avoid misinterpreting prices as weights
+            if trace is not None:
+                trace.append(f"High-precision weight detected (x.xxx): {val_str}. Returning immediately.")
+            return float(val_str)
     
     # Multiplier detection
     mult_match = re.search(r'(\d+(?:\.\d+)?)\s*[\*xX×]\s*(\d+(?:\.\d+)?)', line)
@@ -171,7 +172,7 @@ def _extract_quantity_from_line(line: str, trace: Optional[List[str]] = None) ->
 
 def is_end_of_receipt(line: str) -> bool:
     """Checks if the line contains a keyword indicating the end of the receipt footprint."""
-    end_words = ["אמצעי", "ישרכארט", "כאל", "כ.אשראי", "ויזה"]
+    end_words = ["אמצעי", "ישרכארט", "כאל", "כ.אשראי", "ויזה", "ישראכרט"]
     return any(word in line for word in end_words)
 
 def parse_receipt_google(text: str) -> Dict[str, Any]:
@@ -207,7 +208,7 @@ def parse_receipt_google(text: str) -> Dict[str, Any]:
         line_clean = clean_ocr_artifacts(line_text)
         bcode = get_best_barcode(line_clean, trace=line_trace)
         qty_from_line = _extract_quantity_from_line(line_clean, trace=line_trace)
-        has_price = bool(re.search(r'\d+\.\d{2}', line_clean))
+        has_price = bool(re.search(r'(?<!-)\b\d+\.\d{2}\b(?!-)', line_clean))
         is_discount = bool(re.search(r'-\d|\d-|\bהנחה\b|\bמבצע\b', line_clean))
         
         # State tracking for logging

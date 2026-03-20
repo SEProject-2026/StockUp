@@ -7,7 +7,6 @@ class ReceiptScanner:
         Parses one or more receipt images and merges them.
         """
         # Scan all slices
-        all_paths.reverse() 
         parsed_slices = []
         
         for path in all_paths:
