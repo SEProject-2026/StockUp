@@ -10,8 +10,15 @@ def _normalize_unit(unit: str) -> str:
     return "UNIT"
 
 def _extract_pdf_line_data(line: str, index: int, trace: List[str]) -> Optional[Dict[str, Any]]:
-    units_pattern = r'(\'יח|יח\'|חי|יח|יחידה|יחידות|ק"ג|ג"ק|קג|קיג|ג"ק|`חי|`ח י|י ח|י\"ח|ח\"י)'
+    #remove discount lines
+    promo_keywords = ['מבצע:', ':מבצע', ':עצבמ','חולשמ']
+    if any(kw in line for kw in promo_keywords):
+        trace.append(f"L{index}: REJECTED - Promotion/Discount line detected: '{line[:30]}...'")
+        return None
+    
+    units_pattern = r'(\'יח|יח\'|חי|יח|יחידה|יחידות|ק"ג|ג"ק|קג|גק|קיג|ג"ק|`חי|`ח י|י ח|י\"ח|ח\"י)'
     unit_match = re.search(units_pattern, line)
+    
     
     if not unit_match:
         if re.search(r'\d{5,}', line):
@@ -59,8 +66,8 @@ def _extract_pdf_line_data(line: str, index: int, trace: List[str]) -> Optional[
     try:
         qty_val = float(qty_match)
         if qty_val <= 0:
-            qty_val = 1.0
-            trace.append(f"L{index}: INFO - Quantity was {qty_match}, forced to 1.0")
+            trace.append(f"L{index}: INFO - Quantity was {qty_match}, skipped")
+            return None
         
         trace.append(f"L{index}: SUCCESS - ID {barcode} | Qty {qty_val} | Unit {unit_str}")
         return {
