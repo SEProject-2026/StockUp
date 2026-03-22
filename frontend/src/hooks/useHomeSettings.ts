@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { getCurrentUserId } from "@/src/auth/token";
+import { useAuth } from "@/app/_layout"; 
 import {
-  getHomeJoinCode,
   updateExpirationRange,
   answerJoinRequest,
-  getJoinRequests,
   getMyHomes,
   getHomeDetails,
   leaveHome,
@@ -15,6 +13,7 @@ import {
   deleteHome,
 } from "@/src/api/homes";
 import { useRealtimeContext } from "../providers/RealtimeProvider";
+
 export function useRealtimeJoinRequestsRefresh(
   homeId: string | undefined,
   refreshJoinRequests: () => Promise<void>
@@ -26,8 +25,6 @@ export function useRealtimeJoinRequestsRefresh(
   useEffect(() => {
     if (!homeId) return;
 
-    console.log("[JoinRequestsRefresh] homeId:", homeId, "version:", currentVersion);
-
     if (firstRunRef.current) {
       firstRunRef.current = false;
       return;
@@ -38,7 +35,10 @@ export function useRealtimeJoinRequestsRefresh(
 }
 
 export function useHomeSettings(currentHomeId?: string) {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // שליפת המשתמש המחובר מה-Context
+  const { session } = useAuth();
+  const currentUserId = session?.user?.id;
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expiryAlertsEnabled, setExpiryAlertsEnabled] = useState(true);
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
@@ -69,7 +69,9 @@ export function useHomeSettings(currentHomeId?: string) {
   const clampDays = (n: number) => Math.max(0, Math.min(30, n));
 
   const loadHomeData = async () => {
-    if (!currentHomeId) return;
+    //Protection: If there is no home or there is no userId yet (loading), we will not try to pull data
+    if (!currentHomeId || !currentUserId) return;
+    
     try {
       setLoadingHomeMeta(true);
       const homesRes = await getMyHomes();
@@ -89,16 +91,24 @@ export function useHomeSettings(currentHomeId?: string) {
       }));
       setHomeMembers(members);
     } catch (e: any) {
-      Alert.alert("שגיאה", "טעינת הנתונים נכשלה");
+      console.error("[useHomeSettings] Error loading home data:", e);
+      // Alert.alert("שגיאה", "טעינת הנתונים נכשלה");
     } finally {
       setLoadingHomeMeta(false);
     }
   };
 
-  useEffect(() => { getCurrentUserId().then(setCurrentUserId); }, []);
-  useEffect(() => { loadHomeData(); }, [currentHomeId, currentUserId]);
+  // Automatically load when home or user changes
+  useEffect(() => { 
+    if (currentHomeId && currentUserId) {
+      loadHomeData(); 
+    }
+  }, [currentHomeId, currentUserId]);
 
-  const isHomeAdmin = !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
+  // Real-time management permission calculation
+  const isHomeAdmin = useMemo(() => {
+    return !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
+  }, [homeMeta, currentUserId]);
 
   const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
     try {

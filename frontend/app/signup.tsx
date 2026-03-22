@@ -17,9 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
-import { register, login } from "@/src/api/auth";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/src/lib/supabase";
 
 export default function SignupScreen() {

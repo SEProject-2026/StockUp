@@ -1,10 +1,6 @@
-import { apiFetch, authFetch } from "@/src/api/client";
-import {
-  setAccessToken,
-  clearAccessToken,
-  setCurrentUserId,
-  clearCurrentUserId,
-} from "@/src/auth/token";
+import { authFetch } from "@/src/api/client";
+import { supabase } from "@/src/lib/supabase";
+import { setSelectedHomeId } from "../utils/selected-home";
 
 export type GeneralResponse<T = any> = {
   status: "success" | "error";
@@ -17,45 +13,18 @@ export type UserDTO = {
   email: string;
   name?: string;
 };
-
-export type LoginResponse = {
-  status: "success" | "error";
-  access_token: string;
-  data: UserDTO;
-};
-
-export async function register(payload: {
-  email: string;
-  password: string;
-  password_confirm: string;
-  name: string;
-}) {
-  return apiFetch<GeneralResponse<UserDTO>>("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function login(payload: { email: string; password: string }) {
-  const res = await apiFetch<LoginResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  if (res.access_token) {
-    await setAccessToken(res.access_token);
-  }
-
-  if (res.data?.id) {
-    await setCurrentUserId(res.data.id);
-  }
-
-  return res;
-}
-
 export async function logout() {
-  await clearAccessToken();
-  await clearCurrentUserId();
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+
+    await setSelectedHomeId(null);
+    
+    console.log("[Auth] Logout successful and storage cleared.");
+  } catch (e) {
+    console.error("[Auth] Error during logout:", e);
+    throw e;
+  }
 }
 
 export async function updateName(payload: { name: string }) {
@@ -65,16 +34,12 @@ export async function updateName(payload: { name: string }) {
   });
 }
 
-export async function changePassword(payload: {
-  current_password: string;
-  new_password: string;
-}) {
-  return authFetch<GeneralResponse>("/auth/password", {
-    method: "PUT",
-    body: JSON.stringify(payload),
+export async function changePassword(payload: { new_password: string }) {
+  const { error } = await supabase.auth.updateUser({
+    password: payload.new_password
   });
+  if (error) throw error;
 }
-
 
 export async function updatePushToken(token: string) {
   return authFetch<GeneralResponse>("/auth/me/push-token", {

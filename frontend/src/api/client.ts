@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "@/src/config/api";
-import { getAccessToken } from "@/src/auth/token";
 import { getSelectedHomeId } from "../utils/selected-home";
+import { supabase } from "../lib/supabase";
 
 type FastApiDetailItem = {
   loc?: (string | number)[];
@@ -118,12 +118,19 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
 
 export async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const [token, homeId] = await Promise.all([getAccessToken(), getSelectedHomeId()]);
+  // 2. במקום getAccessToken הישן, אנחנו מושכים את הסשן מסופבייס
+  const [sessionRes, homeId] = await Promise.all([
+    supabase.auth.getSession(),
+    getSelectedHomeId()
+  ]);
+
+  const token = sessionRes.data.session?.access_token;
 
   return apiFetch<T>(path, {
     ...options,
     headers: {
       ...(options.headers ?? {}),
+      // הטוקן עכשיו מגיע ישירות מהסשן המנוהל של סופבייס
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(homeId ? { "X-Home-ID": homeId } : {}),
     },
