@@ -20,6 +20,7 @@ import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
 import { register, login } from "@/src/api/auth";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "@/src/lib/supabase";
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
@@ -39,37 +40,45 @@ export default function SignupScreen() {
     };
   }, [name, email, password, confirm, loading]);
 
-  async function onSignup() {
-    if (!validation.canSubmit) {
-      return;
-    }
+async function onSignup() {
+  if (!validation.canSubmit) return;
 
-    try {
-      setLoading(true);
-      const cleanEmail = email.trim().toLowerCase();
-      await register({
+  try {
+    setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1.calling Supabase's signUp method to create a new user 
+    const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
-      name: name.trim(),
-      password,
-      password_confirm: confirm,
+      password: password,
+      options: {
+        data: {
+          full_name: name.trim(),
+        },
+        emailRedirectTo: 'stockup://auth',
+      },
     });
 
-    const loginRes = await login({ email: cleanEmail, password });
-    
-    await AsyncStorage.setItem("userToken", loginRes.access_token);
+    if (error) throw error;
 
-    registerForPushNotificationsAsync().catch(console.error);
-
-    Alert.alert("נרשמת בהצלחה!", "ברוך הבא! החשבון שלך מוכן.", [
-      { text: "המשך", onPress: () => router.replace("/home/home") },
+    // 2. If the sign-up is successful, we check if the session exists. 
+    //   If it does, it means the user is logged in immediately (no email confirmation required). 
+    //   If not, it means an email confirmation is required.
+    if (data.session) {
+      registerForPushNotificationsAsync().catch(console.error);
+      Alert.alert("נרשמת בהצלחה!", "ברוך הבא! החשבון שלך מוכן.", [
+        { text: "המשך", onPress: () => router.replace("/home/home") },
       ]);
-
-    } catch (e: any) {
-      Alert.alert("הרשמה נכשלה", e?.message ?? "נסה/י שוב");
-    } finally {
-      setLoading(false);
+    } else {
+      Alert.alert("כמעט סיימנו", "שלחנו לך אימייל לאישור החשבון.");
     }
+
+  } catch (e: any) {
+    Alert.alert("הרשמה נכשלה", e?.message ?? "נסה/י שוב");
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <SafeAreaView style={styles.safeArea}>

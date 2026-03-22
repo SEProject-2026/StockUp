@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import { login } from "@/src/api/auth";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
+import { supabase } from "@/src/lib/supabase";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -29,19 +30,23 @@ export default function LoginScreen() {
     return password.length >= 6 && !loading;
   }, [email, password, loading]);
 
-  async function onLogin() {
+async function onLogin() {
     if (!canSubmit) return;
 
     try {
       setLoading(true);
 
-      await login({ email: email.trim().toLowerCase(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
 
-      registerForPushNotificationsAsync().catch(console.error);
+      if (error) throw error;
       
+      registerForPushNotificationsAsync().catch(console.error);
       router.replace("/home/home"); 
     } catch (e: any) {
-      Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");
+      Alert.alert("התחברות נכשלה", "אימייל או סיסמה שגויים, נסה/י שוב");
     } finally {
       setLoading(false);
     }
