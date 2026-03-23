@@ -12,12 +12,16 @@ class UserDTO(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+# class RegisterRequest(BaseModel):
+#     email: EmailStr
+#     name: str
+#     password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+#     password_confirm: str = Field(..., min_length=8, description="Password confirmation must match the password")
+
 class RegisterRequest(BaseModel):
+    user_id: UUID
     email: EmailStr
     name: str
-    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
-    password_confirm: str = Field(..., min_length=8, description="Password confirmation must match the password")
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

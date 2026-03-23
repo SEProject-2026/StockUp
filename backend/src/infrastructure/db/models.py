@@ -25,7 +25,6 @@ class UserModel(Base):
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     name = Column(String)
-    hashed_password = Column(String)
     push_token = Column(String, nullable=True)
 
     homes = relationship("HomeModel", secondary=user_home_association, back_populates="users")

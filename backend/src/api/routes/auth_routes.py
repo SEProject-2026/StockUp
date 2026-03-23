@@ -43,8 +43,7 @@ async def register(
     try:
         user = await user_service.register(
             email=request.email, 
-            password=request.password, 
-            confirm_password=request.password_confirm,
+            user_id=request.user_id,
             name=request.name
         )
         
@@ -59,30 +58,30 @@ async def register(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/login", response_model=LoginResponse)
-async def login(
-    request: LoginRequest,
-    user_service: UserServiceDep 
-):
-    """
-    Login and retrieve an access token.
-    """
-    app_logger.info(f"Login request received for email: {request.email}")
-    try:
-        user_entity, token = await user_service.login(request.email, request.password)
+# @router.post("/login", response_model=LoginResponse)
+# async def login(
+#     request: LoginRequest,
+#     user_service: UserServiceDep 
+# ):
+#     """
+#     Login and retrieve an access token.
+#     """
+#     app_logger.info(f"Login request received for email: {request.email}")
+#     try:
+#         user_entity, token = await user_service.login(request.email, request.password)
         
-        return LoginResponse(
-            status="success",
-            access_token=token,
-            data=UserDTO.model_validate(user_entity)
-        )
+#         return LoginResponse(
+#             status="success",
+#             access_token=token,
+#             data=UserDTO.model_validate(user_entity)
+#         )
     
-    except ValueError:
-        app_logger.warning(f"Login failed: Invalid credentials for email {request.email}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid credentials"
-        )
+#     except ValueError:
+#         app_logger.warning(f"Login failed: Invalid credentials for email {request.email}")
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED, 
+#             detail="Invalid credentials"
+#         )
 
 
 @router.put("/update_name", response_model=GeneralResponse)
@@ -108,32 +107,32 @@ async def update_name(
         raise HTTPException(status_code=400, detail=str(e))
     
 
-@router.put("/password", response_model=GeneralResponse)
-async def change_password(
-    request: ChangePasswordRequest,
-    user_service: UserServiceDep, 
-    user_id: UUID = Depends(get_current_user_id)
-):
-    """
-    Change the authenticated user's password.
-    Protected Route.
-    """
-    app_logger.info(f"Password change request received from user {user_id}")
-    try:
-        await user_service.change_password(
-            user_id=user_id,
-            current_password=request.current_password,
-            new_password=request.new_password
-        )
+# @router.put("/password", response_model=GeneralResponse)
+# async def change_password(
+#     request: ChangePasswordRequest,
+#     user_service: UserServiceDep, 
+#     user_id: UUID = Depends(get_current_user_id)
+# ):
+#     """
+#     Change the authenticated user's password.
+#     Protected Route.
+#     """
+#     app_logger.info(f"Password change request received from user {user_id}")
+#     try:
+#         await user_service.change_password(
+#             user_id=user_id,
+#             current_password=request.current_password,
+#             new_password=request.new_password
+#         )
         
-        return GeneralResponse(
-            status="success", 
-            message="Password changed successfully"
-        )
+#         return GeneralResponse(
+#             status="success", 
+#             message="Password changed successfully"
+#         )
         
-    except ValueError as e:
-        app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+#     except ValueError as e:
+#         app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
+#         raise HTTPException(status_code=400, detail=str(e))
     
 class PushTokenUpdateDTO(BaseModel):
     push_token: str

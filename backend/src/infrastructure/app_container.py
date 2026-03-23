@@ -12,6 +12,7 @@ from src.services.management_service import ManagementService
 
 # --- Auth ---
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
+from src.infrastructure.auth.supabase_auth_provider import SupabaseAuthProvider
 
 # --- Repositories (DB Implementation) ---
 from src.infrastructure.repositories.db_user_repository import DbUserRepository
@@ -44,7 +45,8 @@ class AppContainer:
     @staticmethod
     def get_auth_provider():
         if AppContainer._auth_provider_instance is None:
-            AppContainer._auth_provider_instance = JwtAuthProvider()
+            #AppContainer._auth_provider_instance = JwtAuthProvider()
+            AppContainer._auth_provider_instance = SupabaseAuthProvider()
         return AppContainer._auth_provider_instance
 
     @staticmethod

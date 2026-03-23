@@ -12,28 +12,62 @@ class UserService:
         self.user_repo = user_repo
         self.auth_provider = auth_provider
     
-    async def register(self, email: str, password: str, confirm_password: str, name: str) -> User:
-        """
-        Registers a new user to the system.
-        """
-        app_logger.debug(f"Starting registration process for email: {email}")
+    # async def register(self, email: str, password: str, confirm_password: str, name: str) -> User:
+    #     """
+    #     Registers a new user to the system.
+    #     """
+    #     app_logger.debug(f"Starting registration process for email: {email}")
         
-        if await self.user_repo.get_by_email(email):
-            app_logger.warning(f"Registration failed: Email already exists ({email})")
-            raise ValueError("User with this email already exists") 
+    #     if await self.user_repo.get_by_email(email):
+    #         app_logger.warning(f"Registration failed: Email already exists ({email})")
+    #         raise ValueError("User with this email already exists") 
             
-        if password != confirm_password:
-            app_logger.warning(f"Registration failed: Passwords do not match for email ({email})")
-            raise ValueError("Passwords do not match")
+    #     if password != confirm_password:
+    #         app_logger.warning(f"Registration failed: Passwords do not match for email ({email})")
+    #         raise ValueError("Passwords do not match")
 
-        # Encoding is a CPU-intensive operation, good place for a DEBUG log
-        app_logger.debug(f"Encoding password for new user ({email})")
-        hashed_password = PasswordEncoder.encode(password)
+    #     # Encoding is a CPU-intensive operation, good place for a DEBUG log
+    #     app_logger.debug(f"Encoding password for new user ({email})")
+    #     hashed_password = PasswordEncoder.encode(password)
 
-        user = User(email=email, hashed_password=hashed_password, name=name)
+    #     user = User(email=email, hashed_password=hashed_password, name=name)
         
+    #     await self.user_repo.save(user)
+    #     app_logger.info(f"User registered successfully with email: {email}")
+        
+    #     return user
+    
+    async def register(self, email: str, user_id: UUID, name: str) -> User:
+        """
+        Synchronizes a Supabase authenticated user with the local database.
+        """
+        app_logger.debug(f"Starting local registration/sync for user_id: {user_id}, email: {email}")
+        
+        # 1. Check if user already exists by ID (Primary Key)
+        # This prevents duplicate local profiles for the same Supabase user
+        existing_user = await self.user_repo.get_by_id(user_id)
+        if existing_user:
+            app_logger.info(f"User {user_id} already exists locally. Returning existing profile.")
+            return existing_user
+
+        # 2. Check if email is already taken by a different user_id
+        # (Safety check in case of email changes or existing manual accounts)
+        if await self.user_repo.get_by_email(email):
+            app_logger.warning(f"Registration failed: Email {email} is already associated with another account")
+            raise ValueError("Email already exists in the system")
+
+        # 3. Create the new User entity linked to the Supabase UUID
+        # Note: hashed_password is removed from the constructor as discussed
+        user = User(
+            id=user_id, 
+            email=email, 
+            name=name
+        )
+        
+        # 4. Save to our local PostgreSQL
         await self.user_repo.save(user)
-        app_logger.info(f"User registered successfully with email: {email}")
+        
+        app_logger.info(f"User profile synced successfully: {email} (ID: {user_id})")
         
         return user
 

@@ -18,7 +18,6 @@ class DbUserRepository(IUserRepository):
         
         db_user.email = user.email
         db_user.name = user.name
-        db_user.hashed_password = user.hashed_password
         db_user.push_token = user.push_token
         self.db.commit()
         return self._to_domain(db_user)
@@ -51,6 +50,5 @@ class DbUserRepository(IUserRepository):
             id=UUID(db_user.id),
             email=db_user.email,
             name=db_user.name,
-            hashed_password=db_user.hashed_password,
             push_token=db_user.push_token
         )
