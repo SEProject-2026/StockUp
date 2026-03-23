@@ -1,3 +1,4 @@
+
 import asyncio
 import os
 from uuid import UUID, uuid4
@@ -11,6 +12,7 @@ from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
 from src.domain.enums import ExpirationType, LocationType, UnitType
+#from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
@@ -88,12 +90,11 @@ class StockService:
 
         scanner = ReceiptScanner()
 
-        first = valid_paths[0]
-        rest = valid_paths[1:]
         
         app_logger.debug("Parsing receipt files through ML scanner...")
-        chain_name, scanned_items = scanner.parse_receipt(first, *rest)
-
+        chain_name, scanned_items = scanner.parse_receipt(valid_paths)
+        print(f"Scanned items: {scanned_items}")
+        print(f"Chain name: {chain_name}")
         receipt_items_dto: list[ReceiptItemDTO] = []
 
         for barcode, (qty, unit_str) in scanned_items.items():
