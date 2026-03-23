@@ -140,7 +140,8 @@ class ManagementService:
         """User voluntarily leaves a home."""
         app_logger.debug(f"User {user_id} attempting to leave home {home_id}")
         home = await self._check_access(user_id, home_id)
-        
+        # Check if user is admin and has no member left in this home
+        # if so consider deleting the home
         home.leave_home(user_id)
         await self._home_repository.update(home)
         app_logger.info(f"User {user_id} successfully left home {home_id}")

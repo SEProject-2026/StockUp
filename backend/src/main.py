@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
 
 
 
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="StockUp API", version="1.0.0", lifespan=lifespan)
 
 
