@@ -20,39 +20,15 @@ import {
   locationKey,
   StatusFilter,
   InventoryRow,
-  ProductGroupVM,
   dtoToRows,
   rowsSignature,
   statusFilterToExpirationType,
   locationToLocationType,
-  toIsoDateOnly,
 } from "@/src/components/inventory/inventory.utils";
-import { useRealtimeContext } from "../providers/RealtimeProvider";
 
 type LoadMode = "initial" | "soft";
 
 let inventoryCache: Record<string, InventoryRow[]> = {};
-export function useRealtimeInventoryRefresh(
-  homeId: string | undefined,
-  refreshInventory: () => Promise<void>
-) {
-  const { inventoryVersionByHome } = useRealtimeContext();
-  const firstRunRef = useRef(true);
-  const currentVersion = homeId ? (inventoryVersionByHome[homeId] ?? 0) : 0;
-
-  useEffect(() => {
-    if (!homeId) return;
-
-    console.log("[InventoryRefresh] homeId:", homeId, "version:", currentVersion);
-
-    if (firstRunRef.current) {
-      firstRunRef.current = false;
-      return;
-    }
-
-    refreshInventory();
-  }, [homeId, currentVersion, refreshInventory]);
-}
 
 export function useInventoryData(params: {
   homeId?: string;
@@ -81,92 +57,47 @@ export function useInventoryData(params: {
   const requestSeqRef = useRef(0);
   const prevSigRef = useRef<string>(rowsSignature(rows));
 
-  const fetchProducts = useCallback(
-    async (q: string, effCat: locationKey, sf: StatusFilter): Promise<ProductDTO[]> => {
-      if (!homeId) return [];
-
-      if (q.length >= 2) {
-        const res = await searchStock(homeId, q);
-        return res.data ?? [];
-      }
-
-      if (sf !== "all") {
-        const expType = statusFilterToExpirationType(sf);
-        const res = await filterStockByExpiration(homeId, expType!);
-        return res.data ?? [];
-      }
-
-      if (effCat !== "all") {
-        const loc = locationToLocationType(effCat);
-        const res = await filterStockByLocation(homeId, loc);
-        return res.data ?? [];
-      }
-
-      const res = await getAllStock(homeId);
-      return res.data ?? [];
-    },
-    [homeId]
-  );
-
-  const applyClientFilters = useCallback(
-    (input: InventoryRow[], q: string, effCat: locationKey, sf: StatusFilter) => {
-      let out = input;
-
-      if (effCat !== "all") {
-        out = out.filter((r) => r.location === effCat);
-      }
-
-      if (q.length >= 2) {
-        const qq = q.toLowerCase();
-        out = out.filter(
-          (r) =>
-            r.name.toLowerCase().includes(qq) ||
-            r.originalName.toLowerCase().includes(qq)
-        );
-      }
-
-      if (sf !== "all") {
-        const wanted = statusFilterToExpirationType(sf)!;
-        out = out.filter((r) => String(r.status ?? "").toUpperCase() === wanted);
-      }
-
-      return out;
-    },
-    []
-  );
-
   const loadInventory = useCallback(
     async (mode: LoadMode = "soft") => {
       if (!homeId) return;
-
       const mySeq = ++requestSeqRef.current;
       const q = debouncedSearch.trim();
 
       try {
-        if (mode === "initial") {
-          setInitialLoading(true);
-        } else if (q.length > 0) {
-          setIsSearching(true);
+        if (mode === "initial") setInitialLoading(true);
+        else if (q.length > 0) setIsSearching(true);
+
+        let products: ProductDTO[] = [];
+        if (q.length >= 2) {
+          const res = await searchStock(homeId, q);
+          products = res.data ?? [];
+        } else if (statusFilter !== "all") {
+          const expType = statusFilterToExpirationType(statusFilter);
+          const res = await filterStockByExpiration(homeId, expType!);
+          products = res.data ?? [];
+        } else if (effectivelocation !== "all") {
+          const loc = locationToLocationType(effectivelocation);
+          const res = await filterStockByLocation(homeId, loc);
+          products = res.data ?? [];
+        } else {
+          const res = await getAllStock(homeId);
+          products = res.data ?? [];
         }
 
-        const products = await fetchProducts(q, effectivelocation, statusFilter);
         if (mySeq !== requestSeqRef.current) return;
 
+        // הפיכת ה-DTO לשורות שטוחות (InventoryRow)
         const flat = products.flatMap(dtoToRows);
-        const filtered = applyClientFilters(flat, q, effectivelocation, statusFilter);
-        const nextSig = rowsSignature(filtered);
-
-        if (nextSig !== prevSigRef.current) {
-          prevSigRef.current = nextSig;
-          setRows(filtered);
-
-          if (!q && statusFilter === "all" && effectivelocation === "all") {
-            inventoryCache[homeId] = filtered;
-          }
+        
+        setRows(flat);
+        prevSigRef.current = rowsSignature(flat);
+        
+        if (!q && statusFilter === "all" && effectivelocation === "all") {
+          inventoryCache[homeId] = flat;
         }
       } catch (e: any) {
         if (mySeq !== requestSeqRef.current) return;
-        Alert.alert("שגיאה", e?.message ?? "לא הצלחתי לטעון מלאי");
+        console.error("Load error:", e);
       } finally {
         if (mySeq === requestSeqRef.current) {
           setInitialLoading(false);
@@ -174,148 +105,133 @@ export function useInventoryData(params: {
         }
       }
     },
-    [homeId, debouncedSearch, effectivelocation, statusFilter, fetchProducts, applyClientFilters]
+    [homeId, debouncedSearch, effectivelocation, statusFilter]
   );
 
   useEffect(() => {
-    if (!homeId) {
-      setRows([]);
-      setInitialLoading(false);
-      return;
-    }
-
-    const hasCache = (inventoryCache[homeId] || []).length > 0;
-    const mode: LoadMode = hasCache ? "soft" : "initial";
-    loadInventory(mode);
-  }, [homeId, debouncedSearch, effectivelocation, statusFilter, loadInventory]);
-
-  useEffect(() => {
     if (!homeId) return;
-
-    const channel = supabase
-      .channel(`inventory-${homeId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "product_items",
-          filter: `home_id=eq.${homeId}`,
-        },
-        async () => {
-          await loadInventory("soft");
-        }
-      )
-      .subscribe((status) => {
-        console.log("[Realtime][inventory] status:", status);
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [homeId, loadInventory]);
+    loadInventory(inventoryCache[homeId] ? "soft" : "initial");
+  }, [homeId, debouncedSearch, effectivelocation, statusFilter, loadInventory]);
 
   const changeQty = useCallback(
     async (itemId: string, delta: number) => {
       if (!homeId) return;
-
-      const current = rows.find((r) => r.itemId === itemId || r.id === itemId);
+      const current = rows.find((r) => r.itemId === itemId);
       if (!current) return;
 
       const next = current.quantity + delta;
       if (next < 0) return;
 
-      const nextRows =
-        next === 0
-          ? rows.filter((r) => r.itemId !== current.itemId)
-          : rows.map((r) =>
-              r.itemId === current.itemId ? { ...r, quantity: next } : r
-            );
+      const nextRows = next === 0
+        ? rows.filter((r) => r.itemId !== itemId)
+        : rows.map((r) => (r.itemId === itemId ? { ...r, quantity: next } : r));
 
       setRows(nextRows);
-      prevSigRef.current = rowsSignature(nextRows);
 
       try {
         if (next === 0) {
-          await removeItem(homeId, current.productId, current.itemId);
+          await removeItem(homeId, current.productId, itemId);
         } else {
-          await updateItemQuantity(homeId, current.productId, current.itemId, {
-            new_quantity: next,
-          });
+          await updateItemQuantity(homeId, current.productId, itemId, { new_quantity: next });
         }
-
-        inventoryCache[homeId] = nextRows;
-      } catch (e: any) {
+      } catch (e) {
         loadInventory("soft");
       }
     },
     [homeId, rows, loadInventory]
   );
 
-  return {
-    rows,
-    groupedItems: useMemo(() => {
-      const productMap = new Map<string, any>();
+  const deleteRow = useCallback(async (itemId: string) => {
+    const item = rows.find(r => r.itemId === itemId);
+    if (!item) return;
+    await changeQty(itemId, -item.quantity);
+  }, [rows, changeQty]);
 
-      for (const r of rows) {
-        const key = `${r.productId}__${r.originalName}`;
-        const g =
-          productMap.get(key) ??
-          (() => {
-            const hasNick = r.hasNickname;
-            const title = r.name;
-            const subtitle = hasNick ? r.originalName : undefined;
+const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: string | null, quantity?: number, expirationDate?: string | null }) => {
+  if (!homeId) return;
+  const current = rows.find(r => r.itemId === itemId);
+  if (!current) return;
 
-            const fresh = {
-              key,
-              productId: r.productId,
-              title,
-              subtitle,
-              originalName: r.originalName,
-              nickname: hasNick ? title : null,
-              totalQuantity: 0,
-              byLoc: new Map(),
-            };
+  try {
+    // 1. עדכון כינוי - אם המשתמש רוקן את השדה, נשלח "" כדי לאפס
+    if (updatedValues.nickname !== undefined && updatedValues.nickname !== current.name) {
+      const cleanNickname = updatedValues.nickname === null ? null : updatedValues.nickname.trim();
+      await updateProductNickname(homeId, current.productId, { 
+        nickname: cleanNickname // אם ריק, יחזור לשם המקורי
+      });
+    }
 
-            productMap.set(key, fresh);
-            return fresh;
-          })();
+    // 2. עדכון כמות
+    if (updatedValues.quantity !== undefined && updatedValues.quantity !== current.quantity) {
+      if (updatedValues.quantity === 0) {
+        await removeItem(homeId, current.productId, itemId);
+      } else {
+        await updateItemQuantity(homeId, current.productId, itemId, { 
+          new_quantity: updatedValues.quantity 
+        });
+      }
+    }
 
-        g.totalQuantity += r.quantity;
+    // 3. עדכון תוקף
+    if (updatedValues.expirationDate !== undefined && updatedValues.expirationDate !== current.expirationDate) {
+      const cleanDate = updatedValues.expirationDate === null ? null : updatedValues.expirationDate.trim();
+      await updateItemExpiration(homeId, current.productId, itemId, {
+        new_date: cleanDate
+      });
+    }
 
-        const locKey = r.location;
-        const sec =
-          g.byLoc.get(locKey) ??
-          (() => {
-            const created = { location: r.location, totalQuantity: 0, items: [] };
-            g.byLoc.set(locKey, created);
-            return created;
-          })();
+    await loadInventory("soft");
+    setItemToEdit(null);
+  } catch (e) {
+    console.error("Save error:", e);
+    Alert.alert("שגיאה", "לא הצלחתי לשמור את השינויים");
+  }
+}, [homeId, rows, loadInventory]);
 
-        sec.totalQuantity += r.quantity;
-        sec.items.push(r);
+  const groupedItems = useMemo(() => {
+    if (!rows || rows.length === 0) return [];
+
+    const productMap = new Map<string, any>();
+
+    for (const r of rows) {
+      // מפתח ייחודי לפי שם מוצר מקורי (כדי לאחד כפילויות)
+      const key = `${r.productId}__${r.originalName}`;
+      
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          key,
+          productId: r.productId,
+          title: r.name,
+          subtitle: r.hasNickname ? r.originalName : undefined,
+          totalQuantity: 0,
+          byLoc: new Map(),
+        });
       }
 
-      return Array.from(productMap.values())
-        .map((g) => {
-          const order: any = { fridge: 1, freezer: 2, pantry: 3, cleaning: 4, other: 5 };
+      const g = productMap.get(key);
+      g.totalQuantity += r.quantity;
 
-          const sections = Array.from(g.byLoc.values())
-            .sort((a: any, b: any) => (order[a.location] ?? 99) - (order[b.location] ?? 99))
-            .map((sec: any) => ({
-              location: sec.location,
-              totalQuantity: sec.totalQuantity,
-              items: sec.items.sort((a: any, b: any) =>
-                (a.expirationDate ?? "9999-12-31").localeCompare(
-                  b.expirationDate ?? "9999-12-31"
-                )
-              ),
-            }));
+      if (!g.byLoc.has(r.location)) {
+        g.byLoc.set(r.location, { location: r.location, totalQuantity: 0, items: [] });
+      }
 
-          return { ...g, sections };
-        })
-        .sort((a, b) => a.title.localeCompare(b.title, "he"));
-    }, [rows]),
+      const sec = g.byLoc.get(r.location);
+      sec.totalQuantity += r.quantity;
+      sec.items.push(r);
+    }
+
+    return Array.from(productMap.values()).map(g => ({
+      ...g,
+      sections: Array.from(g.byLoc.values()).map((sec: any) => ({
+        ...sec,
+        items: sec.items.sort((a: any, b: any) => (a.expirationDate ?? "9").localeCompare(b.expirationDate ?? "9"))
+      }))
+    })).sort((a, b) => a.title.localeCompare(b.title, "he"));
+  }, [rows]);
+
+  return {
+    rows,
+    groupedItems,
     initialLoading,
     isSearching,
     selectedTab,
@@ -328,7 +244,7 @@ export function useInventoryData(params: {
     setItemToEdit,
     loadInventory,
     changeQty,
-    deleteRow: (id: string) => {},
-    saveEdit: async (id: string, val: any) => {},
+    deleteRow,
+    saveEdit,
   };
 }

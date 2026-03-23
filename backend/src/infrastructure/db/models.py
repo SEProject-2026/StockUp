@@ -26,6 +26,7 @@ class UserModel(Base):
     email = Column(String, unique=True, index=True)
     name = Column(String)
     hashed_password = Column(String)
+    push_token = Column(String, nullable=True)
 
     homes = relationship("HomeModel", secondary=user_home_association, back_populates="users")
     requested_homes = relationship("HomeModel", secondary=join_requests_association, back_populates="join_requests")

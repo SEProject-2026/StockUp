@@ -112,6 +112,20 @@ export async function addItemToShoppingList(
   return unwrapResponse(response);
 }
 
+export async function deleteShoppingListItem(
+  listId: string,
+  itemName: string
+): Promise<ShoppingListDTO> {
+  const response = await authFetch<GeneralResponse<ShoppingListDTO>>(
+    `${BASE}/${listId}/items/${encodeURIComponent(itemName)}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  return unwrapResponse(response);
+}
+
 export async function updateShoppingListItemQuantity(
   listId: string,
   itemName: string,

@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import { login } from "@/src/api/auth";
+import { registerForPushNotificationsAsync } from '../src/api/notifications';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -35,6 +36,9 @@ export default function LoginScreen() {
       setLoading(true);
 
       await login({ email: email.trim().toLowerCase(), password });
+
+      registerForPushNotificationsAsync().catch(console.error);
+      
       router.replace("/home/home"); 
     } catch (e: any) {
       Alert.alert("התחברות נכשלה", e?.message ?? "בדוק אימייל/סיסמה ונסה שוב");

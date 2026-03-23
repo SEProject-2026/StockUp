@@ -16,14 +16,17 @@ from src.domain.enums import ExpirationType, LocationType, UnitType
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
+from src.repositories.user_repository import IUserRepository
+from src.services.notification_service import send_push_notification
 
 class StockService:
  
     def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
-                  catalog_provider: ICatalogProvider):
+                  catalog_provider: ICatalogProvider, user_repository: IUserRepository):
         self._home_repository = home_repository
         self._product_repository = product_repository
         self._catalog_provider = catalog_provider
+        self._user_repository = user_repository
 
     # ==========================================
     # 2. Stock Management (Inventory)
@@ -187,6 +190,32 @@ class StockService:
             self._catalog_provider.persist()
             app_logger.debug("Catalog weights persisted successfully")
 
+        try:
+            home = await self._home_repository.get_by_id(receipt_dto.home_id)
+            scanner_user = await self._user_repository.get_by_id(receipt_dto.user_id)
+            
+            scanner_name = scanner_user.name if scanner_user else "אחד השותפים"
+            home_name = home.get_name()
+            members = home.get_members()
+
+            if count > 0:
+                for member_id in members:
+                    if member_id == receipt_dto.user_id:
+                        continue
+                        
+                    target_user = await self._user_repository.get_by_id(member_id)
+                    if target_user and target_user.push_token:
+                        send_push_notification(
+                            token=target_user.push_token,
+                            title=f"מלאי חדש ב{home_name}! 🛒",
+                            message=f"{scanner_name} הוסיף {count} מוצרים חדשים.",
+                            data={"action": "receipt_added", "home_id": str(receipt_dto.home_id)}
+                        )
+                app_logger.info(f"Receipt scan notifications sent to members of home {receipt_dto.home_id}")
+                
+        except Exception as e:
+            app_logger.error(f"Failed to send receipt notifications: {e}")
+
         return count
         
     async def remove_item(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID) -> Optional[Product]:
@@ -212,6 +241,26 @@ class StockService:
         else:
             await self._product_repository.delete(product_id)
             app_logger.info(f"Removed last item {item_id}. Product {product_id} deleted completely.")
+            
+            # Note: when implementing shopping list
+
+            # try:
+            #     home = await self._home_repository.get_by_id(home_id)
+            #     if home and home.get_admin():
+            #         admin_user = await self._user_repository.get_by_id(home.get_admin())
+                    
+            #         if admin_user and admin_user.push_token:
+            #             product_name = product.nickname if product.nickname else product.original_name
+                        
+            #             send_push_notification(
+            #                 token=admin_user.push_token,
+            #                 title="מוצר אזל מהמלאי! ⚠️",
+            #                 message=f"המוצר '{product_name}' נגמר. תרצה שנוסיף לרשימת הקניות?.",
+            #                 data={"action": "out_of_stock", "home_id": str(home_id)}
+            #             )
+            # except Exception as e:
+            #     app_logger.error(f"Failed to send out of stock notification: {e}")
+            
             return None
 
     async def update_item_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_quantity: int) -> Optional[Product]:
@@ -232,6 +281,27 @@ class StockService:
         else:
             await self._product_repository.delete(product_id)
             app_logger.info(f"Quantity set to 0. Product {product_id} deleted completely.")
+            
+            # Note: when implementing shopping list
+
+            # try:
+            #     home = await self._home_repository.get_by_id(home_id)
+            #     if home and home.get_admin():
+            #         admin_user = await self._user_repository.get_by_id(home.get_admin())
+                    
+            #         if admin_user and admin_user.push_token:
+            #             product_name = product.nickname if product.nickname else product.original_name
+                        
+            #             send_push_notification(
+            #                 token=admin_user.push_token,
+            #                 title="מוצר אזל מהמלאי! ⚠️",
+            #                 message=f"המוצר '{product_name}' נגמר. תרצה שנוסיף לרשימת הקניות?.",
+            #                 data={"action": "out_of_stock", "home_id": str(home_id)}
+            #             )
+            # except Exception as e:
+            #     app_logger.error(f"Failed to send out of stock notification: {e}")
+            
+            
             return None
 
     async def update_item_date(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_date: Optional[date]) -> Product:
@@ -392,6 +462,81 @@ class StockService:
         await self._check_access(user_id, home_id)
         products = await self._product_repository.list_all_by_home(home_id)
         return products
+
+    async def check_expirations_and_notify(self):
+        """
+        Daily cron job function (Scalable Batch Version): 
+        Scans homes in batches, checks for expiring/expired items, 
+        and sends push notifications.
+        """
+        app_logger.info("Starting daily expiration check (Batch Mode)...")
+        
+        batch_size = 100
+        offset = 0
+        total_processed = 0
+
+        while True:
+            try:
+                homes_batch = await self._home_repository.get_homes_batch(limit=batch_size, offset=offset)
+                
+                if not homes_batch:
+                    break 
+
+                for home in homes_batch:
+                    try:
+                        warning_days = home.get_expiration_range()
+                        products = await self._product_repository.list_all_by_home(home.get_id())
+                        
+                        expired_names = set()
+                        expiring_names = set()
+
+                        for product in products:
+                            name = product.nickname if product.nickname else product.original_name
+                            for item in product.items:
+                                status = item.get_status(warning_days)
+                                if status == ExpirationType.EXPIRED:
+                                    expired_names.add(name)
+                                elif status == ExpirationType.GOING_TO_EXPIRE:
+                                    expiring_names.add(name)
+
+                        if not expired_names and not expiring_names:
+                            continue 
+
+                        msg_parts = []
+                        if expired_names:
+                            msg_parts.append(f"❌ פג תוקף: {', '.join(expired_names)}")
+                        if expiring_names:
+                            msg_parts.append(f"⏳ יפוגו בקרוב: {', '.join(expiring_names)}")
+
+                        message = "\n".join(msg_parts)
+                        home_name = home.get_name()
+                        title = f"עדכון מלאי: {home_name} 📅"
+
+                        members = home.get_members()
+                        for member_id in members:
+                            user = await self._user_repository.get_by_id(member_id)
+                            if user and user.push_token:
+                                send_push_notification(
+                                    token=user.push_token,
+                                    title=title,
+                                    message=message,
+                                    data={"action": "expiration_alert", "home_id": str(home.get_id())}
+                                )
+
+                    except Exception as e:
+                        app_logger.error(f"Error checking expirations for home {home.get_id()}: {e}")
+
+                total_processed += len(homes_batch)
+                offset += batch_size
+                
+                # Adding a short sleep to prevent overwhelming the database in case of large number of homes. 
+                asyncio.sleep(0.1) 
+
+            except Exception as e:
+                app_logger.error(f"Fatal error fetching batch at offset {offset}: {e}")
+                break # עוצרים את הלולאה במקרה של קריסת DB כדי לא להיתקע לנצח
+
+        app_logger.info(f"Finished daily expiration check. Processed {total_processed} homes total.")
     
     async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
         """Helper to verify user exists, logged in, and member of the home"""

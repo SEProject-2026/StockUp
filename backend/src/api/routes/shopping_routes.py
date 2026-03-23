@@ -17,6 +17,8 @@ from src.api.security import get_current_user_id
 from src.infrastructure.app_container import AppContainer
 from src.infrastructure.logger import app_logger
 
+from src.api.routes.translate_notifications import translate_error
+
 router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 
 # --- Dependency Injection ---
@@ -45,9 +47,11 @@ async def create_list(
             data=ShoppingListDTO.model_validate(new_list)
         )
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 
 @router.get("/home/{home_id}", response_model=GeneralResponse)
@@ -73,7 +77,8 @@ async def get_list(
         # Verify user has access to the home associated with this list
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(shopping_list))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 
 @router.post("/{list_id}/items", response_model=GeneralResponse)
@@ -90,8 +95,32 @@ async def add_item(
         )
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
+    
+@router.delete("/{list_id}/items/{item_name}", response_model=GeneralResponse)
+async def remove_item_from_list(
+    list_id: UUID,
+    item_name: str,
+    service: ShoppingServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Removes a specific item from the shopping list by its name.
+    """
+    app_logger.info(f"User {user_id} is removing item '{item_name}' from list {list_id}")
+    try:
+        updated_list = await service.remove_item_from_list(list_id, item_name)
+        return GeneralResponse(
+            status="success",
+            message=f"Item '{item_name}' removed successfully",
+            data=ShoppingListDTO.model_validate(updated_list)
+        )
+    except ValueError as e:
+        app_logger.warning(f"Failed to remove item '{item_name}' from list {list_id}: {str(e)}")
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 @router.patch("/{list_id}/items/{item_name}/quantity", response_model=GeneralResponse)
 async def update_quantity(
@@ -105,7 +134,8 @@ async def update_quantity(
         updated = await service.update_item_quantity(list_id, item_name, request.new_quantity)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 
 @router.post("/{list_id}/enter-mode", response_model=GeneralResponse)
@@ -127,7 +157,8 @@ async def enter_shopping_mode(
         )
     except ValueError as e:
         app_logger.warning(f"Failed to enter shopping mode for list {list_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 @router.patch("/{list_id}/items/{item_name}/check", response_model=GeneralResponse)
 async def check_bought(
@@ -140,7 +171,8 @@ async def check_bought(
         updated = await service.check_item_as_bought(list_id, item_name)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 
 @router.post("/{list_id}/exit-mode", response_model=GeneralResponse)
@@ -155,7 +187,8 @@ async def exit_mode(
         updated = await service.exit_shopping_mode(list_id, clear=request.clear)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 
 @router.delete("/{list_id}", status_code=status.HTTP_204_NO_CONTENT)

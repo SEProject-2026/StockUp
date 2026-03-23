@@ -93,8 +93,10 @@ return (
                   <View key={it.id}>
                     <ShoppingItemRow 
                       item={it} mode={mode} isPicked={!!picked[it.id]} 
-                      onToggle={() => togglePick(it.id)} onIncrease={() => updateQuantity(it.id, 1)} 
-                      onDecrease={() => updateQuantity(it.id, -1)} onRemove={() => removeItem(it.id)} 
+                      onToggle={() => togglePick(it.id)} 
+                      onIncrease={() => updateQuantity(it.id, 1)} 
+                      onDecrease={() => updateQuantity(it.id, -1)} 
+                      onRemove={() => removeItem(it.id)} 
                     />
                     {i < section.items.length - 1 && <View style={styles.separator} />}
                   </View>

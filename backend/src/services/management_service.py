@@ -2,6 +2,7 @@ from uuid import UUID
 from typing import List
 from src.repositories.user_repository import IUserRepository
 from src.repositories.i_home_repository import IHomeRepository
+from src.services.notification_service import send_push_notification
 from src.domain.home.home import Home
 from src.infrastructure.logger import app_logger
 
@@ -51,6 +52,26 @@ class ManagementService:
         await self._home_repository.update(home)
         app_logger.info(f"User {user_id} successfully submitted a join request to home {home.get_id()}")
 
+        try:
+            owner_id = home.get_admin()
+            owner = await self._user_repository.get_by_id(owner_id)
+
+            requester = await self._user_repository.get_by_id(user_id)
+            requester_name = requester.name if requester else "שותף חדש"
+
+            if owner and owner.push_token:
+                send_push_notification(
+                    token=owner.push_token,
+                    title="בקשת הצטרפות חדשה! 🏠",
+                    message=f"{requester_name} מבקש להצטרף לבית שלך. היכנסו כדי לאשר.",
+                    data={"action": "join_request", "home_id": str(home.get_id()), "user_id": str(user_id)},
+                    category_id="join_request_category"
+                )
+                app_logger.info(f"Join request push notification sent to home owner {owner_id}")
+                
+        except Exception as e:
+            app_logger.error(f"Failed to send join request notification: {e}")
+
     async def answer_join_request(self, home_id: UUID, head_user_id: UUID, user_id: UUID, approved: bool) -> Home:
         """Head of House approves or denies a join request."""
         action = "approve" if approved else "deny"
@@ -61,6 +82,24 @@ class ManagementService:
 
         await self._home_repository.update(home)
         app_logger.info(f"Join request for user {user_id} was {action}d by head user {head_user_id} in home {home_id}")
+        
+        try:
+            target_user = await self._user_repository.get_by_id(user_id)
+            if target_user and target_user.push_token:
+                home_name = home.get_name()
+                
+                title = "בקשתך אושרה! 🎉" if approved else "עדכון לגבי בקשת ההצטרפות"
+                message = f"ברוך הבא! צורפת בהצלחה ל{home_name}." if approved else f"לצערנו בקשת ההצטרפות ל{home_name} נדחתה."
+                
+                send_push_notification(
+                    token=target_user.push_token,
+                    title=title,
+                    message=message,
+                    data={"action": "join_answered", "home_id": str(home_id), "approved": approved}
+                )
+        except Exception as e:
+            app_logger.error(f"Failed to send join answer notification to {user_id}: {e}")
+
         return home
 
     async def remove_member(self, head_user_id: UUID, home_id: UUID, target_user_id: UUID) -> Home:
@@ -72,6 +111,21 @@ class ManagementService:
         await self._home_repository.update(home)
         
         app_logger.info(f"Member {target_user_id} was removed from home {home_id} by head user {head_user_id}")
+        
+        try:
+            target_user = await self._user_repository.get_by_id(target_user_id)
+            if target_user and target_user.push_token:
+                home_name = home.get_name()
+                
+                send_push_notification(
+                    token=target_user.push_token,
+                    title="עדכון קבוצה 🏠",
+                    message=f"הוסרת מהשותפות ב{home_name}.",
+                    data={"action": "member_removed", "home_id": str(home_id)}
+                )
+        except Exception as e:
+            app_logger.error(f"Failed to send remove member notification to {target_user_id}: {e}")
+
         return home
 
     async def switch_home(self, user_id: UUID, target_home_id: UUID) -> Home:
@@ -98,6 +152,21 @@ class ManagementService:
         
         home.assign_admin(current_head_id, new_head_id)
         await self._home_repository.update(home)
+
+        try:
+            new_head_user = await self._user_repository.get_by_id(new_head_id)
+            if new_head_user and new_head_user.push_token:
+                home_name = home.get_name()
+                
+                send_push_notification(
+                    token=new_head_user.push_token,
+                    title="עדכון ראש בית 🏠",
+                    message=f"הועברת לניהול הבית {home_name}.",
+                    data={"action": "head_transferred", "home_id": str(home_id)}
+                )
+        except Exception as e:
+            app_logger.error(f"Failed to send head transfer notification to {new_head_id}: {e}")
+
         
         app_logger.info(f"Head of House role in home {home_id} transferred from {current_head_id} to {new_head_id}")
         return home
@@ -109,8 +178,27 @@ class ManagementService:
         
         home.can_delete_home(head_user_id)
 
-        # Note: When implementing the notification system, we should also trigger 
-        # notifications to all members about the home deletion here.
+        try:
+            home_name = home.get_name()
+            
+            members = home.get_members()
+            
+            for member_id in members:
+                if member_id == head_user_id:
+                    continue
+                    
+                target_user = await self._user_repository.get_by_id(member_id)
+                if target_user and target_user.push_token:
+                    send_push_notification(
+                        token=target_user.push_token,
+                        title="הבית נמחק 🏚️",
+                        message=f"הבית '{home_name}' נמחק לצמיתות על ידי מנהל הבית.",
+                        data={"action": "home_deleted", "home_id": str(home_id)}
+                    )
+            app_logger.info(f"Home deletion notifications sent to members of home {home_id}")
+            
+        except Exception as e:
+            app_logger.error(f"Failed to send home deletion notifications: {e}")
         
         await self._home_repository.delete(home_id)
         app_logger.info(f"Home {home_id} was completely deleted by head user {head_user_id}")
@@ -149,10 +237,6 @@ class ManagementService:
     async def update_expiration_range(self, head_user_id: UUID, home_id: UUID, new_range: int) -> Home:
         app_logger.debug(f"User {head_user_id} attempting to update expiration range to {new_range} in home {home_id}")
         home = await self._home_repository.get_by_id(home_id)
-        
-        # Note: Missing access check here in your original code! 
-        # Usually, only the head of the house should be able to do this.
-        # Assuming `update_expiration_range` in the Domain model checks this.
         home.update_expiration_range(head_user_id, new_range)
         
         await self._home_repository.update(home)

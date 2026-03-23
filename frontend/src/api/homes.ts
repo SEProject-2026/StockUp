@@ -102,6 +102,26 @@ export async function answerJoinRequest(
   );
 }
 
+export async function approveJoinRequest(homeId: string, userId: string) {
+  return authFetch<GeneralResponse>(`/homes/${homeId}/answer_request`, {
+    method: "POST",
+    body: JSON.stringify({
+        user_id: userId,
+        approved: true
+    })
+  });
+}
+
+export async function rejectJoinRequest(homeId: string, userId: string) {
+  return authFetch<GeneralResponse>(`/homes/${homeId}/answer_request`, {
+    method: "POST",
+    body: JSON.stringify({
+        user_id: userId,
+        approved: false
+    })
+  });
+}
+
 export async function removeMember(homeId: string, targetUserId: string) {
   return authFetch<GeneralResponse<HomeDTO>>(
     `/homes/${homeId}/members/${targetUserId}`,

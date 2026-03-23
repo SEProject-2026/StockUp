@@ -2,10 +2,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from sqlalchemy.orm import Session 
-from src.infrastructure.logger import app_logger
 
+from src.domain.user.user import User
+from src.infrastructure import app_container
+from src.infrastructure.logger import app_logger
+from pydantic import BaseModel
 from src.infrastructure.db.database import get_db
 from src.api.schemas.user_schemas import (
+
     UserDTO,
     RegisterRequest, 
     LoginRequest, 
@@ -18,6 +22,8 @@ from src.api.schemas.common import GeneralResponse
 from src.infrastructure.app_container import AppContainer
 from src.api.security import get_current_user_id
 from src.services.user_service import UserService 
+
+from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -52,7 +58,8 @@ async def register(
     
     except ValueError as e:
         app_logger.warning(f"Registration failed for email {request.email} - Reason: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -101,8 +108,9 @@ async def update_name(
         )
     except ValueError as e:
         app_logger.warning(f"Name update failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)
+
 
 @router.put("/password", response_model=GeneralResponse)
 async def change_password(
@@ -129,4 +137,22 @@ async def change_password(
         
     except ValueError as e:
         app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)
+
+class PushTokenUpdateDTO(BaseModel):
+    push_token: str
+
+
+@router.patch("/me/push-token")
+async def update_push_token(
+    data: PushTokenUpdateDTO,
+    user_service: UserServiceDep, 
+    user_id: UUID = Depends(get_current_user_id)
+):
+    try:
+        await user_service.update_push_token(user_id, data.push_token)
+        return {"status": "success", "message": "Push token saved"}
+    except ValueError as e:
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)

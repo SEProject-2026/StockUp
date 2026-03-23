@@ -153,7 +153,7 @@ export async function updateItemLocation(
 export async function updateProductNickname(
   homeId: string,
   productId: string,
-  payload: { nickname: string }
+  payload: { nickname?: string | null }
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,

@@ -10,6 +10,7 @@ from src.api.schemas.common import GeneralResponse
 from src.api.security import get_current_user_id
 from src.infrastructure.app_container import AppContainer
 from src.infrastructure.logger import app_logger  # <--- Added logger import
+from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/homes", tags=["Home Management"])
 
@@ -41,8 +42,9 @@ async def create_home(
         )
     except ValueError as e:
         app_logger.warning(f"Failed to create home for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
+
 @router.get("/my_homes", response_model=GeneralResponse)
 async def get_my_homes(
     service: ManagementServiceDep,
@@ -59,8 +61,8 @@ async def get_my_homes(
         )
     except ValueError as e:
         app_logger.warning(f"Failed to get homes for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.get("/{home_id}/join_code", response_model=GeneralResponse)
 async def view_home_code(
@@ -74,7 +76,8 @@ async def view_home_code(
         return GeneralResponse(status="success", data={"join_code": code})
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"View join code failed for user {user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
 
 @router.post("/join", response_model=GeneralResponse)
 async def join_home(
@@ -88,7 +91,8 @@ async def join_home(
         return GeneralResponse(status="success", message="Join request sent successfully")
     except ValueError as e:
         app_logger.warning(f"Join home failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.post("/{home_id}/answer_request", response_model=GeneralResponse)
 async def answer_join_request(
@@ -103,7 +107,8 @@ async def answer_join_request(
         return GeneralResponse(status="success", data=HomeDTO.from_domain(home))
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"Answer join request failed for head user {head_user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.delete("/{home_id}/members/{target_user_id}", response_model=GeneralResponse)
 async def remove_member(
@@ -118,7 +123,8 @@ async def remove_member(
         return GeneralResponse(status="success", data=HomeDTO.from_domain(home))
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"Remove member failed for head user {head_user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.post("/{home_id}/leave", response_model=GeneralResponse)
 async def leave_home(
@@ -132,7 +138,8 @@ async def leave_home(
         return GeneralResponse(status="success", message="Left home successfully")
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"Leave home failed for user {user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.put("/{home_id}/switch_head", response_model=GeneralResponse)
 async def switch_home_head(
@@ -147,7 +154,8 @@ async def switch_home_head(
         return GeneralResponse(status="success", data=HomeDTO.from_domain(home))
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"Switch home head failed for current head {current_head_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.delete("/{home_id}", response_model=GeneralResponse)
 async def delete_home(
@@ -161,7 +169,8 @@ async def delete_home(
         return GeneralResponse(status="success", message="Home deleted successfully")
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"Delete home failed for head user {head_user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.get("/{home_id}/details", response_model=GeneralResponse)
 async def get_home_details(
@@ -175,8 +184,8 @@ async def get_home_details(
         return GeneralResponse(status="success", data=details)
     except ValueError as e:
         app_logger.warning(f"Get home details failed for user {user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
 
 @router.patch("/{home_id}/expiration_range", response_model=GeneralResponse)
 async def update_expiration_range(
@@ -200,11 +209,12 @@ async def update_expiration_range(
         )
     except PermissionError as e:
         app_logger.warning(f"Expiration range update forbidden for user {head_user_id} in home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except ValueError as e:
         app_logger.warning(f"Expiration range update failed for home {home_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
 @router.get("/{home_id}/join_requests", response_model=GeneralResponse)
 async def get_join_requests(
@@ -225,4 +235,5 @@ async def get_join_requests(
     except (ValueError, PermissionError) as e:
         app_logger.warning(f"Failed to get join requests for home {home_id} - Reason: {str(e)}")
         # If the user is not the head of the house, return 403 Forbidden
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
