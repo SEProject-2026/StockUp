@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { supabase } from "@/src/lib/supabase";
 import { router } from "expo-router"; 
-import { useAuth } from "@/app/_layout"; // שימוש ב-Hook המרכזי שיצרנו
+import { useAuth } from "@/src/context/auth-context"; // שימוש ב-Hook המרכזי שיצרנו
 
 type RealtimeContextValue = {
   homesVersion: number;

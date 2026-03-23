@@ -9,7 +9,7 @@ import { InventoryProvider } from "../src/context/inventory-context";
 import { RealtimeProvider } from "../src/providers/RealtimeProvider";
 import { approveJoinRequest, rejectJoinRequest } from "@/src/api/homes";
 
-// --- 1. Auth Context ---
+// --- 1. Auth Context (נשאר כאן זמנית, אך מומלץ להעביר לקובץ נפרד ב-src/context) ---
 const AuthContext = createContext<{ session: Session | null; loading: boolean }>({
   session: null,
   loading: true,
@@ -17,7 +17,7 @@ const AuthContext = createContext<{ session: Session | null; loading: boolean }>
 
 export const useAuth = () => useContext(AuthContext);
 
-// --- 2. Navigation Guard  ---
+// --- 2. Navigation Guard ---
 function NavigationGuard() {
   const { session, loading } = useAuth();
   const segments = useSegments();
@@ -26,14 +26,17 @@ function NavigationGuard() {
   useEffect(() => {
     if (loading) return;
 
-    // checking if the user is in the auth group pages (login/signup) or not
-    const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
+    // הגדרת דפים שניתן לגשת אליהם ללא התחברות
+    const isAuthPage = 
+      segments[0] === "login" || 
+      segments[0] === "signup" || 
+      segments[0] === "reset-password"; // הוספנו את איפוס הסיסמה לרשימה הלבנה
 
-    if (!session && !inAuthGroup) {
-      // there's no user and they're trying to access a protected page -> send to Login
+    if (!session && !isAuthPage) {
+      // אין משתמש והוא מנסה להיכנס לדף מוגן -> שלח ללוגין
       router.replace("/login");
-    } else if (session && inAuthGroup) {
-      // there is a user and they're trying to access the login/signup pages -> send to Home
+    } else if (session && isAuthPage) {
+      // יש משתמש והוא מנסה להיכנס לדפי התחברות -> שלח לבית
       router.replace("/home/home");
     }
   }, [session, loading, segments]);
@@ -45,7 +48,12 @@ function NavigationGuard() {
         animation: "fade",
         animationDuration: 150,
       }}
-    />
+    >
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="reset-password" options={{ headerShown: false }} /> 
+      <Stack.Screen name="home/home" options={{ headerShown: false }} />
+    </Stack>
   );
 }
 
@@ -54,15 +62,13 @@ export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  //A. Supabase Auth Management
+  // A. ניהול Auth
   useEffect(() => {
-    // first check - is there an active session?
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listening for changes in real time
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
@@ -71,7 +77,7 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Notification management
+  // B. ניהול התראות
   useEffect(() => {
     const handleNotification = (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data;
@@ -103,22 +109,18 @@ export default function RootLayout() {
     };
 
     const subscription = Notifications.addNotificationResponseReceivedListener(handleNotification);
-    Notifications.getLastNotificationResponseAsync().then(response => {
-      if (response) handleNotification(response);
-    });
-
     return () => subscription.remove();
-  }, []);
+  }, [router]);
 
   return (
-    <AuthContext.Provider value={{ session, loading }}>
-      <RealtimeProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthContext.Provider value={{ session, loading }}>
+        <RealtimeProvider>
           <InventoryProvider>
             <NavigationGuard />
           </InventoryProvider>
-        </GestureHandlerRootView>
-      </RealtimeProvider>
-    </AuthContext.Provider>
+        </RealtimeProvider>
+      </AuthContext.Provider>
+    </GestureHandlerRootView>
   );
 }

@@ -90,6 +90,27 @@ export default function LoginScreen() {
     }
   }
 
+  async function onForgotPassword() {
+    if (!email) {
+      Alert.alert("שגיאה", "אנא הזן/י אימייל כדי לקבל קישור לאיפוס");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'stockup://reset-password', // הכתובת שהאפליקציה תפתח
+      });
+
+      if (error) throw error;
+
+      Alert.alert("נשלח!", "בדוק/י את תיבת המייל שלך (כולל ספאם)");
+    } catch (e: any) {
+      Alert.alert("שגיאה", "לא הצלחנו לשלוח מייל איפוס");
+    } finally {
+      setLoading(false);
+    }
+  }
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
@@ -146,13 +167,32 @@ export default function LoginScreen() {
               />
               <Ionicons name="key-outline" size={18} color="#6B7280" />
             </View>
-
-            <TouchableOpacity
-              onPress={() => Alert.alert("איפוס סיסמה", "TODO: מסך איפוס")}
-              style={styles.forgotRow}
+            {/* החליפי את הכפתור הזמני שלך בזה: */}
+            <TouchableOpacity 
+              style={{ 
+                padding: 10, 
+                backgroundColor: '#FFEDD5', 
+                borderRadius: 8, 
+                marginTop: 10,
+                alignItems: 'center' 
+              }}
+              onPress={() => {
+                router.replace("/reset-password");
+              }}
             >
-              <Text style={styles.forgotText}>שכחת סיסמה?</Text>
+              <Text style={{ color: '#9A3412', fontWeight: 'bold' }}>🔨 בדיקת מסך איפוס (לחצי כאן)</Text>
             </TouchableOpacity>
+            {/* <TouchableOpacity
+              onPress={onForgotPassword}
+              style={styles.forgotRow}
+              disabled={loading}
+            >
+              {loading && !password ? ( // אינדיקציה קטנה אם זה טוען רק את המייל
+                <ActivityIndicator size="small" color="#0284C7" />
+              ) : (
+                <Text style={styles.forgotText}>שכחת סיסמה?</Text>
+              )}            
+            </TouchableOpacity> */}
 
             {/* כפתור התחברות רגיל */}
             <TouchableOpacity
@@ -202,7 +242,6 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ... הסטיילים הקיימים שלך נשארים אותו דבר ...
   safeArea: { flex: 1, backgroundColor: "#F9FAFB" },
   gradient: { ...StyleSheet.absoluteFillObject },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
@@ -225,7 +264,6 @@ const styles = StyleSheet.create({
   secondaryBtn: { height: 44, borderRadius: 999, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
   secondaryBtnText: { color: "#1D4ED8", fontSize: 13, fontWeight: "800" },
 
-  // סטיילים חדשים לכפתור גוגל
   googleBtn: {
     height: 46,
     borderRadius: 999,
