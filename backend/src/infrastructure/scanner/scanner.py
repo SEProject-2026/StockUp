@@ -3,10 +3,10 @@ import re
 import json
 import time
 
-from src.infrastructure.google_scanner.pdf_parser import parse_receipt_pdf
-from src.infrastructure.google_scanner.pdf_extractor import extract_text_from_pdf, is_text_pdf
-from src.infrastructure.google_scanner.google_vision_extractor import extract_text_from_image, extract_text_from_image_pdf, extract_first_page_image_text
-from src.infrastructure.google_scanner.google_parser import identify_chain, parse_receipt_google
+from src.infrastructure.scanner.parsers.pdf_parser import parse_receipt_pdf
+from src.infrastructure.scanner.extractors.pdf_extractor import extract_text_from_pdf, is_text_pdf
+from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image, extract_text_from_image_pdf, extract_first_page_image_text
+from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
 
 
 def scan_receipt(file_path: str) -> dict:

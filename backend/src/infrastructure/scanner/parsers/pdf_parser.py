@@ -3,6 +3,9 @@ import re
 import os
 from typing import List, Dict, Any, Optional
 
+
+ENABLE_DEBUG = os.environ.get("ENABLE_DEBUG", "False").lower() == "true"
+
 def _normalize_unit(unit: str) -> str:
     unit = unit.replace('"', '').replace("'", "").strip().lower()
     if any(u in unit for u in ['גק', 'קג', 'קיג', 'ג"ק', 'ק"ג']):
@@ -122,6 +125,8 @@ def parse_receipt_pdf(text: str, chain: str) -> Dict[str, Any]:
     return {"chain": chain, "products": list(products_map.values())}
 
 def _write_pdf_debug_log(logs: List[str]):
+    if not ENABLE_DEBUG:
+        return
     debug_dir = os.path.join(os.getcwd(), "debug")
     os.makedirs(debug_dir, exist_ok=True)
     with open(os.path.join(debug_dir, "pdf_parsing_decisions.log"), "w", encoding="utf-8") as f:

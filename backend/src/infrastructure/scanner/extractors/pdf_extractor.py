@@ -1,13 +1,17 @@
 import os
 import pdfplumber
 
+ENABLE_DEBUG = os.environ.get("ENABLE_DEBUG", "False").lower() == "true"
+
 def _save_pdf_debug_text(pdf_path: str, content: str) -> None:
     """
     Saves the extracted PDF text to a 'debug' folder for verification.
     """
+    if not ENABLE_DEBUG:
+        return
     try:
         # Define and create debug directory in current execution path
-        debug_dir = os.path.join(os.getcwd(), "debug")
+        debug_dir = os.path.join(os.getcwd(), "results", "raw")
         if not os.path.exists(debug_dir):
             os.makedirs(debug_dir)
         

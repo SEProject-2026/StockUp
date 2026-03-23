@@ -5,13 +5,14 @@ from typing import Dict, List, Any, Optional, Union
 
 from numpy import trace
 
+ENABLE_DEBUG = os.environ.get("ENABLE_DEBUG", "False").lower() == "true"
 
 CHAIN_HPS = {
     "520038234": "shufersal",
     "520022732": "shufersal",
     "513770669": "ramilevi",
     "557756376": "ramilevi",
-    "511956100": "yochananof",
+    "511344186": "yohananof",
     "511394112": "victory",
     "514068900": "victory",
     "514068980": "victory",
@@ -35,7 +36,7 @@ def identify_chain(text: str) -> str:
         "שופרסל": "shufersal",
         "מחסני השוק": "mck",
         "אושר עד": "osherad",
-        "יוחננוף": "yochananof",
+        "יוחננוף": "yohananof",
         "טיב טעם": "tivtaam",
         "ויקטורי": "victory",
         "חצי חינם": "hazi-hinam"
@@ -264,8 +265,12 @@ def parse_receipt_google(text: str) -> Dict[str, Any]:
     return {"chain": chain, "products": products}
 
 def _write_debug_log(logs: List[str]) -> None:
+    if not ENABLE_DEBUG:
+        return
     debug_dir = os.path.join(os.getcwd(), "debug")
     if not os.path.exists(debug_dir): os.makedirs(debug_dir)
     with open(os.path.join(debug_dir, "parsing_decisions.log"), "w", encoding="utf-8") as f:
         f.write("\n\n".join(logs))
+
+        
 

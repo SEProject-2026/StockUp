@@ -13,7 +13,7 @@ from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
 from src.domain.enums import ExpirationType, LocationType, UnitType
 #from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
-from src.infrastructure.google_scanner.receipt_scanner import ReceiptScanner
+from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
 

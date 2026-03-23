@@ -8,6 +8,8 @@ import cv2
 from pdf2image import convert_from_path
 from src.infrastructure.logger import app_logger
 
+
+ENABLE_DEBUG = os.environ.get("ENABLE_DEBUG", "False").lower() == "true"
 try:
     from google.cloud import vision
 except ImportError:
@@ -151,8 +153,10 @@ def _reconstruct_vision_text(response):
 
 
 def _save_debug_text(image_path: str, text_json: str, pdf_page_index: int = 0) -> None:
+    if not ENABLE_DEBUG:
+        return
     try:
-        debug_dir = os.path.join(os.getcwd(), "debug")
+        debug_dir = os.path.join(os.getcwd(),"results", "raw")
         if not os.path.exists(debug_dir):
             os.makedirs(debug_dir)
 

@@ -1,0 +1,90 @@
+{
+    "chain": "shufersal",
+    "items": [
+        {
+            "barcode": "74184",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "884912342737",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "3387390525960",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290100687109",
+            "quantity": 12,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290107947466",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290107947480",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110553364",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "3029815",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4126674",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290019611745",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8006540429327",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110327514",
+            "quantity": 3,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116933894",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "967684",
+            "quantity": 1,
+            "unit": "KG"
+        },
+        {
+            "barcode": "1036",
+            "quantity": 0.5,
+            "unit": "KG"
+        },
+        {
+            "barcode": "4170479",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290016497526",
+            "quantity": 1,
+            "unit": "UNIT"
+        }
+    ]
+}
