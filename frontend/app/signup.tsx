@@ -19,6 +19,7 @@ import ScreenHeader from "@/src/layout/ScreenHeader";
 import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
 import { supabase } from "@/src/lib/supabase";
+import { registerBackend } from "@/src/api/auth";
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
@@ -45,7 +46,7 @@ async function onSignup() {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1.calling Supabase's signUp method to create a new user 
+    // 1. יצירת המשתמש ב-Supabase
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password: password,
@@ -59,16 +60,30 @@ async function onSignup() {
 
     if (error) throw error;
 
-    // 2. If the sign-up is successful, we check if the session exists. 
-    //   If it does, it means the user is logged in immediately (no email confirmation required). 
-    //   If not, it means an email confirmation is required.
+    if (data.user) {
+      try {
+        await registerBackend({
+          user_id: data.user.id,
+          email: cleanEmail,
+          name: name.trim(),
+        });
+        console.log("[Signup] Backend registration successful");
+      } catch (backendError) {
+        console.error("[Signup] Backend registration failed:", backendError);
+      }
+    }
+
     if (data.session) {
       registerForPushNotificationsAsync().catch(console.error);
       Alert.alert("נרשמת בהצלחה!", "ברוך הבא! החשבון שלך מוכן.", [
         { text: "המשך", onPress: () => router.replace("/home/home") },
       ]);
     } else {
-      Alert.alert("כמעט סיימנו", "שלחנו לך אימייל לאישור החשבון.");
+      Alert.alert(
+        "כמעט סיימנו", 
+        "שלחנו לך אימייל לאישור החשבון. אנא אשרי אותו כדי שתוכלי להתחבר.",
+        [{ text: "הבנתי", onPress: () => router.replace("/login") }]
+      );
     }
 
   } catch (e: any) {

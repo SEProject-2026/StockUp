@@ -22,6 +22,7 @@ async def get_current_user_id(
     
     if user_id is None:
         raise HTTPException(
+            status_code=401,  
             detail="Invalid or expired token",
         )
         

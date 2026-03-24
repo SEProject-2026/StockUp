@@ -13,6 +13,19 @@ export type UserDTO = {
   email: string;
   name?: string;
 };
+export type RegisterRequest = {
+  user_id: string;
+  email: string;
+  name: string;
+};
+
+export async function registerBackend(payload: RegisterRequest) {
+  return authFetch<GeneralResponse<UserDTO>>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function logout() {
   try {
     const { error } = await supabase.auth.signOut();
