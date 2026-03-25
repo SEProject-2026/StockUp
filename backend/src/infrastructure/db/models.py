@@ -6,15 +6,15 @@ from src.infrastructure.db.database import Base
 user_home_association = Table(
     "user_home",
     Base.metadata,
-    Column("user_id", String, ForeignKey("users.id"), primary_key=True),
-    Column("home_id", String, ForeignKey("homes.id"), primary_key=True)
+    Column("user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("home_id", String, ForeignKey("homes.id", ondelete="CASCADE"), primary_key=True)
 )
 
 join_requests_association = Table(
     "home_join_requests",
     Base.metadata,
-    Column("user_id", String, ForeignKey("users.id"), primary_key=True),
-    Column("home_id", String, ForeignKey("homes.id"), primary_key=True)
+    Column("user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("home_id", String, ForeignKey("homes.id", ondelete="CASCADE"), primary_key=True)
 )
 
 # --- Users & Homes ---
@@ -30,6 +30,7 @@ class UserModel(Base):
 
     homes = relationship("HomeModel", secondary=user_home_association, back_populates="users")
     requested_homes = relationship("HomeModel", secondary=join_requests_association, back_populates="join_requests")
+    receipt_records = relationship("ReceiptRecordModel", back_populates="user")
 
 
 class HomeModel(Base):
@@ -49,6 +50,7 @@ class HomeModel(Base):
     # Cascade delete is important: If Home is deleted, delete all Products
     products = relationship("ProductModel", back_populates="home", cascade="all, delete-orphan")
     shopping_lists = relationship("ShoppingListModel", back_populates="home", cascade="all, delete-orphan")
+    receipt_records = relationship("ReceiptRecordModel", back_populates="home", cascade="all, delete-orphan")
 
 
 # --- Products & Items (Refactored) ---
@@ -57,7 +59,7 @@ class ProductModel(Base):
     __tablename__ = "products"
 
     id = Column(String, primary_key=True, index=True)
-    home_id = Column(String, ForeignKey("homes.id"))
+    home_id = Column(String, ForeignKey("homes.id", ondelete="CASCADE"))
     
     original_name = Column(String)
     nickname = Column(String, nullable=True)
@@ -72,9 +74,9 @@ class ProductModel(Base):
 class ProductItemModel(Base):
     __tablename__ = "product_items"
 
-    id = Column(String, primary_key=True, index=True) 
+    id = Column(String, primary_key=True, index=True)
     
-    product_id = Column(String, ForeignKey("products.id"))
+    product_id = Column(String, ForeignKey("products.id", ondelete="CASCADE"))
     
     expiration_date = Column(Date, nullable=True) 
     quantity = Column(Integer)
@@ -108,7 +110,7 @@ class ShoppingListModel(Base):
     id = Column(String, primary_key=True, index=True)
     
     # Link to the home - allows multiple lists per home (One-to-Many)
-    home_id = Column(String, ForeignKey("homes.id"), index=True, nullable=False)
+    home_id = Column(String, ForeignKey("homes.id", ondelete="CASCADE"), index=True, nullable=False)
     
     # Descriptive name of the list (e.g., "Weekly Groceries")
     name = Column(String, default="New Shopping List")
@@ -128,3 +130,32 @@ class ShoppingListModel(Base):
 
     # Relationship back to the HomeModel
     home = relationship("HomeModel", back_populates="shopping_lists")
+
+
+# --- Receipt History (For Analytics and Recommendations) ---
+
+class ReceiptRecordModel(Base):
+    __tablename__ = "receipt_records"
+
+    id = Column(String, primary_key=True, index=True)
+    home_id = Column(String, ForeignKey("homes.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    chain = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    home = relationship("HomeModel", back_populates="receipt_records")
+    user = relationship("UserModel", back_populates="receipt_records")
+    items = relationship("ReceiptRecordItemModel", back_populates="receipt", cascade="all, delete-orphan")
+
+
+class ReceiptRecordItemModel(Base):
+    __tablename__ = "receipt_record_items"
+
+    id = Column(String, primary_key=True, index=True)
+    receipt_id = Column(String, ForeignKey("receipt_records.id", ondelete="CASCADE"), index=True, nullable=False)
+    
+    name = Column(String, nullable=False)
+    barcode = Column(String, nullable=True, index=True)
+    quantity = Column(Float, nullable=False)
+    
+    receipt = relationship("ReceiptRecordModel", back_populates="items")
