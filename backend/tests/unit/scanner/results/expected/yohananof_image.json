@@ -1,0 +1,160 @@
+{
+    "chain": "yohananof",
+    "items": [
+        {
+            "barcode": "3800103433586",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290102393176",
+            "quantity": 4,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116932033",
+            "quantity": 3,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290104728310",
+            "quantity": 4,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290119375370",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290002824640",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000474540",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110324773",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110325893",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110577254",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290005287213",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290107974073",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290011618025",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290012313868",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116535951",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290002057758",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8445291050396",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8445291081345",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000523224",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000061108",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000061085",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290105693341",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290106572959",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290100700396",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000178134",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000178103",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290004658847",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000052311",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "406176",
+            "quantity": 0.805,
+            "unit": "KG"
+        },
+        {
+            "barcode": "661",
+            "quantity": 1.485,
+            "unit": "KG"
+        },
+        {
+            "barcode": "602",
+            "quantity": 0.88,
+            "unit": "KG"
+        }
+    ]
+}

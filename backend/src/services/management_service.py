@@ -153,6 +153,21 @@ class ManagementService:
         
         home.assign_admin(current_head_id, new_head_id)
         await self._home_repository.update(home)
+
+        try:
+            new_head_user = await self._user_repository.get_by_id(new_head_id)
+            if new_head_user and new_head_user.push_token:
+                home_name = home.get_name()
+                
+                send_push_notification(
+                    token=new_head_user.push_token,
+                    title="עדכון ראש בית 🏠",
+                    message=f"הועברת לניהול הבית {home_name}.",
+                    data={"action": "head_transferred", "home_id": str(home_id)}
+                )
+        except Exception as e:
+            app_logger.error(f"Failed to send head transfer notification to {new_head_id}: {e}")
+
         
         app_logger.info(f"Head of House role in home {home_id} transferred from {current_head_id} to {new_head_id}")
         return home
