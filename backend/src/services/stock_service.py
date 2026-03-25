@@ -25,6 +25,8 @@ class StockService:
         self._product_repository = product_repository
         self._catalog_provider = catalog_provider
         self._user_repository = user_repository
+        self.locaton_filter = None
+        self.expiration_filter = None
 
     # ==========================================
     # 2. Stock Management (Inventory)
@@ -368,42 +370,49 @@ class StockService:
     # Read / Filter / Search Operations
     # ==========================================
 
-    async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> List[ProductDTO]:
-        app_logger.debug(f"Filtering products by location: {location} for home {home_id}")
-        await self._check_access(user_id, home_id)
-        
-        products = await self._product_repository.list_all_by_home(home_id)
-        warning_days = 3 
-        
-        dtos = []
-        for p in products:
-            dto = self._create_filtered_dto(
-                product=p, 
-                warning_days=warning_days,
-                filter_func=lambda item: item.location == location
-            )
-            if dto:
-                dtos.append(dto)
-                
-        return dtos
+    async def filter_products(self, user_id: UUID, home_id: UUID, query: str, location: Optional[LocationType], expiration_type: Optional[ExpirationType]) -> List[ProductDTO]:
 
-    async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[ProductDTO]:
-        app_logger.debug(f"Filtering products by expiration type: {filter_type} for home {home_id}")
+        app_logger.debug(f"Starting filter_manager with location={location} and expiration_type={expiration_type} for home {home_id}")
         warning_days = await self._check_access(user_id, home_id)
+
+        products = await self._product_repository.filter_products(home_id, query_text=query, location=location, expiration_type=expiration_type, warning_days=warning_days)
+        return products        
+
+    # async def filter_by_location(self, user_id: UUID, home_id: UUID, location: LocationType) -> List[ProductDTO]:
+    #     app_logger.debug(f"Filtering products by location: {location} for home {home_id}")
+    #     warning_days = await self._check_access(user_id, home_id)
         
-        products = await self._product_repository.list_all_by_home(home_id)
+    #     products = await self._product_repository.list_all_by_home(home_id)
         
-        dtos = []
-        for p in products:
-            dto = self._create_filtered_dto(
-                product=p,
-                warning_days=warning_days, 
-                filter_func=lambda item: item.get_status(warning_days) == filter_type
-            )
-            if dto:
-                dtos.append(dto)
+    #     dtos = []
+    #     for p in products:
+    #         dto = self._create_filtered_dto(
+    #             product=p, 
+    #             warning_days=warning_days,
+    #             filter_func=lambda item: item.location == location
+    #         )
+    #         if dto:
+    #             dtos.append(dto)
                 
-        return dtos
+    #     return dtos
+
+    # async def filter_by_expiration_type(self, user_id: UUID, home_id: UUID, filter_type: ExpirationType) -> List[ProductDTO]:
+    #     app_logger.debug(f"Filtering products by expiration type: {filter_type} for home {home_id}")
+    #     warning_days = await self._check_access(user_id, home_id)
+        
+    #     products = await self._product_repository.list_all_by_home(home_id)
+        
+    #     dtos = []
+    #     for p in products:
+    #         dto = self._create_filtered_dto(
+    #             product=p,
+    #             warning_days=warning_days, 
+    #             filter_func=lambda item: item.get_status(warning_days) == filter_type
+    #         )
+    #         if dto:
+    #             dtos.append(dto)
+                
+    #     return dtos
 
     def _create_filtered_dto(self, product: Product, warning_days: int, filter_func: Callable) -> Optional[ProductDTO]:
         filtered_items_dtos = []
@@ -436,12 +445,12 @@ class StockService:
             items=filtered_items_dtos
         )
 
-    async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> List[Product]:
-        """Searches for products based on product name or nickname."""
-        app_logger.debug(f"Searching local inventory for '{query}' in home {home_id}")
-        await self._check_access(user_id, home_id)
-        search_results = await self._product_repository.search_by_name(home_id, query)            
-        return search_results
+    # async def search_product(self, user_id: UUID, home_id: UUID, query: str) -> List[Product]:
+    #     """Searches for products based on product name or nickname."""
+    #     app_logger.debug(f"Searching local inventory for '{query}' in home {home_id}")
+    #     await self._check_access(user_id, home_id)
+    #     search_results = await self._product_repository.search_by_name(home_id, query)            
+    #     return search_results
 
     async def search_product_by_name_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[CatalogItem]:
         app_logger.debug(f"Searching external catalog for '{query}'")
