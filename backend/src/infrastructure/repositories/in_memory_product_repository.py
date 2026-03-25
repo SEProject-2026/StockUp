@@ -1,3 +1,5 @@
+import copy
+import datetime
 import uuid
 from typing import Dict, List, Optional
 from src.domain.enums import ExpirationType, LocationType
@@ -83,3 +85,54 @@ class InMemoryProductRepository(IProductRepository):
 
     async def clear(self):
         self._products_db.clear()
+
+    async def filter_products(self, home_id, query_text: Optional[str] = None, location: Optional[LocationType] = None, expiration_type: Optional[ExpirationType] = None, warning_days: int = 0):
+        query_text = query_text.lower() if query_text else None
+        results = []
+        today = datetime.date.today()
+
+        for p in self._products_db.values():
+            if str(p.home_id) != str(home_id):
+                continue
+            
+            if query_text:
+                name_match = p.original_name and query_text in p.original_name.lower()
+                nickname_match = p.nickname and query_text in p.nickname.lower()
+                if not (name_match or nickname_match):
+                    continue
+ 
+            filtered_items = p.items
+
+            if location:
+                filtered_items = [
+                    item for item in filtered_items if item.location == location
+                ]
+                
+            if expiration_type:
+                if expiration_type == ExpirationType.EXPIRED:
+                    filtered_items = [
+                        item for item in filtered_items if item.expiration_date and item.expiration_date < today
+                    ]
+                elif expiration_type == ExpirationType.GOING_TO_EXPIRE:
+                    warning_date = today + datetime.timedelta(days=warning_days)
+                    filtered_items = [
+                        item for item in filtered_items 
+                        if item.expiration_date and (today <= item.expiration_date <= warning_date)
+                    ]
+                elif expiration_type == ExpirationType.FRESH:
+                    warning_date = today + datetime.timedelta(days=warning_days)
+                    filtered_items = [
+                        item for item in filtered_items 
+                        if not item.expiration_date or item.expiration_date > warning_date
+                    ]
+
+            if (location or expiration_type) and not filtered_items:
+                continue
+        
+            p_copy = copy.deepcopy(p)
+            
+            p_copy._items = filtered_items 
+            
+            results.append(p_copy)
+        
+        return results
