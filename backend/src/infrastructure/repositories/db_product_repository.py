@@ -209,8 +209,7 @@ class DbProductRepository(IProductRepository):
             query = query.filter(
                 or_(
                     ProductModel.original_name.ilike(f"%{query_text}%"),
-                    ProductModel.nickname.ilike(f"%{query_text}%"),
-                    ProductModel.barcode == query_text
+                    ProductModel.nickname.ilike(f"%{query_text}%")
                 )
             )
 
@@ -220,10 +219,10 @@ class DbProductRepository(IProductRepository):
         if expiration_type:
             today = date.today()
             
-            if expiration_type.name == "EXPIRED":
+            if expiration_type == ExpirationType.EXPIRED:
                 query = query.filter(ProductItemModel.expiration_date < today)
                 
-            elif expiration_type.name == "GOING_TO_EXPIRE":
+            elif expiration_type == ExpirationType.GOING_TO_EXPIRE:
                 warning_date = today + timedelta(days=warning_days)
                 query = query.filter(
                     and_(

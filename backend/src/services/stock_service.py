@@ -370,7 +370,7 @@ class StockService:
     # Read / Filter / Search Operations
     # ==========================================
 
-    async def filter_products(self, user_id: UUID, home_id: UUID, query: str, location: Optional[LocationType], expiration_type: Optional[ExpirationType]) -> List[ProductDTO]:
+    async def filter_products(self, user_id: UUID, home_id: UUID, query: Optional[str]=None, location: Optional[LocationType]=None, expiration_type: Optional[ExpirationType]=None) -> List[Product]:
 
         app_logger.debug(f"Starting filter_manager with location={location} and expiration_type={expiration_type} for home {home_id}")
         warning_days = await self._check_access(user_id, home_id)
