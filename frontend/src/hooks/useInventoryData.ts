@@ -3,8 +3,8 @@ import { Alert } from "react-native";
 import { supabase } from "@/src/lib/supabase";
 
 import {
-  filterStockByExpiration,
-  filterStockByLocation,
+  // filterStockByExpiration,
+  // filterStockByLocation,
   getAllStock,
   searchStock,
   updateProductNickname,
@@ -12,6 +12,7 @@ import {
   updateItemQuantity,
   removeItem,
   type ProductDTO,
+  filterStock,
 } from "@/src/api/stock";
 
 import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
@@ -68,16 +69,10 @@ export function useInventoryData(params: {
         else if (q.length > 0) setIsSearching(true);
 
         let products: ProductDTO[] = [];
-        if (q.length >= 2) {
-          const res = await searchStock(homeId, q);
-          products = res.data ?? [];
-        } else if (statusFilter !== "all") {
-          const expType = statusFilterToExpirationType(statusFilter);
-          const res = await filterStockByExpiration(homeId, expType!);
-          products = res.data ?? [];
-        } else if (effectivelocation !== "all") {
-          const loc = locationToLocationType(effectivelocation);
-          const res = await filterStockByLocation(homeId, loc);
+        if (q.length >= 2 || statusFilter !== "all" || effectivelocation !== "all") {
+          const expType = statusFilter === "all" ? null : statusFilterToExpirationType(statusFilter);
+          const locType = effectivelocation === "all" ? null : locationToLocationType(effectivelocation);
+          const res = await filterStock(homeId, q, locType, expType);
           products = res.data ?? [];
         } else {
           const res = await getAllStock(homeId);
