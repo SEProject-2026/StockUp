@@ -158,9 +158,15 @@ class RecommendationEngine:
             # 2. Historical Match Context
             matches = self._fuzzy_match_products(item_lower, metadata.name_to_bc)
             for bc in matches:
-                ctx.mapped_cart_barcodes.add(bc)
                 cat = metadata.bc_to_cat.get(bc)
-                if cat: ctx.mapped_cart_categories.add(cat)
+                if cat:
+                    ctx.mapped_cart_categories.add(cat)
+                    # Point 4: Robust Pairings - Expand category to include ALL its member barcodes.
+                    # This ensures that if the user adds "Milk", we find items bought with ANY milk brand.
+                    for member_bc in metadata.cat_to_bcs.get(cat, []):
+                        ctx.mapped_cart_barcodes.add(member_bc)
+                else:
+                    ctx.mapped_cart_barcodes.add(bc)
                 
                 # Check which historical receipts contained this item to infer store type
                 for r in receipts:
@@ -259,7 +265,12 @@ class RecommendationEngine:
                         if t_bc not in ctx.mapped_cart_barcodes:
                             co_occurrence[t_bc][s_bc] += 1
 
-        recommendations = []
+        # Calculate Category Stock
+        cat_stock = defaultdict(float)
+        for bc, stock in metadata.bc_to_stock.items():
+            cat = metadata.bc_to_cat.get(bc)
+            if cat: cat_stock[cat] += stock
+            
         total_receipts = len(receipts)
         cat_freq = self._calculate_category_frequencies(receipts)
 
@@ -269,7 +280,12 @@ class RecommendationEngine:
             generic = metadata.bc_to_cat.get(t_bc)
             if generic: grouped_targets[generic].append(t_bc)
             
+        recommendations = []
         for generic, bcs in grouped_targets.items():
+            # Point 5: Stock-Aware Pairings - Do not suggest items already in stock (quantity > 0)
+            if cat_stock.get(generic, 0) > 0:
+                continue
+
             agg_sources = defaultdict(int)
             for bc in bcs:
                 for src, count in co_occurrence[bc].items(): agg_sources[src] += count
@@ -302,6 +318,13 @@ class RecommendationEngine:
         chain = (receipt.chain or "") 
         if any(kw in chain for kw in ["pharm", "be", "pharmacy", "סופר פארם", "ניו פארם"]):
             return StoreType.PHARMACY
+        
+        grocery_chains = {
+            "RAMI LEVI", "SHUFERSAL", "YOHANANOF", "VICTORY", "STOPSHOP", "TIV TAAM", 
+            "רמי לוי", "שופרסל", "יוחננוף", "ויקטורי", "טיב טעם", "חצי חינם", "מחסני השוק"
+        }
+        if any(kw in chain for kw in grocery_chains):
+            return StoreType.GROCERY
         
         pharmacy_keywords = {"אקמול", "אדוויל", "חיתול", "מגבונים", "תרופה", "ויטמין", "סימילאק", "נורופן"}
         grocery_keywords = {"מלפפון", "עגבניה", "חלב", "ביצים", "גבינה", "יוגורט","לחם","בשר","עוף","דג"}
@@ -350,9 +373,13 @@ class RecommendationEngine:
         return words[0]
 
     def _fuzzy_match_products(self, text: str, name_to_bc: Dict[str, str]) -> List[str]:
-        """Attribute-Aware Fuzzy Matching with strict guard rails."""
-        text = text .strip()
+        """Attribute-Aware Fuzzy Matching with symmetric cleaning for robust recognition."""
+        text = text.strip()
         if not text: return []
+        
+        # Symmetric cleaning for the search text
+        clean_text = "".join(c for c in text if c not in string.punctuation)
+        for brand in COMMON_BRANDS: clean_text = clean_text.replace(brand, "").strip()
         
         search_tokens = set(text.split())
         search_attrs = {a for a in DISTINCTIVE_ATTRIBUTES if a in text}
@@ -368,13 +395,14 @@ class RecommendationEngine:
             clean_name = "".join(c for c in name_lower if c not in string.punctuation)
             for brand in COMMON_BRANDS: clean_name = clean_name.replace(brand , "").strip()
             
-            if clean_name.startswith(text):
+            if clean_name.startswith(clean_text) or (clean_text and clean_name == clean_text):
                 matches.append((barcode, 100))
             elif any(t in name_lower for t in search_tokens):
                 matches.append((barcode, 50))
         
         # Return only top-tier matches
         if not matches:
+            # Note: We must clean the keys here too if we want difflib to be accurate
             fuzzy = difflib.get_close_matches(text, list(name_to_bc.keys()), n=1, cutoff=0.9)
             if fuzzy: return [name_to_bc[f] for f in fuzzy]
             return []

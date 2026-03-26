@@ -188,3 +188,16 @@ export async function deleteShoppingList(listId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export async function getRecommendations(
+  listId: string
+): Promise<string[]> {
+  const response = await authFetch<GeneralResponse<string[]>>(
+    `${BASE}/${listId}/recommendations`,
+    {
+      method: "GET",
+    }
+  );
+
+  return unwrapResponse(response);
+}

@@ -14,6 +14,46 @@ import { styles, BRAND, type SectionLocation } from "@/src/components/shopping/s
 import { ShoppingItemRow } from "@/src/components/shopping/ShoppingItemRow";
 import { ShoppingHeader } from "@/src/components/shopping/ShoppingHeader";
 import { AddShoppingItemModal } from "@/src/components/shopping/AddShoppingItemModal";
+import { SuggestionsModal } from "@/src/components/shopping/SuggestionsModal";
+
+const fabStyles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#F59E0B",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    zIndex: 999,
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    left: -2,
+    backgroundColor: "#EF4444",
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#fff",
+    zIndex: 1000,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "900",
+  }
+});
 
 export default function ShoppingListScreen() {
   const insets = useSafeAreaInsets();
@@ -22,7 +62,8 @@ export default function ShoppingListScreen() {
 
   const {
     mode, items, filteredItems, loading, picked, query, setQuery,
-    addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick
+    addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick, 
+    suggestions, dismissSuggestion, suggestionsModalOpen, setSuggestionsModalOpen
   } = useShoppingList({ homeId: homeId ?? "", listId: listId ?? "" });
 
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
@@ -106,6 +147,31 @@ return (
           )}
         />
 
+        {/* Suggestions Modal */}
+        <SuggestionsModal 
+          open={suggestionsModalOpen} 
+          onClose={() => setSuggestionsModalOpen(false)} 
+          suggestions={suggestions}
+          onAdd={(name) => addItem(name, 1, "suggestion", "OTHER")}
+          onDismiss={dismissSuggestion}
+        />
+
+        {/* Floating Suggestions Button */}
+        {suggestions.length > 0 && (
+          <TouchableOpacity 
+            style={[
+              fabStyles.container, 
+              { bottom: 85 + insets.bottom } // Above bottom actions
+            ]}
+            onPress={() => setSuggestionsModalOpen(true)}
+          >
+            <View style={fabStyles.badge}>
+              <Text style={fabStyles.badgeText}>{suggestions.length}</Text>
+            </View>
+            <Ionicons name="sparkles" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
+
         {/* הכפתור הדינמי בתחתית המסך */}
         <View style={[styles.bottomActions, { paddingBottom: 16 + insets.bottom }]}>
           {mode === "SHOPPING" ? (
@@ -140,4 +206,5 @@ return (
         <View style={[styles.bottomBar, { paddingBottom: 10 + insets.bottom }]}><BottomNavBar activeTab="shopping-list" /></View>
       </SafeAreaView>
     </View>
-  );}
+  );
+}

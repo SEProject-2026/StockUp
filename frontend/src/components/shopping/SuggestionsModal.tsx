@@ -1,80 +1,188 @@
-import React, { useState, useMemo } from "react";
-import { Modal, View, Text, TouchableOpacity, TextInput, FlatList, Pressable, StyleSheet } from "react-native";
+import React from "react";
+import { Modal, View, Text, TouchableOpacity, ScrollView, Platform, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { styles, BRAND } from "./styles";
 
-const BRAND = { BG: "#F4F4F4", CARD: "#FFFFFF", BORDER: "#E5E7EB", TEXT: "#111827", MUTED: "#6B7280", PRIMARY: "#0284C7", PRIMARY_SOFT: "#E5F3FF" };
+type SuggestionItem = {
+  id: string;
+  name: string;
+  reason?: string;
+  type?: 'staple' | 'pairing';
+};
 
-interface Props {
+type Props = {
   open: boolean;
   onClose: () => void;
-  suggestions: any[];
-  existingNamesSet: Set<string>;
+  suggestions: SuggestionItem[];
   onAdd: (name: string) => void;
-}
+  onDismiss: (id: string) => void;
+};
 
-export const SuggestionsModal = ({ open, onClose, suggestions, existingNamesSet, onAdd }: Props) => {
-  const [q, setQ] = useState("");
-
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    const base = suggestions.filter(s => !existingNamesSet.has(s.name.trim().toLowerCase()));
-    if (!query) return base;
-    return base.filter(s => s.name.toLowerCase().includes(query));
-  }, [q, suggestions, existingNamesSet]);
+export const SuggestionsModal = ({ open, onClose, suggestions, onAdd, onDismiss }: Props) => {
+  const sortedSuggestions = [...suggestions].sort((a, b) => {
+    if (a.type === 'staple' && b.type !== 'staple') return -1;
+    if (a.type !== 'staple' && b.type === 'staple') return 1;
+    return 0;
+  });
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>המלצות למוצרים</Text>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
-              <Ionicons name="close" size={20} color={BRAND.TEXT} />
+    <Modal visible={open} transparent animationType="slide">
+      <View style={suggestionRowStyles.backdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
+        <View style={suggestionRowStyles.sheet}>
+          <View style={suggestionRowStyles.handle} />
+          
+          <View style={suggestionRowStyles.header}>
+            <Text style={suggestionRowStyles.title}>✨ הצעות מותאמות אישית</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close-circle" size={28} color={BRAND.BORDER} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchCard}>
-            <Ionicons name="search" size={18} color={BRAND.MUTED} />
-            <TextInput value={q} onChangeText={setQ} placeholder="חיפוש בהמלצות..." style={styles.searchInput} textAlign="right" />
-          </View>
-
-          <FlatList
-            data={filtered}
-            keyExtractor={(x) => x.id}
-            renderItem={({ item: s }) => (
-              <View style={styles.suggestionRow}>
-                <TouchableOpacity onPress={() => onAdd(s.name)} style={styles.addMiniBtn}>
-                  <Ionicons name="add" size={15} color={BRAND.PRIMARY} />
-                  <Text style={styles.addMiniText}>הוסף</Text>
-                </TouchableOpacity>
-                <View style={styles.suggestionTextWrap}>
-                  <Text style={styles.suggestionName}>{s.name}</Text>
-                  {!!s.reason && <Text style={styles.suggestionReason}>{s.reason}</Text>}
-                </View>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            {sortedSuggestions.length === 0 ? (
+              <View style={{ padding: 40, alignItems: "center" }}>
+                <Ionicons name="sparkles-outline" size={48} color={BRAND.BORDER} />
+                <Text style={{ marginTop: 16, color: BRAND.MUTED, textAlign: "center", fontSize: 16 }}>
+                  אין המלצות חדשות כרגע.
+                </Text>
               </View>
+            ) : (
+              sortedSuggestions.map((s) => {
+                const isStaple = s.type === 'staple';
+                return (
+                  <View 
+                    key={s.id} 
+                    style={[
+                      suggestionRowStyles.row,
+                      isStaple ? suggestionRowStyles.stapleRow : suggestionRowStyles.pairingRow
+                    ]}
+                  >
+                    <TouchableOpacity 
+                      style={[
+                        suggestionRowStyles.addButton,
+                        { backgroundColor: isStaple ? "#6366F1" : BRAND.SUCCESS }
+                      ]}
+                      onPress={() => onAdd(s.name)}
+                    >
+                      <Ionicons name="add" size={20} color="#fff" />
+                    </TouchableOpacity>
+
+                    <View style={suggestionRowStyles.content}>
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+                        <Ionicons 
+                          name={isStaple ? "star" : "link"} 
+                          size={12} 
+                          color={isStaple ? "#4F46E5" : "#10B981"} 
+                          style={{ marginLeft: 4 }}
+                        />
+                        <Text style={suggestionRowStyles.name}>{s.name}</Text>
+                      </View>
+                      {!!s.reason && (
+                        <Text style={suggestionRowStyles.reason}>{s.reason}</Text>
+                      )}
+                    </View>
+
+                    <TouchableOpacity 
+                      style={suggestionRowStyles.dismissButton}
+                      onPress={() => onDismiss(s.id)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={BRAND.MUTED} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
             )}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          />
-        </Pressable>
-      </Pressable>
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end", padding: 12 },
-  modalCard: { backgroundColor: "#FFF", borderRadius: 22, padding: 16, maxHeight: "80%" },
-  modalHandle: { alignSelf: "center", width: 40, height: 5, borderRadius: 10, backgroundColor: "#DDD", marginBottom: 15 },
-  modalHeader: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
-  modalTitle: { fontSize: 18, fontWeight: "900" },
-  searchCard: { flexDirection: "row-reverse", alignItems: "center", backgroundColor: "#F3F4F6", borderRadius: 12, paddingHorizontal: 10, marginBottom: 15 },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14 },
-  suggestionRow: { flexDirection: "row-reverse", alignItems: "center", padding: 12, borderWidth: 1, borderColor: "#EEE", borderRadius: 15 },
-  suggestionTextWrap: { flex: 1, alignItems: "flex-end" },
-  suggestionName: { fontWeight: "800", color: "#111" },
-  suggestionReason: { fontSize: 11, color: "#666" },
-  addMiniBtn: { flexDirection: "row-reverse", alignItems: "center", gap: 5, backgroundColor: "#E5F3FF", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  addMiniText: { color: "#0284C7", fontWeight: "bold", fontSize: 12 },
-  iconBtn: { padding: 5 }
+const suggestionRowStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "85%",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 20,
+  },
+  handle: {
+    width: 40,
+    height: 5,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  header: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: BRAND.TEXT,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  stapleRow: {
+    backgroundColor: "#F5F3FF", // Light indigo
+    borderColor: "#E0E7FF",
+  },
+  pairingRow: {
+    backgroundColor: "#F0FDF4", // Light green
+    borderColor: "#DCFCE7",
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: BRAND.TEXT,
+    textAlign: "right",
+  },
+  reason: {
+    fontSize: 12,
+    color: BRAND.MUTED,
+    textAlign: "right",
+    marginTop: 2,
+  },
+  content: {
+    flex: 1,
+    marginRight: 12,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+  },
+  dismissButton: {
+    padding: 8,
+  }
 });

@@ -12,7 +12,7 @@ class ShoppingListItemDTO(BaseModel):
     item_name: str
     quantity: int
     is_bought: bool
-    location: LocationType
+    location: Optional[LocationType] = LocationType.OTHER
 
 
 
