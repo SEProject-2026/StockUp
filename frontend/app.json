@@ -4,22 +4,39 @@
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.elbad.frontend"
+      "bundleIdentifier": "com.elbad.frontend",
+      "icon": "./assets/icon.png"
     },
     "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
       "edgeToEdgeEnabled": true,
-      "package": "com.elbad.frontend"
+      "package": "com.elbad.frontend",
+      "versionCode": 1
     },
     "web": {
-      "output": "static"
+      "output": "static",
+      "favicon": "./assets/icon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
