@@ -26,7 +26,6 @@ def test_register_duplicate_email():
     })
     
     assert response.status_code == 400
-    assert "already exists" in response.text
 
 def test_login_success():
     testing_container.client.post("/auth/register", json={

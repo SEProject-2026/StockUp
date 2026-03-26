@@ -35,7 +35,7 @@ class Home:
     
     def get_join_requests_names(self, head_user_id: UUID) -> Set[UUID]:
         if not self.is_admin(head_user_id):
-            raise PermissionError("Only admin can view join requests.")
+            raise PermissionError("Only admin can view join requests")
         return self._join_requests
     
     def get_expiration_range(self) -> int:
@@ -49,9 +49,9 @@ class Home:
 
     def assign_admin(self, head_user_id: UUID, user_id: UUID) -> None:
         if not self.is_admin(head_user_id):
-                raise PermissionError("Only current admin can transfer admin rights.")
+                raise PermissionError("Only current admin can transfer admin rights")
         if not self.is_member(user_id):
-            raise ValueError("User is not a member of the home.")
+            raise ValueError("User is not a member of the home")
         self._admin = user_id
 
     def is_admin(self, user_id: UUID) -> bool:
@@ -62,17 +62,17 @@ class Home:
     
     def add_join_request(self, user_id: UUID) -> None:
         if self.has_request_from(user_id):
-            raise ValueError("User has already requested to join.")
+            raise ValueError("User has already requested to join")
         if self.is_member(user_id):
-            raise ValueError("User is already a member of the home.")
+            raise ValueError("User is already a member of the home")
         self._join_requests.add(user_id)
 
     def answer_join_request(self, head_user_id: UUID, user_id: UUID, approved: bool) -> None:
         if not self.is_admin(head_user_id):
-            raise PermissionError("Only admin can approve or deny join requests.")
+            raise PermissionError("Only admin can approve or deny join requests")
         
         if not self.has_request_from(user_id):
-            raise ValueError("No such join request found.")
+            raise ValueError("No such join request found")
         
         if approved:
             self.add_member(user_id)
@@ -81,7 +81,7 @@ class Home:
         
     def add_member(self, user_id: UUID) -> None:
         if self.is_member(user_id):
-            raise ValueError("User is already a member of the home.")
+            raise ValueError("User is already a member of the home")
         self._members.add(user_id)
 
     def is_member(self, user_id: UUID) -> bool:
@@ -89,29 +89,29 @@ class Home:
     
     def remove_member(self, head_user_id: UUID, user_id: UUID) -> None:
         if not self.is_admin(head_user_id):
-            raise PermissionError("Only admin can remove members from the home.")
+            raise PermissionError("Only admin can remove members from the home")
         
         if self.is_member(user_id):
             self._members.remove(user_id)
         else:
-            raise ValueError("User is not a member of the home.")
+            raise ValueError("User is not a member of the home")
         
     def leave_home(self, user_id: UUID) -> None:
         if self.is_admin(user_id):
-            raise PermissionError("Admin cannot leave the home. Transfer admin rights before leaving.")
+            raise PermissionError("Admin cannot leave the home. Transfer admin rights before leaving")
         if not self.is_member(user_id):
-            raise ValueError("User is not a member of this home.")
+            raise ValueError("User is not a member of this home")
         
         self._members.remove(user_id)
         
     def view_home_code(self, user_id: UUID) -> str:
         if not self.is_admin(user_id):
-            raise PermissionError("Only admin can view the home join code.")
+            raise PermissionError("Only admin can view the home join code")
         return self.get_join_code()
     
     def get_home_details(self, user_id: UUID) -> Dict:
         if not self.is_member(user_id):
-            raise ValueError("User is not a member of the home.")
+            raise ValueError("User is not a member of the home")
         
         details = {
             "id": str(self.get_id()),
@@ -124,16 +124,16 @@ class Home:
     
     def can_switch_home(self, user_id: UUID) -> None:
         if not self.is_member(user_id):
-            raise ValueError("User is not a member of the home.")
+            raise ValueError("User is not a member of the home")
 
     def can_delete_home(self, head_user_id: UUID) -> None:
         if not self.is_admin(head_user_id):
-            raise PermissionError("Only admin can delete the home.")
+            raise PermissionError("Only admin can delete the home")
         
 
     def update_expiration_range(self, head_user_id: UUID, new_range: int) -> None:
         if not self.is_admin(head_user_id):
-            raise PermissionError("Only admin can update expiration range.")
+            raise PermissionError("Only admin can update expiration range")
         if new_range <= 0:
-            raise ValueError("Expiration range must be a positive integer.")
+            raise ValueError("Expiration range must be a positive integer")
         self.set_expiration_range(new_range)

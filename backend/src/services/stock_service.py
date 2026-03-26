@@ -552,7 +552,7 @@ class StockService:
         home = await self._home_repository.get_by_id(home_id)
         if not home:
             app_logger.warning(f"Access check failed: Home {home_id} does not exist")
-            raise ValueError("Home retrieval failed.")
+            raise ValueError("Home retrieval failed")
         if not home.is_member(user_id):
             app_logger.warning(f"Access check failed: User {user_id} is not a member of home {home_id}")
             raise ValueError("User is not a member of the home")
