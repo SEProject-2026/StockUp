@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from src.domain.enums import ExpirationType
+from src.domain.enums import ExpirationType, LocationType
 from src.domain.product.product import Product
 from uuid import UUID
 
@@ -52,4 +52,16 @@ class IProductRepository(ABC):
     @abstractmethod
     async def get_by_location(self, home_id: UUID, location: str) -> List[Product]:
         """Retrieves products stored in a specific location within the home."""
+        pass
+
+    @abstractmethod  
+    async def filter_products(
+        self, 
+        home_id: UUID, 
+        query_text: Optional[str], 
+        location: Optional[LocationType], 
+        expiration_type: Optional[ExpirationType],
+        warning_days: int
+    ) -> List[Product]:
+        """Filters products based on their expiration status."""
         pass

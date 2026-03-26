@@ -54,7 +54,7 @@ export function mapLocationTolocation(loc?: string | null): location {
 }
 
 // UI location -> Backend LocationType
-export function locationToLocationType(cat: location): LocationType {
+export function locationToLocationType(cat: location): LocationType | null {
   switch (cat) {
     case "fridge":
       return "FRIDGE";
@@ -65,8 +65,9 @@ export function locationToLocationType(cat: location): LocationType {
     case "cleaning":
       return "CLEANING";
     case "other":
-    default:
       return "OTHER";
+    default:
+      return null;
   }
 }
 

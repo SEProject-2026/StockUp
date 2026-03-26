@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     tesseract-ocr \
     tesseract-ocr-heb \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # 5. Copy requirements and install

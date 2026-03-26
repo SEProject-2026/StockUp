@@ -128,9 +128,11 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
 
       setSuggestions([]);
     } catch (e) {
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי לטעון את הרשימה";
+
       Alert.alert(
         "שגיאה",
-        e instanceof Error ? e.message : "לא הצלחתי לטעון את הרשימה"
+        message
       );
     } finally {
       setLoading(false);
@@ -175,9 +177,10 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
 
         syncFromDto(dto);
       } catch (e) {
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי להוסיף את המוצר";
         Alert.alert(
           "שגיאה",
-          e instanceof Error ? e.message : "לא הצלחתי להוסיף את המוצר"
+          message
         );
       }
     },
@@ -194,7 +197,8 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
         syncFromDto(dto);
       } catch (e) {
         console.error("Full Error Object:", e); // זה ידפיס ללוג של ה-VSCode/Terminal
-        Alert.alert("שגיאה", "לא הצלחתי למחוק את הפריט");
+        const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי למחוק את הפריט";
+        Alert.alert("שגיאה", message);
         
       }
     },
@@ -218,7 +222,8 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
         const dto = await updateShoppingListItemQuantity(listId, current.name, newQty);
         syncFromDto(dto);
       } catch (e) {
-        Alert.alert("שגיאה", "עדכון הכמות נכשל");
+        const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי לעדכן את הכמות";
+        Alert.alert("שגיאה", message);
       }
     },
     [items, listId, syncFromDto, removeItem]
@@ -233,10 +238,8 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
         const dto = await checkShoppingListItemAsBought(listId, current.name);
         syncFromDto(dto);
       } catch (e) {
-        Alert.alert(
-          "שגיאה",
-          e instanceof Error ? e.message : "לא הצלחתי לעדכן את סימון המוצר"
-        );
+        const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי לעדכן את סימון המוצר";
+        Alert.alert("שגיאה", message);
       }
     },
     [items, listId, syncFromDto]
@@ -251,10 +254,8 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       syncFromDto(dto);
       return dto;
     } catch (e) {
-      Alert.alert(
-        "שגיאה",
-        e instanceof Error ? e.message : "לא הצלחתי להפעיל את מצב הקנייה"
-      );
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי להפעיל את מצב הקנייה";
+      Alert.alert("שגיאה", message);
     } finally {
       setModeSubmitting(false);
     }
@@ -270,9 +271,10 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
         syncFromDto(dto);
         return dto;
       } catch (e) {
+        const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי לסיים את מצב הקנייה";
         Alert.alert(
           "שגיאה",
-          e instanceof Error ? e.message : "לא הצלחתי לסיים את מצב הקנייה"
+          message
         );
       } finally {
         setModeSubmitting(false);

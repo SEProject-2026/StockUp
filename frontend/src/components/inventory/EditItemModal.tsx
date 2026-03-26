@@ -17,9 +17,9 @@ type Props = {
   item: any | null;
   onClose: () => void;
   onSave: (values: { 
-    nickname: string; 
+    nickname?: string | null; 
     quantity: number; 
-    expirationDate?: string 
+    expirationDate?: string | null
   }) => Promise<void> | void;
 };
 
@@ -65,10 +65,12 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
     if (!canSave) return;
     try {
       setSaving(true);
+      const trimmedNickname = nickname?.trim() ?? null;
+      const trimmedExp = exp?.trim() ?? null;
       await onSave({
-        nickname: nickname.trim(), // יכול להיות ריק
+        nickname: trimmedNickname === "" ? (initialNickname !== "" ? null : undefined) : trimmedNickname,
         quantity: qtyNum,
-        expirationDate: exp.trim(),
+        expirationDate: trimmedExp === "" ? (initialExp !== "" ? null : undefined) : trimmedExp,
       });
     } catch (error) {
       console.error("Save error:", error);

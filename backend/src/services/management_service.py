@@ -140,7 +140,8 @@ class ManagementService:
         """User voluntarily leaves a home."""
         app_logger.debug(f"User {user_id} attempting to leave home {home_id}")
         home = await self._check_access(user_id, home_id)
-        
+        # Check if user is admin and has no member left in this home
+        # if so consider deleting the home
         home.leave_home(user_id)
         await self._home_repository.update(home)
         app_logger.info(f"User {user_id} successfully left home {home_id}")
@@ -152,6 +153,21 @@ class ManagementService:
         
         home.assign_admin(current_head_id, new_head_id)
         await self._home_repository.update(home)
+
+        try:
+            new_head_user = await self._user_repository.get_by_id(new_head_id)
+            if new_head_user and new_head_user.push_token:
+                home_name = home.get_name()
+                
+                send_push_notification(
+                    token=new_head_user.push_token,
+                    title="עדכון ראש בית 🏠",
+                    message=f"הועברת לניהול הבית {home_name}.",
+                    data={"action": "head_transferred", "home_id": str(home_id)}
+                )
+        except Exception as e:
+            app_logger.error(f"Failed to send head transfer notification to {new_head_id}: {e}")
+
         
         app_logger.info(f"Head of House role in home {home_id} transferred from {current_head_id} to {new_head_id}")
         return home
