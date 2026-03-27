@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
-import { supabase } from "@/src/lib/supabase";
 
 import {
   // filterStockByExpiration,

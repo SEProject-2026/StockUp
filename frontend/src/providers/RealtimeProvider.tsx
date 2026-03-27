@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "../../app/shopping-list/supabase";
 import { getCurrentUserId } from "@/src/auth/token";
 import { router } from "expo-router"; 
 
