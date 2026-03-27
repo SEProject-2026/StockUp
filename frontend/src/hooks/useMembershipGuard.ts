@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { router } from "expo-router";
-import { supabase } from "../../app/shopping-list/supabase";
+import { supabase } from "@/src/lib/supabase";
 import { useRealtimeContext } from "@/src/providers/RealtimeProvider";
 
 export function useMembershipGuard(homeId: string | undefined) {

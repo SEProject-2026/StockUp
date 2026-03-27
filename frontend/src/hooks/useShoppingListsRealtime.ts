@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { supabase } from "../../app/shopping-list/supabase";
+import { supabase } from "@/src/lib/supabase";
 
 export function useShoppingListsRealtime(
   homeId: string | undefined,
