@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import { Modal, View, Text, TextInput, TouchableOpacity, Pressable, KeyboardAvoidingView, Platform, Alert, ScrollView } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { locationLabel, locationIcon } from "@/src/utils/shoppingUtils";
 import { styles, BRAND } from "./styles";
 import { type LocationKey } from "@/src/hooks/shopping/useShoppingList";
 
@@ -36,49 +34,49 @@ export function AddShoppingItemModal({ open, onClose, onAdd, existingCategories 
           <Pressable style={styles.modalCard} onPress={e => e.stopPropagation()}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>הוספת פריט (בחרי קטגוריה)</Text>
-            
+
             <View style={styles.field}>
               <Text style={styles.label}>שם מוצר</Text>
-              <TextInput 
-                value={name} 
-                onChangeText={setName} 
-                style={styles.input} 
-                textAlign="right" 
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                style={styles.input}
+                textAlign="right"
                 placeholder="מה לקנות?"
               />
             </View>
 
             <View style={styles.field}>
               <Text style={styles.label}>כמות</Text>
-              <TextInput 
-                value={qty} 
-                onChangeText={setQty} 
-                keyboardType="numeric" 
-                style={styles.input} 
-                textAlign="right" 
+              <TextInput
+                value={qty}
+                onChangeText={setQty}
+                keyboardType="numeric"
+                style={styles.input}
+                textAlign="right"
               />
             </View>
 
             <View style={styles.field}>
               <Text style={styles.label}>קטגוריה (למשל: ירקות, משקאות...)</Text>
-              <TextInput 
-                value={loc} 
-                onChangeText={setLoc} 
-                style={styles.input} 
-                textAlign="right" 
+              <TextInput
+                value={loc}
+                onChangeText={setLoc}
+                style={styles.input}
+                textAlign="right"
                 placeholder="איפה זה נמצא?"
               />
-              
+
               {suggestionList.length > 0 && (
                 <View style={{ marginTop: 8 }}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingLeft: 4 }}>
                     {suggestionList.map((cat) => (
-                      <TouchableOpacity 
-                        key={cat} 
+                      <TouchableOpacity
+                        key={cat}
                         style={[
-                          styles.chip, 
+                          styles.chip,
                           loc === cat && { backgroundColor: BRAND.PRIMARY, borderColor: BRAND.PRIMARY }
-                        ]} 
+                        ]}
                         onPress={() => setLoc(cat)}
                       >
                         <Text style={[styles.chipText, loc === cat && { color: "#fff" }]}>{cat}</Text>

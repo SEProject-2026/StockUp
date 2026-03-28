@@ -1,7 +1,6 @@
 import pytest
 from uuid import uuid4, UUID
 from tests.container import testing_container
-from src.domain.enums import LocationType
 
 # --- Setup & Reset ---
 
@@ -58,7 +57,7 @@ async def test_add_item_to_list_api():
     item_payload = {
         "item_name": "Steak",
         "quantity": 2,
-        "location": LocationType.FRIDGE
+        "location": "FRIDGE"
     }
     add_res = testing_container.client.post(f"/shopping-lists/{list_id}/items", json=item_payload, headers=headers)
 
@@ -68,6 +67,30 @@ async def test_add_item_to_list_api():
     assert len(items) == 1
     assert items[0]["item_name"] == "Steak"
     assert items[0]["quantity"] == 2
+    assert items[0]["location"] == "FRIDGE"
+
+@pytest.mark.asyncio
+async def test_add_custom_location_item_api():
+    """Scenario: User adds an item with a custom string location via API."""
+    headers = get_auth_headers("custom@test.com", "User")
+    home_id = create_home_helper(headers)["id"]
+    
+    # 1. Create List
+    list_res = testing_container.client.post("/shopping-lists/", json={"home_id": home_id, "name": "Party"}, headers=headers)
+    list_id = list_res.json()["data"]["id"]
+    
+    # 2. Act: Add Item with custom location
+    item_payload = {
+        "item_name": "Balloons",
+        "quantity": 10,
+        "location": "Living Room"
+    }
+    add_res = testing_container.client.post(f"/shopping-lists/{list_id}/items", json=item_payload, headers=headers)
+    
+    # 3. Assert
+    assert add_res.status_code == 200
+    items = add_res.json()["data"]["items"]
+    assert items[0]["location"] == "Living Room"
 
 @pytest.mark.asyncio
 async def test_check_item_and_exit_mode_flow():

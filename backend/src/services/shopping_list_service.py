@@ -1,6 +1,5 @@
 from typing import List, Optional
 from uuid import UUID
-from src.domain.enums import LocationType
 from src.domain.shopping_list.shopping_list import ShoppingList
 from src.infrastructure.logger import app_logger
 
