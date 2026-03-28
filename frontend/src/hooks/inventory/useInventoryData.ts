@@ -14,7 +14,7 @@ import {
   filterStock,
 } from "@/src/api/stock";
 
-import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/src/hooks/common/useDebouncedValue";
 
 import {
   locationKey,
@@ -80,7 +80,6 @@ export function useInventoryData(params: {
 
         if (mySeq !== requestSeqRef.current) return;
 
-        // הפיכת ה-DTO לשורות שטוחות (InventoryRow)
         const flat = products.flatMap(dtoToRows);
         
         setRows(flat);
