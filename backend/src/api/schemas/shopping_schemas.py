@@ -2,7 +2,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
-from src.domain.enums import LocationType
 
 # --- Response DTOs ---
 
