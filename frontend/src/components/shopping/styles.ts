@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from "react-native";
-import { type LocationKey as BaseLocation } from "@/src/hooks/useShoppingList";
+import { type LocationKey as BaseLocation } from "@/src/hooks/shopping/useShoppingList";
 
 export type SectionLocation = BaseLocation | "UNSORTED";
 
@@ -90,4 +90,18 @@ export const styles = StyleSheet.create({
   primaryBtn: { marginTop: 4, height: 46, borderRadius: 14, backgroundColor: BRAND.PRIMARY, alignItems: "center", justifyContent: "center" },
   primaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "900" },
   bottomBar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(255,255,255,0.92)", borderTopWidth: 1, borderTopColor: "#E5E7EB" },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BRAND.BORDER,
+    backgroundColor: BRAND.CARD,
+    marginRight: 8,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: BRAND.TEXT,
+  },
 });

@@ -17,13 +17,13 @@ import DatePickerModal from "@/src/components/add-item/DatePickerModal";
 import { addProduct } from "@/src/api/stock";
 import { searchCatalog, getCatalogByBarcode, type CatalogItem } from "@/src/api/catalog";
 import { location_OPTIONS, routeTolocation, locationMap } from "@/src/components/add-item/types";
-import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/src/hooks/common/useDebouncedValue";
 import { setLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
 
 // Custom Hooks & Utils
-import { useBatchAddItems } from "@/src/hooks/useBatchAddItems";
+import { useBatchAddItems } from "@/src/hooks/inventory/useBatchAddItems";
 import { normalizeCatalogList, normalizeCatalogOne } from "@/src/utils/batch-add-utils";
-import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
+import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 const BRAND_BG = "#F4F4F4";
 

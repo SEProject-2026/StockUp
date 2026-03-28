@@ -44,7 +44,7 @@ class ShoppingListService:
         """
         await self.shopping_repo.delete(id)
 
-    async def add_item_to_list(self, id: UUID, item_name: str, quantity: int, location: Optional[LocationType] = LocationType.OTHER) -> ShoppingList:
+    async def add_item_to_list(self, id: UUID, item_name: str, quantity: int, location: Optional[str] = "OTHER") -> ShoppingList:
         """
         Adds a specific product definition to the shopping list.
         """

@@ -15,8 +15,10 @@ type RealtimeContextValue = {
   homesVersion: number;
   inventoryVersionByHome: Record<string, number>;
   joinRequestsVersionByHome: Record<string, number>;
+  homeMetaVersionByHome: Record<string, number>;
   bumpInventoryVersion: (homeId: string) => void;
   bumpJoinRequestsVersion: (homeId: string) => void;
+  bumpHomeMetaVersion: (homeId: string) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -25,6 +27,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
   const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
+  const [homeMetaVersionByHome, setHomeMetaVersionByHome] = useState<Record<string, number>>({});
 
   const channelsRef = useRef<any[]>([]);
 
@@ -53,6 +56,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const bumpJoinRequestsVersion = useCallback((homeId: string) => {
     if (!homeId) return;
     setJoinRequestsVersionByHome((prev) => ({
+      ...prev,
+      [homeId]: (prev[homeId] ?? 0) + 1,
+    }));
+  }, []);
+
+  const bumpHomeMetaVersion = useCallback((homeId: string) => {
+    if (!homeId) return;
+    setHomeMetaVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
     }));
@@ -88,17 +99,20 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               const next = payload.new as { user_id?: string; home_id?: string } | null;
               const oldRow = payload.old as { user_id?: string; home_id?: string } | null;
               const rowUserId = next?.user_id ?? oldRow?.user_id;
+              const rowHomeId = next?.home_id ?? oldRow?.home_id;
 
               if (rowUserId === userId) {
-                // Checking if the user has been removed from the home
                 if (payload.eventType === "DELETE") {
                   console.log("[Realtime] User was removed from home, redirecting to home list...");
                   router.replace("/home/home"); 
                   return;
                 }
                 
-                // In case of an update or addition, simply refresh the list of houses.
                 bumpHomesVersion();
+              }
+
+              if (rowHomeId) {
+                bumpHomeMetaVersion(rowHomeId);
               }
             }
           )
@@ -209,11 +223,38 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             console.log("[Realtime] home_join_requests status:", status);
           });
 
+        // 5. Homes Channel - Responsible for changes in the home itself (name, admin, etc.)
+        const homesChannel = supabase
+          .channel(`rt-homes-${userId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "homes",
+            },
+            (payload) => {
+              console.log("[Realtime] homes payload:", payload);
+
+              const next = payload.new as { id?: string } | null;
+              const oldRow = payload.old as { id?: string } | null;
+              const changedHomeId = next?.id ?? oldRow?.id;
+
+              if (changedHomeId) {
+                bumpHomeMetaVersion(changedHomeId);
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log("[Realtime] homes status:", status);
+          });
+
         channelsRef.current = [
           userHomeChannel,
           productsChannel,
           productItemsChannel,
           joinRequestsChannel,
+          homesChannel,
         ];
       } catch (error) {
         console.log("[Realtime] setup error:", error);
@@ -240,10 +281,20 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       homesVersion,
       inventoryVersionByHome,
       joinRequestsVersionByHome,
+      homeMetaVersionByHome,
       bumpInventoryVersion,
       bumpJoinRequestsVersion,
+      bumpHomeMetaVersion,
     }),
-    [homesVersion, inventoryVersionByHome, joinRequestsVersionByHome, bumpInventoryVersion, bumpJoinRequestsVersion]
+    [
+      homesVersion,
+      inventoryVersionByHome,
+      joinRequestsVersionByHome,
+      homeMetaVersionByHome,
+      bumpInventoryVersion,
+      bumpJoinRequestsVersion,
+      bumpHomeMetaVersion,
+    ]
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
