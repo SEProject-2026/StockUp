@@ -6,14 +6,7 @@ export type GeneralResponse<T = unknown> = {
   data?: T;
 };
 
-export type LocationType =
-  | "FRIDGE"
-  | "FREEZER"
-  | "PANTRY"
-  | "CLEANING"
-  | "BATHROOM"
-  | "LAUNDRY"
-  | "OTHER";
+export type LocationType = string;
 
 export type ShoppingListItemDTO = {
   item_name: string;

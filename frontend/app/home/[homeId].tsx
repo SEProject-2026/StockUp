@@ -13,9 +13,11 @@ import SideTitleCard from "@/src/components/ui/cards/SideTitleCard";
 import ExpiringSoonCard from "@/src/components/homes/ExpiringSoonCard";
 
 // Hooks & Logic
-import { useHomeData } from "@/src/hooks/useHomeData";
+import { useHomeData } from "@/src/hooks/home/useHomeData";
+import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard";
+import { useShoppingList } from "@/src/hooks/shopping/useShoppingList";
 import { setSelectedHomeId } from "@/src/utils/selected-home";
-import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- הוספת ה-Import
+import { useRealtimeHomesRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
 
 const BRAND_BLUE_SOFT = "#F0FAFF";
 
@@ -139,11 +141,7 @@ export default function HomeDashboardScreen() {
                 icon="add-circle-outline"
                 onPress={() => router.push({ pathname: "/inventory/add-item", params: { homeId: currentHomeId } })}
               />
-              <QuickActionButton
-                label="מצב בסיס"
-                icon="list-outline"
-                onPress={() => router.push({ pathname: "/base-mode", params: { homeId: currentHomeId } })}
-              />
+
             </ScrollView>
           </View>
 

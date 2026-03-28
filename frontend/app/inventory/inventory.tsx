@@ -12,9 +12,9 @@ import { GroupedInventoryList } from "@/src/components/inventory/GroupedInventor
 import { EditItemModal } from "@/src/components/inventory/EditItemModal";
 
 import type { locationKey } from "@/src/components/inventory/inventory.utils";
-import { useInventoryData } from "@/src/hooks/useInventoryData";
-import { useRealtimeInventoryRefresh } from "@/src/hooks/useRealtimeInventoryRefresh";
-import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
+import { useInventoryData } from "@/src/hooks/inventory/useInventoryData";
+import { useRealtimeInventoryRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
+import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 export function InventoryScreenBase({
   initiallocation = "all",

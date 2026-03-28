@@ -51,7 +51,7 @@ class DbProductRepository(IProductRepository):
                 db_item = existing_items[domain_item_id_str]
                 
                 db_item.expiration_date = domain_item.expiration_date
-                db_item.location = domain_item.location.name if domain_item.location else "OTHER"
+                db_item.location = domain_item.location.value if domain_item.location else LocationType.OTHER.value
                 
                 
                 quantity_diff = domain_item.quantity - db_item.quantity 
@@ -66,7 +66,7 @@ class DbProductRepository(IProductRepository):
                     product_id=str(product.id),
                     quantity=domain_item.quantity,
                     expiration_date=domain_item.expiration_date,
-                    location=domain_item.location.name if domain_item.location else "OTHER"
+                    location=domain_item.location.value if domain_item.location else LocationType.OTHER.value
                 )
                 self.db.add(new_db_item)
 
@@ -82,7 +82,7 @@ class DbProductRepository(IProductRepository):
         #         product_id=str(product.id),
         #         quantity=item.quantity,
         #         expiration_date=item.expiration_date,
-        #         location=item.location.name if item.location else "OTHER"
+        #         location=item.location if item.location else "OTHER"
         #     ) for item in product.items
         # ]
         # # Flush ensures the SQL is sent to the DB buffer
@@ -178,13 +178,13 @@ class DbProductRepository(IProductRepository):
         # (Since we are just loading state from DB, not adding new items)
         restored_items = []
         for db_item in db_model.items:
-            loc_enum = LocationType[db_item.location] if db_item.location else LocationType.OTHER
+            loc_str = db_item.location if db_item.location else LocationType.OTHER.value
             
             domain_item = ProductItem(
                 id=UUID(db_item.id),
                 quantity=db_item.quantity,
                 expiration_date=db_item.expiration_date,
-                location=loc_enum
+                location=LocationType(loc_str)
             )
             restored_items.append(domain_item)
             
@@ -196,7 +196,7 @@ class DbProductRepository(IProductRepository):
         self, 
         home_id: UUID, 
         query_text: Optional[str] = None, 
-        location: Optional[LocationType] = None, 
+        location: Optional[str] = None, 
         expiration_type: Optional[ExpirationType] = None,
         warning_days: int = 0
     ) -> List[Product]:
@@ -214,7 +214,7 @@ class DbProductRepository(IProductRepository):
             )
 
         if location:
-            query = query.filter(ProductItemModel.location == location.name)
+            query = query.filter(ProductItemModel.location == location)
 
         if expiration_type:
             today = date.today()

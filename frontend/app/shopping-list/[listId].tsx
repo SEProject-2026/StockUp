@@ -5,8 +5,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useShoppingList, type ShoppingItem, type LocationKey } from "@/src/hooks/useShoppingList";
-import { LOCATIONS, locationLabel, locationIcon } from "@/src/hooks/useBaseMode";
+import { useShoppingList, type ShoppingItem, type LocationKey } from "@/src/hooks/shopping/useShoppingList";
+import { locationLabel, locationIcon } from "@/src/utils/shoppingUtils";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
 
@@ -28,27 +28,32 @@ export default function ShoppingListScreen() {
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
 
   const groupedSections = useMemo(() => {
-    const groups = new Map<SectionLocation, ShoppingItem[]>();
+    const groups = new Map<string, ShoppingItem[]>();
     
     filteredItems.forEach((it) => {
-      const loc = (it.location as SectionLocation) || "UNSORTED";
+      const loc = it.location || "OTHER";
       if (!groups.has(loc)) groups.set(loc, []);
       groups.get(loc)!.push(it);
     });
 
-    const sections = (LOCATIONS as LocationKey[])
-      .filter(l => groups.has(l as SectionLocation))
-      .map(l => ({
-        location: l as SectionLocation,
-        title: locationLabel(l as any),
-        items: groups.get(l as SectionLocation)!
-      }));
+    const allLocations = Array.from(groups.keys()).sort((a, b) => 
+      a.localeCompare(b, "he")
+    );
 
-    if (groups.has("UNSORTED")) {
-      sections.push({ location: "UNSORTED", title: "ללא מיקום", items: groups.get("UNSORTED")! });
-    }
-    return sections;
+    return allLocations.map(l => ({
+      location: l,
+      title: locationLabel(l as any),
+      items: groups.get(l)!
+    }));
   }, [filteredItems]);
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>();
+    items.forEach(it => {
+      if (it.location) cats.add(it.location);
+    });
+    return Array.from(cats).sort((a, b) => a.localeCompare(b, "he"));
+  }, [items]);
 
   if (loading) return (
     <SafeAreaView style={styles.safeArea}>
@@ -57,7 +62,7 @@ export default function ShoppingListScreen() {
     </SafeAreaView>
   );
 
-return (
+  return (
     <View style={{ flex: 1 }}>
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient colors={["#E5F3FF", BRAND.BG]} style={StyleSheet.absoluteFill} />
@@ -66,7 +71,7 @@ return (
         <FlatList
           data={groupedSections}
           keyExtractor={s => s.location}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }} // צמצמתי מרווח תחתון
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
           ListHeaderComponent={
             <ShoppingHeader 
               isShoppingMode={mode === "SHOPPING"} totalCount={items.length} pickedCount={pickedCount}
@@ -106,7 +111,6 @@ return (
           )}
         />
 
-        {/* הכפתור הדינמי בתחתית המסך */}
         <View style={[styles.bottomActions, { paddingBottom: 16 + insets.bottom }]}>
           {mode === "SHOPPING" ? (
             <TouchableOpacity 
@@ -136,8 +140,14 @@ return (
           )}
         </View>
 
-        <AddShoppingItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={(p) => addItem(p.name, p.qty, "manual", p.location)} />
+        <AddShoppingItemModal 
+          open={addOpen} 
+          onClose={() => setAddOpen(false)} 
+          onAdd={(p) => addItem(p.name, p.qty, "manual", p.location)}
+          existingCategories={uniqueCategories}
+        />
         <View style={[styles.bottomBar, { paddingBottom: 10 + insets.bottom }]}><BottomNavBar activeTab="shopping-list" /></View>
       </SafeAreaView>
     </View>
-  );}
+  );
+}

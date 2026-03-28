@@ -2,7 +2,6 @@ import pytest
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 from time import sleep
-from src.domain.enums import LocationType
 from src.domain.shopping_list.shopping_list import ShoppingList, ShoppingListItem
 
 # --- Fixtures ---
@@ -18,20 +17,28 @@ def empty_list():
 @pytest.fixture
 def populated_list(empty_list):
     """Provides a list with some items already added."""
-    empty_list.add_item("Milk", 2, LocationType.FRIDGE)
-    empty_list.add_item("Bread", 1, LocationType.PANTRY)
+    empty_list.add_item("Milk", 2, "FRIDGE")
+    empty_list.add_item("Bread", 1, "PANTRY")
     return empty_list
 
 # --- Tests ---
 
 def test_add_new_item(empty_list):
-    """Test adding a brand new item to the list."""
-    empty_list.add_item("Apples", 5, LocationType.PANTRY)
+    """Test adding a brand new item to the list with a standard location."""
+    empty_list.add_item("Apples", 5, "PANTRY")
     
     assert len(empty_list.items) == 1
     assert empty_list.items[0].item_name == "Apples"
     assert empty_list.items[0].quantity == 5
-    assert empty_list.items[0].location == LocationType.PANTRY
+    assert empty_list.items[0].location == "PANTRY"
+
+def test_add_item_with_custom_location(empty_list):
+    """Test adding an item with a completely custom string location."""
+    empty_list.add_item("Sushi", 1, "Ma'afiya")
+    
+    assert len(empty_list.items) == 1
+    assert empty_list.items[0].item_name == "Sushi"
+    assert empty_list.items[0].location == "Ma'afiya"
 
 def test_add_existing_item_updates_quantity(populated_list):
     """Test that adding an existing item increases its quantity instead of duplicating."""

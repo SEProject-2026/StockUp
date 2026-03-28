@@ -3,13 +3,12 @@ from uuid import UUID, uuid4
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-from src.domain.enums import LocationType
 
 class ShoppingListItem(BaseModel):
     item_name: str
     quantity: int
     is_bought: bool = False
-    location: Optional[LocationType] = LocationType.OTHER
+    location: str = "OTHER"
 
 class ShoppingList(BaseModel):
     id: UUID= Field(default_factory=uuid4)
@@ -22,7 +21,7 @@ class ShoppingList(BaseModel):
     def _refresh_timestamp(self):
         self.updated_at = datetime.now()
 
-    def add_item(self, item_name: str, quantity: int, location: Optional[LocationType] = LocationType.OTHER) -> None:
+    def add_item(self, item_name: str, quantity: int, location: str = "OTHER") -> None:
         for item in self.items:
             if item.item_name == item_name:
                 item.quantity += quantity

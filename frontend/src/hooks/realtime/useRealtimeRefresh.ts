@@ -1,18 +1,50 @@
 import { useEffect, useRef } from "react";
 import { useRealtimeContext } from "@/src/providers/RealtimeProvider";
 
+// --- Homes Refresh ---
+type LoadHomesFn = (mode?: "initial" | "refresh") => Promise<void>;
+
+export function useRealtimeHomesRefresh(loadHomes: LoadHomesFn) {
+  const { homesVersion } = useRealtimeContext();
+
+  useEffect(() => {
+    loadHomes("refresh");
+  }, [homesVersion, loadHomes]);
+}
+
+// --- Inventory Refresh ---
+export function useRealtimeInventoryRefresh(
+  homeId: string | undefined,
+  refreshInventory: () => Promise<void>
+) {
+  const { inventoryVersionByHome } = useRealtimeContext();
+  const lastVersionRef = useRef<number>(0);
+
+  const currentVersion = homeId ? (inventoryVersionByHome[homeId] ?? 0) : 0;
+
+  useEffect(() => {
+    if (!homeId) return;
+
+    // הגנה נוספת: בדקי אם הגרסה באמת השתנתה מאז הפעם האחרונה
+    if (currentVersion === lastVersionRef.current) return;
+    
+    console.log("[InventoryRefresh] Triggering refresh for version:", currentVersion);
+    lastVersionRef.current = currentVersion;
+    void refreshInventory();
+  }, [homeId, currentVersion, refreshInventory]);
+}
+
+// --- Join Requests Refresh ---
 export function useRealtimeJoinRequestsRefresh(
   homeId: string | undefined,
   refreshJoinRequests: () => Promise<void>
 ) {
   const { joinRequestsVersionByHome } = useRealtimeContext();
   
-  // Ref-ים לשמירת המצב הקודם
   const lastHomeIdRef = useRef<string | undefined>(undefined);
   const lastVersionRef = useRef<number>(-1);
   const refreshRef = useRef(refreshJoinRequests);
 
-  // תמיד מעדכנים את הפונקציה ב-Ref
   useEffect(() => {
     refreshRef.current = refreshJoinRequests;
   }, [refreshJoinRequests]);
@@ -20,25 +52,21 @@ export function useRealtimeJoinRequestsRefresh(
   const currentVersion = homeId ? (joinRequestsVersionByHome[homeId] ?? 0) : 0;
 
   useEffect(() => {
-    // 1. הגנה: אם אין homeId, או שה-homeId והגרסה זהים למה שכבר עיבדנו - עצור מיד
     if (!homeId || (homeId === lastHomeIdRef.current && currentVersion <= lastVersionRef.current)) {
       return;
     }
 
-    // 2. טיפול במצב טעינה ראשוני (גרסה 0) - מעדכנים Ref בלי להריץ ריענון
     if (lastVersionRef.current === -1 && currentVersion === 0) {
       lastHomeIdRef.current = homeId;
       lastVersionRef.current = 0;
       return;
     }
 
-    // 3. ריענון אמיתי - קורה רק אם ה-ID השתנה או שהגרסה עלתה
     console.log("[JoinRequestsRefresh] TRIGGERED", { homeId, currentVersion });
 
     lastHomeIdRef.current = homeId;
     lastVersionRef.current = currentVersion;
 
     void refreshRef.current();
-
-  }, [homeId, currentVersion]); // Dependencies מינימליים
+  }, [homeId, currentVersion]);
 }

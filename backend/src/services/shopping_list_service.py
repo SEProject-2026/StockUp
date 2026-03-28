@@ -1,6 +1,5 @@
 from typing import List, Optional
 from uuid import UUID
-from src.domain.enums import LocationType
 from src.domain.shopping_list.shopping_list import ShoppingList
 from src.infrastructure.logger import app_logger
 
@@ -44,7 +43,7 @@ class ShoppingListService:
         """
         await self.shopping_repo.delete(id)
 
-    async def add_item_to_list(self, id: UUID, item_name: str, quantity: int, location: Optional[LocationType] = LocationType.OTHER) -> ShoppingList:
+    async def add_item_to_list(self, id: UUID, item_name: str, quantity: int, location: Optional[str] = "OTHER") -> ShoppingList:
         """
         Adds a specific product definition to the shopping list.
         """
