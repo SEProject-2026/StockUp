@@ -24,7 +24,10 @@ import {
   rowsSignature,
   statusFilterToExpirationType,
   locationToLocationType,
+  LocationSectionVM,
+  locationLabel,
 } from "@/src/components/inventory/inventory.utils";
+import type { location } from "@/src/context/inventory-context";
 
 type LoadMode = "initial" | "soft";
 
@@ -181,50 +184,69 @@ const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: 
   }
 }, [homeId, rows, loadInventory]);
 
-  const groupedItems = useMemo(() => {
+  const groupedSections = useMemo((): LocationSectionVM[] => {
     if (!rows || rows.length === 0) return [];
 
-    const productMap = new Map<string, any>();
+    // 1. Group by location then by product
+    const locMap = new Map<location, Map<string, any>>();
 
     for (const r of rows) {
-      // מפתח ייחודי לפי שם מוצר מקורי (כדי לאחד כפילויות)
+      if (!locMap.has(r.location)) {
+        locMap.set(r.location, new Map());
+      }
+      const productMap = locMap.get(r.location)!;
       const key = `${r.productId}__${r.originalName}`;
-      
+
       if (!productMap.has(key)) {
         productMap.set(key, {
-          key,
+          key: `${r.location}__${key}`, // key must be unique even if product appears in diff locations
           productId: r.productId,
           title: r.name,
           subtitle: r.hasNickname ? r.originalName : undefined,
           totalQuantity: 0,
-          byLoc: new Map(),
+          sections: [{ location: r.location, totalQuantity: 0, items: [] }]
         });
       }
 
       const g = productMap.get(key);
       g.totalQuantity += r.quantity;
-
-      if (!g.byLoc.has(r.location)) {
-        g.byLoc.set(r.location, { location: r.location, totalQuantity: 0, items: [] });
-      }
-
-      const sec = g.byLoc.get(r.location);
+      const sec = g.sections[0]; // in this mode, g always has exactly one section matching its parent location
       sec.totalQuantity += r.quantity;
       sec.items.push(r);
     }
 
-    return Array.from(productMap.values()).map(g => ({
-      ...g,
-      sections: Array.from(g.byLoc.values()).map((sec: any) => ({
-        ...sec,
-        items: sec.items.sort((a: any, b: any) => (a.expirationDate ?? "9").localeCompare(b.expirationDate ?? "9"))
-      }))
-    })).sort((a, b) => a.title.localeCompare(b.title, "he"));
+    // 2. Transform to LocationSectionVM[]
+    const result: LocationSectionVM[] = [];
+    
+    // Sort locations in a specific order if needed, but for now just all
+    const allLocations: location[] = ["fridge", "freezer", "pantry", "cleaning", "other"];
+    
+    for (const loc of allLocations) {
+      const productMap = locMap.get(loc);
+      if (productMap && productMap.size > 0) {
+        const products = Array.from(productMap.values())
+          .map(g => ({
+            ...g,
+            sections: g.sections.map((sec: any) => ({
+              ...sec,
+              items: sec.items.sort((a: any, b: any) => (a.expirationDate ?? "9").localeCompare(b.expirationDate ?? "9"))
+            }))
+          }))
+          .sort((a, b) => a.title.localeCompare(b.title, "he"));
+
+        result.push({
+          location: loc,
+          label: locationLabel(loc),
+          items: products
+        });
+      }
+    }
+
+    return result;
   }, [rows]);
 
   return {
     rows,
-    groupedItems,
     initialLoading,
     isSearching,
     selectedTab,
@@ -239,5 +261,6 @@ const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: 
     changeQty,
     deleteRow,
     saveEdit,
+    groupedItems: groupedSections,
   };
 }

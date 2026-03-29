@@ -2,6 +2,7 @@ import React from "react";
 import { useEffect } from "react";
 import { Stack, useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { I18nManager } from "react-native";
 import { InventoryProvider } from "../src/context/inventory-context";
 import * as Notifications from 'expo-notifications';
 import { approveJoinRequest, rejectJoinRequest } from "@/src/api/homes";
@@ -9,6 +10,12 @@ import { RealtimeProvider } from "../src/providers/RealtimeProvider";
 
 export default function RootLayout() {
   const router = useRouter();
+
+  // Force RTL for Hebrew
+  if (!I18nManager.isRTL) {
+    I18nManager.allowRTL(true);
+    I18nManager.forceRTL(true);
+  }
 
   useEffect(() => {
     // הפונקציה המרכזית שעושה את העבודה, לא משנה מאיפה ההתראה הגיעה

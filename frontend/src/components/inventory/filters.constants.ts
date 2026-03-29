@@ -5,11 +5,19 @@ import type { Ionicons } from "@expo/vector-icons";
 export type StatusFilter = "all" | "soon" | "expired";
 
 export const COLORS = {
-  BRAND_BLUE_SOFT: "#F0FAFF",
-  BRAND_TEXT: "#111827",
-  BRAND_MUTED: "#6B7280",
-  ACCENT: "#0284C7",
-  BORDER: "#E5E7EB",
+  BRAND_BLUE_SOFT: "#F0F9FF",
+  BRAND_TEXT: "#0F172A",
+  BRAND_MUTED: "#64748B",
+  ACCENT: "#0EA5E9",
+  BORDER: "#E2E8F0",
+  SUCCESS: "#10B981", // Emerald
+  SUCCESS_SOFT: "#ECFDF5",
+  WARNING: "#F59E0B", // Amber
+  WARNING_SOFT: "#FFFBEB",
+  DANGER: "#EF4444", // Red
+  DANGER_SOFT: "#FEF2F2",
+  CARD_BG: "#FFFFFF",
+  BG_DIM: "#F8FAFC",
 } as const;
 
 export const CATEGORIES: Array<{
