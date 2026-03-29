@@ -17,23 +17,28 @@ export type StatusFilter = "all" | "soon" | "expired";
 
 // ----- Group VM (what the list wants) -----
 export type ProductGroupVM = {
-  key: string; // unique: productId + originalName (extra safety)
+  key: string; 
   productId: string;
 
-  title: string; // nickname if exists else original
-  subtitle?: string; // original (only if nickname exists)
+  title: string; 
+  subtitle?: string; 
 
-  // used for sorting/search
   originalName: string;
   nickname?: string | null;
 
   totalQuantity: number;
 
   sections: Array<{
-    location: location; // ui
+    location: location; 
     totalQuantity: number;
     items: InventoryRow[];
   }>;
+};
+
+export type LocationSectionVM = {
+  location: location;
+  label: string;
+  items: ProductGroupVM[];
 };
 
 // Backend LocationType -> UI location
@@ -54,7 +59,7 @@ export function mapLocationTolocation(loc?: string | null): location {
 }
 
 // UI location -> Backend LocationType
-export function locationToLocationType(cat: location): LocationType {
+export function locationToLocationType(cat: location): LocationType | null {
   switch (cat) {
     case "fridge":
       return "FRIDGE";
@@ -65,8 +70,9 @@ export function locationToLocationType(cat: location): LocationType {
     case "cleaning":
       return "CLEANING";
     case "other":
-    default:
       return "OTHER";
+    default:
+      return null;
   }
 }
 

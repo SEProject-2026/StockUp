@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Alert } from "react-native";
-import { LOCATIONS, locationLabel } from "@/src/hooks/useBaseMode";
 import {
   getShoppingList,
   addItemToShoppingList,
@@ -14,12 +13,7 @@ import {
   type LocationType,
 } from "@/src/api/shoppingLists";
 
-export type LocationKey =
-  | "FRIDGE"
-  | "FREEZER"
-  | "PANTRY"
-  | "CLEANING"
-  | "OTHER";
+export type LocationKey = string;
 
 export type ShoppingItem = {
   id: string;
@@ -43,16 +37,7 @@ type UseShoppingListParams = {
 };
 
 function normalizeLocation(value?: string | null): LocationKey {
-  switch (value) {
-    case "FRIDGE":
-    case "FREEZER":
-    case "PANTRY":
-    case "CLEANING":
-    case "OTHER":
-      return value;
-    default:
-      return "OTHER";
-  }
+  return value || "OTHER";
 }
 
 function mapDtoToItems(dto: ShoppingListDTO): ShoppingItem[] {
@@ -64,32 +49,6 @@ function mapDtoToItems(dto: ShoppingListDTO): ShoppingItem[] {
     location: normalizeLocation(item.location),
     isBought: item.is_bought,
   }));
-}
-
-export function useShoppingSections(filteredItems: any[]) {
-  const groupedSections = useMemo(() => {
-    const groups = new Map<string, any[]>();
-
-    for (const item of filteredItems) {
-      const loc = item?.location || "UNSORTED";
-      if (!groups.has(loc)) groups.set(loc, []);
-      groups.get(loc)!.push(item);
-    }
-
-    const orderedKnown = LOCATIONS.filter((loc) => groups.has(loc)).map((loc) => ({
-      location: loc,
-      title: locationLabel(loc as any),
-      items: groups.get(loc) || [],
-    }));
-
-    const unsorted = groups.has("UNSORTED")
-      ? [{ location: "UNSORTED", title: "ללא מיקום", items: groups.get("UNSORTED") }]
-      : [];
-
-    return [...orderedKnown, ...unsorted];
-  }, [filteredItems]);
-
-  return groupedSections;
 }
 
 export function useShoppingList({ homeId, listId }: UseShoppingListParams) {

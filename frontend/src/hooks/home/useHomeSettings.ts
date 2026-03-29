@@ -3,10 +3,8 @@ import { Alert } from "react-native";
 import { router } from "expo-router";
 import { getCurrentUserId } from "@/src/auth/token";
 import {
-  getHomeJoinCode,
   updateExpirationRange,
   answerJoinRequest,
-  getJoinRequests,
   getMyHomes,
   getHomeDetails,
   leaveHome,
@@ -14,28 +12,7 @@ import {
   removeMember,
   deleteHome,
 } from "@/src/api/homes";
-import { useRealtimeContext } from "../providers/RealtimeProvider";
-export function useRealtimeJoinRequestsRefresh(
-  homeId: string | undefined,
-  refreshJoinRequests: () => Promise<void>
-) {
-  const { joinRequestsVersionByHome } = useRealtimeContext();
-  const firstRunRef = useRef(true);
-  const currentVersion = homeId ? (joinRequestsVersionByHome[homeId] ?? 0) : 0;
-
-  useEffect(() => {
-    if (!homeId) return;
-
-    console.log("[JoinRequestsRefresh] homeId:", homeId, "version:", currentVersion);
-
-    if (firstRunRef.current) {
-      firstRunRef.current = false;
-      return;
-    }
-
-    refreshJoinRequests();
-  }, [homeId, currentVersion, refreshJoinRequests]);
-}
+import { useRealtimeContext } from "../../providers/RealtimeProvider";
 
 export function useHomeSettings(currentHomeId?: string) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -65,6 +42,9 @@ export function useHomeSettings(currentHomeId?: string) {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [leavingHomeLoading, setLeavingHomeLoading] = useState(false);
   const [deletingHomeLoading, setDeletingHomeLoading] = useState(false);
+
+  const { homeMetaVersionByHome } = useRealtimeContext();
+  const currentHomeMetaVersion = currentHomeId ? (homeMetaVersionByHome[currentHomeId] ?? 0) : 0;
 
   const clampDays = (n: number) => Math.max(0, Math.min(30, n));
 
@@ -96,7 +76,7 @@ export function useHomeSettings(currentHomeId?: string) {
   };
 
   useEffect(() => { getCurrentUserId().then(setCurrentUserId); }, []);
-  useEffect(() => { loadHomeData(); }, [currentHomeId, currentUserId]);
+  useEffect(() => { loadHomeData(); }, [currentHomeId, currentUserId, currentHomeMetaVersion]);
 
   const isHomeAdmin = !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
 

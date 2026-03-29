@@ -1,11 +1,13 @@
+from datetime import date, timedelta
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, contains_eager
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.repositories.i_product_repository import IProductRepository
 from src.domain.product.product import Product, ProductItem
-from src.domain.enums import LocationType
+from src.domain.enums import ExpirationType, ExpirationType, LocationType
 from src.infrastructure.db.models import ProductModel, ProductItemModel
+from sqlalchemy import select, or_, and_
 
 class DbProductRepository(IProductRepository):
     def __init__(self, db: Session):
@@ -49,7 +51,7 @@ class DbProductRepository(IProductRepository):
                 db_item = existing_items[domain_item_id_str]
                 
                 db_item.expiration_date = domain_item.expiration_date
-                db_item.location = domain_item.location.name if domain_item.location else "OTHER"
+                db_item.location = domain_item.location.value if domain_item.location else LocationType.OTHER.value
                 
                 
                 quantity_diff = domain_item.quantity - db_item.quantity 
@@ -64,7 +66,7 @@ class DbProductRepository(IProductRepository):
                     product_id=str(product.id),
                     quantity=domain_item.quantity,
                     expiration_date=domain_item.expiration_date,
-                    location=domain_item.location.name if domain_item.location else "OTHER"
+                    location=domain_item.location.value if domain_item.location else LocationType.OTHER.value
                 )
                 self.db.add(new_db_item)
 
@@ -80,7 +82,7 @@ class DbProductRepository(IProductRepository):
         #         product_id=str(product.id),
         #         quantity=item.quantity,
         #         expiration_date=item.expiration_date,
-        #         location=item.location.name if item.location else "OTHER"
+        #         location=item.location if item.location else "OTHER"
         #     ) for item in product.items
         # ]
         # # Flush ensures the SQL is sent to the DB buffer
@@ -176,16 +178,61 @@ class DbProductRepository(IProductRepository):
         # (Since we are just loading state from DB, not adding new items)
         restored_items = []
         for db_item in db_model.items:
-            loc_enum = LocationType[db_item.location] if db_item.location else LocationType.OTHER
+            loc_str = db_item.location if db_item.location else LocationType.OTHER.value
             
             domain_item = ProductItem(
                 id=UUID(db_item.id),
                 quantity=db_item.quantity,
                 expiration_date=db_item.expiration_date,
-                location=loc_enum
+                location=LocationType(loc_str)
             )
             restored_items.append(domain_item)
             
         product._items = restored_items
         
         return product
+    
+    async def filter_products(
+        self, 
+        home_id: UUID, 
+        query_text: Optional[str] = None, 
+        location: Optional[str] = None, 
+        expiration_type: Optional[ExpirationType] = None,
+        warning_days: int = 0
+    ) -> List[Product]:
+        
+        query = self.db.query(ProductModel).join(ProductModel.items)
+        
+        query = query.filter(ProductModel.home_id == str(home_id))
+
+        if query_text and len(query_text) >= 2:
+            query = query.filter(
+                or_(
+                    ProductModel.original_name.ilike(f"%{query_text}%"),
+                    ProductModel.nickname.ilike(f"%{query_text}%")
+                )
+            )
+
+        if location:
+            query = query.filter(ProductItemModel.location == location)
+
+        if expiration_type:
+            today = date.today()
+            
+            if expiration_type == ExpirationType.EXPIRED:
+                query = query.filter(ProductItemModel.expiration_date < today)
+                
+            elif expiration_type == ExpirationType.GOING_TO_EXPIRE:
+                warning_date = today + timedelta(days=warning_days)
+                query = query.filter(
+                    and_(
+                        ProductItemModel.expiration_date >= today,
+                        ProductItemModel.expiration_date <= warning_date
+                    )
+                )
+
+        query = query.options(contains_eager(ProductModel.items))
+
+        db_products = query.distinct().all()
+        
+        return [self._to_domain(p) for p in db_products]

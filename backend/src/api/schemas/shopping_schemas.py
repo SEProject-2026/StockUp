@@ -2,7 +2,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
-from src.domain.enums import LocationType
 
 # --- Response DTOs ---
 
@@ -12,7 +11,7 @@ class ShoppingListItemDTO(BaseModel):
     item_name: str
     quantity: int
     is_bought: bool
-    location: Optional[LocationType] = LocationType.OTHER
+    location: str
 
 
 
@@ -39,7 +38,7 @@ class AddItemRequest(BaseModel):
     """Payload for adding an item to a list."""
     item_name: str = Field(..., min_length=1)
     quantity: int = Field(..., gt=0)
-    location: Optional[LocationType] = LocationType.OTHER
+    location: Optional[str] = "OTHER"
 
 
 class UpdateQuantityRequest(BaseModel):

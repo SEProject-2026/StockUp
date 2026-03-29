@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Keyboard } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,13 +17,13 @@ import DatePickerModal from "@/src/components/add-item/DatePickerModal";
 import { addProduct } from "@/src/api/stock";
 import { searchCatalog, getCatalogByBarcode, type CatalogItem } from "@/src/api/catalog";
 import { location_OPTIONS, routeTolocation, locationMap } from "@/src/components/add-item/types";
-import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/src/hooks/common/useDebouncedValue";
 import { setLastAddItemReturnDrafts } from "@/src/context/add-item-return-store";
 
 // Custom Hooks & Utils
-import { useBatchAddItems } from "@/src/hooks/useBatchAddItems";
+import { useBatchAddItems } from "@/src/hooks/inventory/useBatchAddItems";
 import { normalizeCatalogList, normalizeCatalogOne } from "@/src/utils/batch-add-utils";
-import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
+import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 const BRAND_BG = "#F4F4F4";
 
@@ -152,7 +152,6 @@ export default function BatchAddItemsScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient colors={["#E5F3FF", BRAND_BG]} style={StyleSheet.absoluteFill} />
 
@@ -160,6 +159,11 @@ export default function BatchAddItemsScreen() {
           title={isReceiptReviewMode ? "הוספה לקבלה" : "הוספה מרובה"} 
           onBack={() => router.back()} 
         />
+
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
 
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: 140 + insets.bottom }]}
@@ -190,6 +194,7 @@ export default function BatchAddItemsScreen() {
               if (item.barcode) setters.setBarcode(item.barcode);
               setSuggestions([]);
               setters.setName("");
+              Keyboard.dismiss();
             }}
             onClearSelectedCatalogItem={() => setters.setSelectedCatalogItem(null)}
           />
@@ -201,6 +206,7 @@ export default function BatchAddItemsScreen() {
             onRemove={actions.removeFromList} 
           />
         </ScrollView>
+      </KeyboardAvoidingView>
 
         <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
           <PrimaryButton
@@ -234,7 +240,6 @@ export default function BatchAddItemsScreen() {
           onClear={() => setters.setExpiresAt(undefined)}
         />
       </SafeAreaView>
-    </KeyboardAvoidingView>
   );
 }
 
