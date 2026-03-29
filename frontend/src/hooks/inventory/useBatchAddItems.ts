@@ -9,7 +9,7 @@ export function useBatchAddItems(initialLocation: location) {
   const [barcode, setBarcode] = useState("");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [loc, setLoc] = useState<location>(initialLocation);
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
@@ -22,7 +22,7 @@ export function useBatchAddItems(initialLocation: location) {
     setBarcode("");
     setName("");
     setNickname("");
-    setQuantity("");
+    setQuantity("1");
     if (!keepLocation) setLoc(initialLocation);
     setExpiresAt(undefined);
     setSelectedCatalogItem(null);

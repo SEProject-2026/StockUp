@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   header: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   row: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     marginBottom: 24,
   },
   saveBtn: {
