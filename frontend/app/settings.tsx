@@ -64,7 +64,7 @@ export default function SettingsScreen() {
   };
   
   const refreshJoinRequests = useCallback(async () => {
-    if (!currentHomeId) return;
+    if (!currentHomeId || !state.isHomeAdmin) return;
     try {
       const res = await getJoinRequests(currentHomeId);
       const requests = Object.entries(res.data || {}).map(([id, name]) => ({

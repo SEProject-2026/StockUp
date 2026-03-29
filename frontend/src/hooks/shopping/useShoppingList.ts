@@ -10,8 +10,10 @@ import {
   deleteShoppingListItem,
   getRecommendations,
   type ShoppingListDTO,
+  type RecommendationDTO,
   type LocationType,
 } from "@/src/api/shoppingLists";
+import { supabase } from "@/src/config/supabase";
 
 export type LocationKey = string;
 
@@ -61,6 +63,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   const [query, setQuery] = useState("");
   const [modeSubmitting, setModeSubmitting] = useState(false);
   const [dismissedBarcodes, setDismissedBarcodes] = useState<Set<string>>(new Set());
+  const [isDeleted, setIsDeleted] = useState(false);
 
   const syncFromDto = useCallback((dto: ShoppingListDTO) => {
     const mappedItems = mapDtoToItems(dto);
@@ -93,7 +96,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       
       try {
         console.log(`[useShoppingList] Fetching recommendations for list ${listId}...`);
-        const recs = (await getRecommendations(listId)) as any[];
+        const recs = await getRecommendations(listId);
         console.log(`[useShoppingList] Received ${recs.length} recommendations:`, recs);
         const mappedSuggestions = recs.map(r => ({ 
           id: r.barcode, 
@@ -121,6 +124,31 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!listId) return;
+
+    const channel = supabase
+      .channel(`shopping_list_detail:${listId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "shopping_lists",
+          filter: `id=eq.${listId}`,
+        },
+        () => {
+          console.log(`[Realtime] Shopping list ${listId} deleted`);
+          setIsDeleted(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [listId]);
 
   const existingNamesSet = useMemo(() => {
     return new Set(items.map((it) => it.name.trim().toLowerCase()));
@@ -159,7 +187,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
         // After adding an item, update recommendations
         try {
           console.log(`[useShoppingList] Updating recommendations after item addition...`);
-          const recs = (await getRecommendations(listId)) as any[];
+          const recs = await getRecommendations(listId);
           console.log(`[useShoppingList] New recommendations:`, recs);
           const mappedSuggestions = recs.map(r => ({ 
             id: r.barcode, 
@@ -193,7 +221,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
 
         // SYNC: Update recommendations after an item is removed
         try {
-          const recs = (await getRecommendations(listId)) as any[];
+          const recs = await getRecommendations(listId);
           const mappedSuggestions = recs.map(r => ({ 
             id: r.barcode, 
             name: r.name, 
@@ -323,5 +351,6 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
     dismissSuggestion,
     suggestionsModalOpen,
     setSuggestionsModalOpen,
+    isDeleted,
   };
 }

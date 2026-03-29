@@ -9,6 +9,7 @@ import { useShoppingList, type ShoppingItem, type LocationKey } from "@/src/hook
 import { locationLabel, locationIcon } from "@/src/utils/shoppingUtils";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
+import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard";
 
 import { styles, BRAND, type SectionLocation } from "@/src/components/shopping/styles";
 import { ShoppingItemRow } from "@/src/components/shopping/ShoppingItemRow";
@@ -59,12 +60,23 @@ export default function ShoppingListScreen() {
   const insets = useSafeAreaInsets();
   const [addOpen, setAddOpen] = useState(false);
   const { homeId, listId, listName } = useLocalSearchParams<{ homeId: string; listId: string; listName: string }>();
+  useMembershipGuard(homeId);
 
   const {
     mode, items, filteredItems, loading, picked, query, setQuery,
     addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick, 
-    suggestions, dismissSuggestion, suggestionsModalOpen, setSuggestionsModalOpen
+    suggestions, dismissSuggestion, suggestionsModalOpen, setSuggestionsModalOpen, isDeleted
   } = useShoppingList({ homeId: homeId ?? "", listId: listId ?? "" });
+
+  React.useEffect(() => {
+    if (isDeleted) {
+      Alert.alert("הרשימה נמחקה", "רשימת הקניות שבה צפית נמחקה על ידי משתמש אחר.");
+      router.replace({
+        pathname: "/shopping-list/shopping-list",
+        params: { homeId }
+      });
+    }
+  }, [isDeleted, homeId]);
 
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
 
@@ -157,8 +169,11 @@ export default function ShoppingListScreen() {
           open={suggestionsModalOpen} 
           onClose={() => setSuggestionsModalOpen(false)} 
           suggestions={suggestions}
-          onAdd={(name) => addItem(name, 1, "suggestion", "OTHER")}
+          onAdd={(name, location) => {
+            addItem(name, 1, "suggestion", location);
+          }}
           onDismiss={dismissSuggestion}
+          existingCategories={uniqueCategories}
         />
 
         {/* Floating Suggestions Button */}

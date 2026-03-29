@@ -3,8 +3,8 @@ export function normalizeName(s: string) {
 }
 
 export function locationLabel(loc: string) {
-  // We no longer translate fixed keys. We just return the string as provided by the user.
-  return loc || "אחר";
+  if (!loc || loc === "OTHER" || loc === "UNSORTED") return "אחר";
+  return loc;
 }
 
 export function locationIcon(loc: string) {

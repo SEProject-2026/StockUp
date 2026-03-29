@@ -98,6 +98,8 @@ class RecommendationEngine:
 
         # 5. Filter & Sort Final Results
         all_candidates = staple_recommendations + pairing_recommendations
+        if not all_candidates:
+            return []
         return self._diversity_filter(all_candidates, max_results)
 
     async def _fetch_raw_data(self, home_id: UUID) -> Tuple[List[ReceiptDTO], List]:
@@ -119,7 +121,12 @@ class RecommendationEngine:
             if p.nickname: meta.name_to_bc[p.nickname ] = p.barcode
             
             if p.items:
-                meta.bc_to_loc[p.barcode] = p.items[0].location.name
+                # Point: ensure p.items[0].location is an Enum before accessing .name
+                loc = p.items[0].location
+                if hasattr(loc, 'name'):
+                    meta.bc_to_loc[p.barcode] = loc.name
+                else:
+                    meta.bc_to_loc[p.barcode] = str(loc)
                 meta.bc_to_stock[p.barcode] = sum(item.quantity for item in p.items)
 
         # Populate from receipt history

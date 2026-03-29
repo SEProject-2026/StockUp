@@ -23,6 +23,12 @@ export type ShoppingListDTO = {
   items: ShoppingListItemDTO[];
   updated_at: string;
 };
+export type RecommendationDTO = {
+  barcode: string;
+  name: string;
+  reason: string;
+  type: 'staple' | 'pairing';
+};
 
 export type CreateShoppingListRequest = {
   home_id: string;
@@ -184,8 +190,8 @@ export async function deleteShoppingList(listId: string): Promise<void> {
 
 export async function getRecommendations(
   listId: string
-): Promise<string[]> {
-  const response = await authFetch<GeneralResponse<string[]>>(
+): Promise<RecommendationDTO[]> {
+  const response = await authFetch<GeneralResponse<RecommendationDTO[]>>(
     `${BASE}/${listId}/recommendations`,
     {
       method: "GET",
