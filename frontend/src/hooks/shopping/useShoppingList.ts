@@ -11,6 +11,7 @@ import {
   type LocationType,
   deleteShoppingListItem,
 } from "@/src/api/shoppingLists";
+import { supabase } from "@/src/config/supabase";
 
 export type LocationKey = string;
 
@@ -57,6 +58,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [modeSubmitting, setModeSubmitting] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
 
   const syncFromDto = useCallback((dto: ShoppingListDTO) => {
     const mappedItems = mapDtoToItems(dto);
@@ -101,6 +103,31 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!listId) return;
+
+    const channel = supabase
+      .channel(`shopping_list_detail:${listId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "shopping_lists",
+          filter: `id=eq.${listId}`,
+        },
+        () => {
+          console.log(`[Realtime] Shopping list ${listId} deleted`);
+          setIsDeleted(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [listId]);
 
   const existingNamesSet = useMemo(() => {
     return new Set(items.map((it) => it.name.trim().toLowerCase()));
@@ -258,5 +285,6 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
     updateQuantity,
     enterShoppingMode,
     modeSubmitting,
+    isDeleted,
   };
 }
