@@ -22,8 +22,18 @@ export default function ShoppingListScreen() {
 
   const {
     mode, items, filteredItems, loading, picked, query, setQuery,
-    addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick
+    addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick, isDeleted
   } = useShoppingList({ homeId: homeId ?? "", listId: listId ?? "" });
+
+  React.useEffect(() => {
+    if (isDeleted) {
+      Alert.alert("הרשימה נמחקה", "רשימת הקניות שבה צפית נמחקה על ידי משתמש אחר.");
+      router.replace({
+        pathname: "/shopping-list/shopping-list",
+        params: { homeId }
+      });
+    }
+  }, [isDeleted, homeId]);
 
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
 
