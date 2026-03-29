@@ -61,11 +61,8 @@ export function InventoryScreenBase({
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={[COLORS.BG_DIM, "#E2E8F0"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.gradientBackground}
-        pointerEvents="none"
+        colors={["#E5F3FF", COLORS.BG_DIM]}
+        style={StyleSheet.absoluteFill}
       />
 
       <View style={{ flex: 1 }}>
@@ -135,6 +132,5 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.BG_DIM },
-  gradientBackground: { ...StyleSheet.absoluteFillObject, opacity: 0.3 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

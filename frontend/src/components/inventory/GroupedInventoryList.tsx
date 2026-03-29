@@ -252,7 +252,7 @@ function BatchRow(props: {
 const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 60 },
   sectionHeaderContainer: {
-    backgroundColor: COLORS.BG_DIM,
+    backgroundColor: "rgba(248, 250, 252, 0.95)", // Semi-transparent BG_DIM
     paddingTop: 16,
     paddingBottom: 8,
   },
