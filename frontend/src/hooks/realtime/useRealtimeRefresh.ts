@@ -37,7 +37,8 @@ export function useRealtimeInventoryRefresh(
 // --- Join Requests Refresh ---
 export function useRealtimeJoinRequestsRefresh(
   homeId: string | undefined,
-  refreshJoinRequests: () => Promise<void>
+  refreshJoinRequests: () => Promise<void>,
+  enabled: boolean = true
 ) {
   const { joinRequestsVersionByHome } = useRealtimeContext();
   
@@ -52,7 +53,7 @@ export function useRealtimeJoinRequestsRefresh(
   const currentVersion = homeId ? (joinRequestsVersionByHome[homeId] ?? 0) : 0;
 
   useEffect(() => {
-    if (!homeId || (homeId === lastHomeIdRef.current && currentVersion <= lastVersionRef.current)) {
+    if (!homeId || !enabled || (homeId === lastHomeIdRef.current && currentVersion <= lastVersionRef.current)) {
       return;
     }
 
