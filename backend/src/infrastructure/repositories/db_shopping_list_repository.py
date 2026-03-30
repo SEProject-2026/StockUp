@@ -48,7 +48,8 @@ class DbShoppingListRepository(IShoppingListRepository):
             self.db.commit()
 
     def _to_domain(self, db_list: ShoppingListModel) -> ShoppingList:
-        items = [ShoppingListItem(**item) for item in db_list.items]
+        db_items = db_list.items if db_list.items is not None else []
+        items = [ShoppingListItem(**item) for item in db_items if isinstance(item, dict)]
         return ShoppingList(
             id=UUID(db_list.id),
             home_id=UUID(db_list.home_id),

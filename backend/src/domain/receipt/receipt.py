@@ -12,7 +12,7 @@ class ReceiptItemDTO(BaseModel):
     """
     name: str = Field(..., min_length=2, description="The product name")
     barcode: Optional[str] = Field(None, description="The barcode of the product")
-    quantity: int = Field(..., gt=0, description="Quantity amount (must be positive)")
+    quantity: float = Field(..., gt=0, description="Quantity amount (must be positive)")
     unit: UnitType = Field(default=UnitType.UNIT, description="Unit of measurement")
     location: Optional[LocationType] = Field(default=LocationType.OTHER, description="Suggested storage location")
     expiration_date: Optional[date]= Field(None, description="Expiration date if available/applicable")

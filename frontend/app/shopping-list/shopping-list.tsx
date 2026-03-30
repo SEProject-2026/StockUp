@@ -12,6 +12,7 @@ import {
   createShoppingList, 
   deleteShoppingList 
 } from "@/src/api/shoppingLists";
+import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard";
 
 import { ShoppingListCard } from "@/src/components/shopping/ShoppingListCard";
 import { ShoppingListsHeader } from "@/src/components/shopping/ShoppingListsHeader";
@@ -28,6 +29,7 @@ const BRAND = {
 export default function ShoppingListsScreen() {
   const insets = useSafeAreaInsets();
   const { homeId } = useLocalSearchParams<{ homeId?: string }>();
+  useMembershipGuard(homeId);
   
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);

@@ -61,7 +61,7 @@ export default function PendingList(props: {
 const styles = StyleSheet.create({
   headerRow: {
     marginTop: 2,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
   },
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 12, color: BRAND_MUTED },
 
   emptyCard: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 10,
     padding: 12,
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   emptyText: { flex: 1, color: BRAND_MUTED, textAlign: "right", fontSize: 12 },
 
   row: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingVertical: 12,

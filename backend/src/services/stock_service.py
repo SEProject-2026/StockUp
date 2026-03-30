@@ -12,6 +12,7 @@ from src.repositories.i_product_repository import IProductRepository
 from src.repositories.i_home_repository import IHomeRepository
 from src.repositories.catalog_provider import ICatalogProvider
 from src.repositories.catalog_provider import CatalogItem
+from src.repositories.i_receipt_repository import IReceiptRepository
 from src.domain.enums import ExpirationType, LocationType, UnitType
 #from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
@@ -23,12 +24,13 @@ from src.services.notification_service import send_push_notification
 class StockService:
  
     def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
-                  catalog_provider: ICatalogProvider, user_repository: IUserRepository, receipt_scanner: IReceiptScanner):
+                  catalog_provider: ICatalogProvider, user_repository: IUserRepository, receipt_scanner: IReceiptScanner, receipt_repository: IReceiptRepository):
         self._home_repository = home_repository
         self._product_repository = product_repository
         self._catalog_provider = catalog_provider
         self._user_repository = user_repository
         self._receipt_scanner = receipt_scanner
+        self._receipt_repository = receipt_repository
         self.locaton_filter = None
         self.expiration_filter = None
 
@@ -92,11 +94,45 @@ class StockService:
         print(f"Scanned items: {scanned_items}")
         print(f"Chain name: {chain_name}")
         receipt_items_dto: list[ReceiptItemDTO] = []
-        for barcode, (raw_qty, unit_str) in scanned_items.items():
-            item_dto = await self._map_scanned_item_to_dto(barcode, raw_qty, unit_str, chain_name)
-            receipt_items_dto.append(item_dto)
+
+        for barcode, (qty, unit_str) in scanned_items.items():
+            unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
+            ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+
+            if ci:
+                avg_unit_weight = 1
+                if unit == UnitType.KG:
+                    avg_unit_weight = ci.weight
+                    new_qty = qty / avg_unit_weight if avg_unit_weight else 1
+                else:
+                    new_qty = qty
+                
+                final_qty = new_qty
+
+                receipt_items_dto.append(
+                    ReceiptItemDTO(
+                        barcode=barcode,
+                        name=ci.name,
+                        quantity=final_qty,
+                        unit=unit,
+                        location=ci.location,
+                        weight=qty if unit == UnitType.KG else None,
+                    )
+                )
+            else:
+                receipt_items_dto.append(
+                    ReceiptItemDTO(
+                        name="Unknown Product",
+                        barcode=barcode,
+                        quantity=qty if unit == UnitType.UNIT else 1,
+                        unit=unit,
+                    )
+                )
 
         app_logger.info(f"Successfully scanned receipt from '{chain_name}' with {len(receipt_items_dto)} items")
+        for item in receipt_items_dto:
+            app_logger.debug(f"  Item: {item.name} (barcode: {item.barcode}, qty: {item.quantity})")
+            
         return ReceiptDTO(
             id=uuid4(),
             home_id=home_id,
@@ -178,8 +214,10 @@ class StockService:
                 
             if item.nickname:
                 product.set_nickname(item.nickname)
-                
-            product.add_item(item.quantity, item.location, item.expiration_date)
+            
+            # Inventory uses Integer quantity. We ensure at least 1 unit if it's a known product.
+            inventory_qty = max(1, int(item.quantity))
+            product.add_item(inventory_qty, item.location, item.expiration_date)
             
             products_to_save[product.id] = product
             count += 1
@@ -187,6 +225,23 @@ class StockService:
         if products_to_save:
             await self._product_repository.save_all(list(products_to_save.values()))
             app_logger.info(f"Bulk saved {len(products_to_save)} products to DB for home {receipt_dto.home_id}")
+            
+        # Save the receipt to the receipt repository to track what was bought together
+        # We only save KNOWN products to avoid polluting recommendation data with "Unknown Product" placeholders
+        known_items = [item for item in receipt_dto.items if item.name != "Unknown Product"]
+        
+        if known_items:
+            app_logger.info(f"Persisting receipt history for house {receipt_dto.home_id} ({len(known_items)} items)")
+            # Create a localized DTO for storage that only contains known items
+            persistence_dto = ReceiptDTO(
+                id=receipt_dto.id,
+                home_id=receipt_dto.home_id,
+                user_id=receipt_dto.user_id,
+                chain=receipt_dto.chain,
+                items=known_items
+            )
+            await self._receipt_repository.save(persistence_dto)
+            app_logger.info(f"Successfully saved receipt record for home {receipt_dto.home_id}")
         
         if catalog_updated:
             self._catalog_provider.persist()
