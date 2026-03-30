@@ -1,5 +1,5 @@
 import pytest
-from tests.container import testing_container
+from tests1.container import testing_container
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_db_mode_for_module():

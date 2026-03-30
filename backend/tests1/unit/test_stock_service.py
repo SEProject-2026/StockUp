@@ -3,7 +3,7 @@ import pytest
 from uuid import UUID, uuid4
 from datetime import date, timedelta
 from src.domain.product.product import Product
-from tests.container import testing_container
+from tests1.container import testing_container
 from src.domain.enums import ExpirationType, LocationType, UnitType
 
 # --- Helper Functions ---
@@ -20,8 +20,11 @@ async def setup_env():
     Creates environment for Service Testing.
     """
     # 1. Register User
+    fake_uid = "550e8400-e29b-41d4-a716-446655440000"
     user = await testing_container.user_service.register(
-        "stock_test@test.com", "Pass123!", "Pass123!", "Stock User"
+        user_id=fake_uid,
+        email="stock_test@test.com",
+        name="Stock User"
     )
     
     # 2. Create Home
@@ -964,7 +967,7 @@ from datetime import date
 from uuid import uuid4
 from src.domain.receipt.receipt import ReceiptDTO, ReceiptItemDTO
 from src.domain.enums import LocationType
-from tests.container import testing_container
+from tests1.container import testing_container
 
 @pytest.mark.asyncio
 async def test_add_receipt_success():

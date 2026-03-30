@@ -1,5 +1,5 @@
 import pytest
-from tests.container import testing_container
+from tests1.container import testing_container
 from src.domain.user.user import User
 
 # --- Tests ---
@@ -13,9 +13,10 @@ async def test_save_and_get_user():
     # Arrange
     # Access the repo directly from the container (it is already initialized with the DB session)
     repo = testing_container.user_repo 
+    fake_uid = "550e8400-e29b-41d4-a716-446655440000"
     new_user = User(
+        id=fake_uid,
         email="integration_test@example.com", 
-        hashed_password="hashed_secret", # Make sure this matches your Domain model field name
         name="Integration Tester"
     )
 
@@ -39,12 +40,14 @@ async def test_duplicate_email_should_fail():
     Verifies that the database enforces the unique constraint on the email field.
     """
     repo = testing_container.user_repo
-    user1 = User(email="unique@example.com", hashed_password="123", name="User One")
+    fake_uid1 = "550e8400-e29b-41d4-a716-446655440001"
+    fake_uid2 = "550e8400-e29b-41d4-a716-446655440002"
+    user1 = User(id=fake_uid1, email="unique@example.com", name="User One")
     
     # First save must be awaited
     await repo.save(user1)
 
-    user2 = User(email="unique@example.com", hashed_password="456", name="User Two")
+    user2 = User(id=fake_uid2, email="unique@example.com", name="User Two")
     
     # Expect an exception when trying to save the duplicate
     with pytest.raises(Exception): 

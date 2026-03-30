@@ -1,6 +1,6 @@
 import pytest
 from uuid import uuid4
-from tests.container import testing_container
+from tests1.container import testing_container
 from src.domain.home.home import Home
 from src.domain.user.user import User
 
@@ -10,7 +10,8 @@ async def create_test_user(email="admin@test.com", name="Admin"):
     """
     Helper to create a user in the DB, required for creating a Home (Foreign Key).
     """
-    user = User(email=email, hashed_password="hash", name=name)
+    fake_uid = "550e8400-e29b-41d4-a716-446655440000"
+    user = User(id=fake_uid, email=email, name=name)
     # We use the user repo directly to save the user
     await testing_container.user_repo.save(user)
     return user

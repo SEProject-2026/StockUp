@@ -1,12 +1,13 @@
 import pytest
 from uuid import uuid4
 from src.domain.shopping_list.shopping_list import ShoppingList, ShoppingListItem
-from tests.container import testing_container
+from tests1.container import testing_container
 
 async def create_home_context():
     """Helper to create a home in DB for FK constraints."""
+    fake_uid = "550e8400-e29b-41d4-a716-446655440000"
     user = await testing_container.user_service.register(
-        f"repo_{uuid4().hex[:4]}@test.com", "Pass123!", "Pass123!", "Repo User"
+        f"repo_{uuid4().hex[:4]}@test.com", fake_uid, "Repo User"
     )
     home = await testing_container.management_service.create_home(user.id, "Integration Home")
     return home.get_id()

@@ -1,7 +1,7 @@
 import pytest
 from uuid import UUID, uuid4
 from src.domain.enums import LocationType
-from tests.container import testing_container
+from tests1.container import testing_container
 from src.domain.shopping_list.shopping_list import ShoppingList
 
 # --- Setup Helpers ---
@@ -17,8 +17,9 @@ async def setup_shopping_env():
     """
     Helper to set up a user and a home for shopping list tests.
     """
+    fake_uid = "550e8400-e29b-41d4-a716-446655440000"
     user = await testing_container.user_service.register(
-        "shop_test@test.com", "Secret123!", "Secret123!", "Shopper"
+        "shop_test@test.com", fake_uid, "Shopper"
     )
     home = await testing_container.management_service.create_home(user.id, "Test Home")
     return user.id, home.get_id()

@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from typing import Any, Callable, List, Optional, Dict
 from datetime import date
 
+from src.repositories.i_receipt_scanner import IReceiptScanner
 from src.api.schemas.product_schemas import ProductDTO, ProductItemDTO
 from src.domain.product.product import Product
 from src.repositories.i_product_repository import IProductRepository
@@ -20,11 +21,12 @@ from src.services.notification_service import send_push_notification
 class StockService:
  
     def __init__(self, home_repository: IHomeRepository, product_repository: IProductRepository,
-                  catalog_provider: ICatalogProvider, user_repository: IUserRepository):
+                  catalog_provider: ICatalogProvider, user_repository: IUserRepository, receipt_scanner: IReceiptScanner):
         self._home_repository = home_repository
         self._product_repository = product_repository
         self._catalog_provider = catalog_provider
         self._user_repository = user_repository
+        self._receipt_scanner = receipt_scanner
 
     # ==========================================
     # 2. Stock Management (Inventory)
@@ -73,60 +75,21 @@ class StockService:
         app_logger.debug(f"Starting receipt scan for home {home_id} with {len(files_paths)} files")
         await self._check_access(user_id, home_id)
 
-        if not isinstance(files_paths, list) or not files_paths:
-            app_logger.warning("Receipt scan failed: files_paths is empty or not a list")
-            raise ValueError("files_paths must be a non-empty list of file paths")
-
-        if not all(isinstance(fp, (str, os.PathLike)) for fp in files_paths):
-            app_logger.warning("Receipt scan failed: Invalid file path types provided")
-            raise TypeError("files_paths must contain only path strings")
-
+        # 1. Validation Guards
+        self._validate_file_paths(files_paths)
         valid_paths = [str(fp) for fp in files_paths if fp and os.path.exists(str(fp))]
         if not valid_paths:
-            app_logger.warning("Receipt scan failed: No valid existing files found in the provided paths")
             raise ValueError("No valid files found in files_paths")
 
-        scanner = ReceiptScanner()
+        # 2. Scanning
+        first, *rest = valid_paths
+        chain_name, scanned_items = self._receipt_scanner.parse_receipt(first, *rest)
 
-        first = valid_paths[0]
-        rest = valid_paths[1:]
-        
-        app_logger.debug("Parsing receipt files through ML scanner...")
-        chain_name, scanned_items = scanner.parse_receipt(first, *rest)
-
+        # 3. Item Mapping Logic
         receipt_items_dto: list[ReceiptItemDTO] = []
-
-        for barcode, (qty, unit_str) in scanned_items.items():
-            unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
-            ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
-
-            if ci:
-                avg_unit_weight = 1
-                if unit == UnitType.KG:
-                    avg_unit_weight = ci.weight
-                    new_qty = qty / avg_unit_weight if avg_unit_weight else 1
-                else:
-                    new_qty = qty
-
-                receipt_items_dto.append(
-                    ReceiptItemDTO(
-                        barcode=barcode,
-                        name=ci.name,
-                        quantity=int(new_qty),
-                        unit=unit,
-                        location=ci.location,
-                        weight=qty if unit == UnitType.KG else None,
-                    )
-                )
-            else:
-                receipt_items_dto.append(
-                    ReceiptItemDTO(
-                        name="Unknown Product",
-                        barcode=barcode,
-                        quantity=int(qty) if unit == UnitType.UNIT else 1,
-                        unit=unit,
-                    )
-                )
+        for barcode, (raw_qty, unit_str) in scanned_items.items():
+            item_dto = await self._map_scanned_item_to_dto(barcode, raw_qty, unit_str, chain_name)
+            receipt_items_dto.append(item_dto)
 
         app_logger.info(f"Successfully scanned receipt from '{chain_name}' with {len(receipt_items_dto)} items")
         return ReceiptDTO(
@@ -136,6 +99,41 @@ class StockService:
             chain=chain_name,
             items=receipt_items_dto,
         )
+
+    async def _map_scanned_item_to_dto(self, barcode: str, raw_qty: float, unit_str: str, chain_name: str) -> ReceiptItemDTO:
+        """Helper to handle the logic of single item mapping and quantity calculation."""
+        unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
+        ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+
+        if ci:
+            # Calculation with Rounding fix
+            avg_unit_weight = ci.weight if (unit == UnitType.KG and ci.weight) else 1
+            calculated_qty = int(round(raw_qty / avg_unit_weight)) if unit == UnitType.KG else int(raw_qty)
+            
+            return ReceiptItemDTO(
+                barcode=barcode,
+                name=ci.name,
+                quantity=max(1, calculated_qty), # Ensure at least 1
+                unit=unit,
+                location=ci.location,
+                weight=raw_qty if unit == UnitType.KG else None,
+            )
+        
+        # Fallback for Unknown Product
+        return ReceiptItemDTO(
+            name="Unknown Product",
+            barcode=barcode,
+            quantity=int(raw_qty) if unit == UnitType.UNIT else 1,
+            unit=unit,
+            weight=raw_qty if unit == UnitType.KG else None # Keep the raw weight even if unknown
+        )
+
+    def _validate_file_paths(self, paths: List[str]):
+        """Internal guard for file path integrity."""
+        if not isinstance(paths, list) or not paths:
+            raise ValueError("files_paths must be a non-empty list of file paths")
+        if not all(isinstance(fp, (str, os.PathLike)) for fp in paths):
+            raise TypeError("files_paths must contain only path strings")
 
     async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
         """High-performance operation for full receipts."""
@@ -348,20 +346,6 @@ class StockService:
         app_logger.info(f"Nickname for product {product_id} updated to '{new_nickname}'")
         return product
     
-    async def update_location(self, user_id: UUID, home_id: UUID, product_id: UUID, new_location: LocationType) -> Product:
-        app_logger.debug(f"Attempting to update aggregate location for product {product_id}")
-        await self._check_access(user_id, home_id)
-
-        product = await self._product_repository.get_by_id(product_id)
-        if not product or product.get_home_id() != home_id:
-            app_logger.warning(f"Aggregate location update failed: Product {product_id} not found")
-            raise ValueError("Product not found in this home")
-            
-        product.set_location(new_location)
-        await self._product_repository.update(product)
-        
-        app_logger.info(f"Aggregate location for product {product_id} updated to {new_location}")
-        return product
 
 
     # ==========================================

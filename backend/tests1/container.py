@@ -42,11 +42,21 @@ class MockCatalogProvider:
         return None
     async def search_items_by_name(self, query):
         return []
+    
+class MockSupabaseAuthProvider:
+    """
+    A fake Auth Provider for tests that doesn't 
+    touch the real Supabase API.
+    """
+    def verify_token(self, token: str):
+        # In tests, we often override this logic anyway, 
+        # so returning None or a dummy value is safe.
+        return None
 
 class TestingContainer:
 
     def __init__(self):
-        self.auth_provider = JwtAuthProvider()
+        self.auth_provider = MockSupabaseAuthProvider()
         self.catalog_provider = MockCatalogProvider()
         self.client = TestClient(app)
         

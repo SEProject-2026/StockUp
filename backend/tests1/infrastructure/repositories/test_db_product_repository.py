@@ -1,7 +1,7 @@
 import pytest
 from datetime import date, timedelta
 from uuid import uuid4
-from tests.container import testing_container
+from tests1.container import testing_container
 from src.domain.product.product import Product
 from src.domain.enums import LocationType
 from src.domain.home.home import Home
@@ -15,7 +15,8 @@ async def create_context():
     Returns Domain Objects: (User, Home)
     """
     # 1. Create & Save User
-    user = User(email="stock_repo@test.com", hashed_password="pw", name="Repo User")
+    fake_uid = "550e8400-e29b-41d4-a716-446655440000"
+    user = User(id=fake_uid, email="stock_repo@test.com", name="Repo User")
     await testing_container.user_repo.save(user)
     
     # 2. Create & Save Home (Linked to User)
