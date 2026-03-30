@@ -633,8 +633,8 @@ async def test_filter_by_location_partial_view():
     )
 
     # 2. Act
-    results = await testing_container.stock_service.filter_by_location(
-        user_id, home_id, LocationType.FRIDGE
+    results = await testing_container.stock_service.filter_products(
+        user_id=user_id, home_id=home_id, location=LocationType.FRIDGE
     )
 
     # 3. Assert
@@ -664,8 +664,8 @@ async def test_filter_by_location_no_matches():
         "Ice Cream", user_id, home_id, 1, "222", None, LocationType.FRIDGE, None
     )
 
-    results = await testing_container.stock_service.filter_by_location(
-        user_id, home_id, LocationType.FREEZER
+    results = await testing_container.stock_service.filter_products(
+        user_id=user_id, home_id=home_id, location=LocationType.FREEZER
     )
 
     assert len(results) == 0
@@ -688,6 +688,7 @@ async def test_filter_by_expiration_fresh_only():
     today = date.today()
     future_date = today + timedelta(days=30)
     past_date = today - timedelta(days=5)
+    warning_days = 7
 
     # Add Fresh Item
     await testing_container.stock_service.add_product(
@@ -699,8 +700,8 @@ async def test_filter_by_expiration_fresh_only():
     )
 
     # Act
-    results = await testing_container.stock_service.filter_by_expiration_type(
-        user_id, home_id, ExpirationType.FRESH
+    results = await testing_container.stock_service.filter_products(
+        user_id=user_id, home_id=home_id, expiration_type=ExpirationType.FRESH
     )
 
     # Assert
@@ -710,7 +711,7 @@ async def test_filter_by_expiration_fresh_only():
     assert dto.total_quantity == 5  # Only the fresh ones
     assert len(dto.items) == 1
     assert dto.items[0].expiration_date == future_date
-    assert dto.items[0].status == ExpirationType.FRESH
+    assert dto.items[0].get_status(warning_days) == ExpirationType.FRESH
 
 
 @pytest.mark.asyncio
@@ -721,6 +722,8 @@ async def test_filter_by_expiration_warning_status():
     Expected: Item should be found and status calculated correctly.
     """
     user_id, home_id = await setup_env()
+
+    warning_days = 7
     
     # 2 days from now (Inside the 3-day warning window)
     warning_date = date.today() + timedelta(days=2) 
@@ -730,16 +733,16 @@ async def test_filter_by_expiration_warning_status():
     )
 
     # Act
-    results = await testing_container.stock_service.filter_by_expiration_type(
-        user_id, home_id, ExpirationType.GOING_TO_EXPIRE
+    results = await testing_container.stock_service.filter_products(
+        user_id=user_id, home_id=home_id, expiration_type=ExpirationType.GOING_TO_EXPIRE
     )
 
     # Assert
     assert len(results) == 1
-    item_dto = results[0].items[0]
+    item = results[0].items[0]
     
-    assert item_dto.status == ExpirationType.GOING_TO_EXPIRE
-    assert item_dto.expiration_date == warning_date
+    assert item.get_status(warning_days) == ExpirationType.GOING_TO_EXPIRE
+    assert item.expiration_date == warning_date
 
 
 @pytest.mark.asyncio
@@ -750,17 +753,18 @@ async def test_filter_by_expiration_includes_no_date_as_fresh():
     Expected: Should be included (None counts as Fresh).
     """
     user_id, home_id = await setup_env()
+    warning_days = 7
     
     await testing_container.stock_service.add_product(
         "Canned Beans", user_id, home_id, 10, "555", None, LocationType.PANTRY, None
     )
 
-    results = await testing_container.stock_service.filter_by_expiration_type(
-        user_id, home_id, ExpirationType.FRESH
+    results = await testing_container.stock_service.filter_products(
+        user_id=user_id, home_id=home_id, expiration_type=ExpirationType.FRESH
     )
 
     assert len(results) == 1
-    assert results[0].items[0].status == ExpirationType.FRESH
+    assert results[0].items[0].get_status(warning_days) == ExpirationType.FRESH
 
 
 @pytest.mark.asyncio
@@ -777,7 +781,7 @@ async def test_search_product_by_name_success():
     )
 
     # 2. Act
-    results = await testing_container.stock_service.search_product(user_id, home_id, "Milk")
+    results = await testing_container.stock_service.filter_products(user_id=user_id, home_id=home_id, query="Milk")
 
     # 3. Assert
     assert len(results) == 1
@@ -803,7 +807,7 @@ async def test_search_product_by_nickname_success():
     )
 
     # Act
-    results = await testing_container.stock_service.search_product(user_id, home_id, "Morning")
+    results = await testing_container.stock_service.filter_products(user_id=user_id, home_id=home_id, query="Morning")
 
     # Assert
     assert len(results) == 1
@@ -823,7 +827,7 @@ async def test_search_product_case_insensitive():
     )
 
     # Act
-    results = await testing_container.stock_service.search_product(user_id, home_id, "pasta")
+    results = await testing_container.stock_service.filter_products(user_id=user_id, home_id=home_id, query="pasta")
 
     assert len(results) == 1
     assert results[0].original_name == "Pasta"
@@ -842,7 +846,7 @@ async def test_search_product_returns_empty_list_when_no_match():
     )
 
     # Act
-    results = await testing_container.stock_service.search_product(user_id, home_id, "Steak")
+    results = await testing_container.stock_service.filter_products(user_id=user_id, home_id=home_id, query="Steak")
 
     # Assert
     assert isinstance(results, list)

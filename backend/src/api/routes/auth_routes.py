@@ -23,6 +23,8 @@ from src.infrastructure.app_container import AppContainer
 from src.api.security import get_current_user_id
 from src.services.user_service import UserService 
 
+from src.api.routes.translate_notifications import translate_error
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 def get_user_service(db: Session = Depends(get_db)) -> UserService:
@@ -55,7 +57,8 @@ async def register(
     
     except ValueError as e:
         app_logger.warning(f"Registration failed for email {request.email} - Reason: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)
 
 
 # @router.post("/login", response_model=LoginResponse)
@@ -104,8 +107,9 @@ async def update_name(
         )
     except ValueError as e:
         app_logger.warning(f"Name update failed for user {user_id} - Reason: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-    
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)
+
 
 # @router.put("/password", response_model=GeneralResponse)
 # async def change_password(
@@ -133,7 +137,7 @@ async def update_name(
 #     except ValueError as e:
 #         app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
 #         raise HTTPException(status_code=400, detail=str(e))
-    
+
 class PushTokenUpdateDTO(BaseModel):
     push_token: str
 
@@ -148,4 +152,5 @@ async def update_push_token(
         await user_service.update_push_token(user_id, data.push_token)
         return {"status": "success", "message": "Push token saved"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=400, detail=translated_message)

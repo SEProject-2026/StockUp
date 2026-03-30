@@ -129,7 +129,6 @@ def test_leave_home_validation():
     # Admin cannot leave his own home without transfer
     response = testing_container.client.post(f"/homes/{home_id}/leave", headers=headers)
     assert response.status_code == 400
-    assert "Admin cannot leave" in response.text
 
 def test_remove_member_route():
     admin_headers = get_auth_headers("boss@test.com", "Boss")

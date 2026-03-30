@@ -169,7 +169,7 @@ def test_filter_by_location():
     testing_container.client.post("/stock/add", json={"name": "Ice Cream", "quantity": 1, "location": "FREEZER"}, headers=headers)
     testing_container.client.post("/stock/add", json={"name": "Bread", "quantity": 1, "location": "PANTRY"}, headers=headers)
     
-    response = testing_container.client.get("/stock/filter/location", params={"location": "FREEZER"}, headers=headers)
+    response = testing_container.client.get("/stock/filter", params={"location": "FREEZER"}, headers=headers)
     
     assert response.status_code == 200
     data = response.json()["data"]
@@ -182,7 +182,7 @@ def test_search_products():
     
     testing_container.client.post("/stock/add", json={"name": "Green Tea", "quantity": 1}, headers=headers)
     
-    response = testing_container.client.get("/stock/search", params={"query": "Tea"}, headers=headers)
+    response = testing_container.client.get("/stock/filter", params={"query": "Tea"}, headers=headers)
     
     assert response.status_code == 200
     data = response.json()["data"]

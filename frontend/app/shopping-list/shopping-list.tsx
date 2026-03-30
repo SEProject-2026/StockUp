@@ -15,7 +15,7 @@ import {
 
 import { ShoppingListCard } from "@/src/components/shopping/ShoppingListCard";
 import { ShoppingListsHeader } from "@/src/components/shopping/ShoppingListsHeader";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
 
 const BRAND = { 
   BG: "#F4F4F4", 

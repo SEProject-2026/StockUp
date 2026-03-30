@@ -1,0 +1,65 @@
+{
+    "chain": "ramilevi",
+    "items": [
+        {
+            "barcode": "7290110115401",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "100",
+            "quantity": 0.564,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290112494351",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290003060535",
+            "quantity": 4,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290112346629",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290119670475",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290117263389",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "2083184",
+            "quantity": 1.032,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290112344861",
+            "quantity": 4,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290119372065",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290108271669",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000058047",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

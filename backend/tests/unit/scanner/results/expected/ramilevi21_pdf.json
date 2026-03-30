@@ -1,0 +1,125 @@
+{
+    "chain": "ramilevi",
+    "items": [
+        {
+            "barcode": "7290112870124",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290108271690",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "43814",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000453538",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "2107798",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290016144031",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290003359820",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1124611",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4903001925784",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290100243084",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290112002143",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290108272819",
+            "quantity": 3,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "108",
+            "quantity": 3.89,
+            "unit": "KG"
+        },
+        {
+            "barcode": "2757535",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8715700419732",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "138",
+            "quantity": 0.44,
+            "unit": "KG"
+        },
+        {
+            "barcode": "2680369",
+            "quantity": 1.44,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290119673148",
+            "quantity": 2,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "5000394002463",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290011018917",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290017406688",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290107932080",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116536347",
+            "quantity": 1,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "100",
+            "quantity": 0.68,
+            "unit": "KG"
+        }
+    ]
+}

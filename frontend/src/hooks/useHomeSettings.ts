@@ -116,7 +116,10 @@ export function useHomeSettings(currentHomeId?: string) {
       await answerJoinRequest(currentHomeId!, { user_id: userId, approved });
       setJoinRequests(prev => prev.filter(req => req.user_id !== userId));
       await loadHomeData();
-    } catch (e) { Alert.alert("שגיאה", "הפעולה נכשלה"); }
+    } catch (e) { 
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message))? e.message : "הפעולה נכשלה";
+      Alert.alert("שגיאה", message); 
+    }
     finally { setProcessingRequestId(null); }
   };
 
@@ -126,7 +129,10 @@ export function useHomeSettings(currentHomeId?: string) {
       await updateExpirationRange(currentHomeId!, { new_range: expiryLeadDays });
       setDaysModalOpen(false);
       await loadHomeData();
-    } catch (e) { Alert.alert("שגיאה", "העדכון נכשל"); }
+    } catch (e) { 
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "העדכון נכשל";
+      Alert.alert("שגיאה", message); 
+    }
     finally { setSavingDays(false); }
   };
 
@@ -139,7 +145,10 @@ export function useHomeSettings(currentHomeId?: string) {
           await switchHomeHead(currentHomeId!, { new_head_id: uId });
           setSwitchHeadOpen(false);
           await loadHomeData();
-        } catch (e) { Alert.alert("שגיאה", "ההחלפה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message))? e.message : "ההחלפה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setSwitchingHead(false); }
       }}
     ]);
@@ -153,7 +162,10 @@ export function useHomeSettings(currentHomeId?: string) {
           setRemovingMemberId(uId);
           await removeMember(currentHomeId!, uId);
           await loadHomeData();
-        } catch (e) { Alert.alert("שגיאה", "ההסרה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message))? e.message : "ההסרה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setRemovingMemberId(null); }
       }}
     ]);
@@ -167,7 +179,10 @@ export function useHomeSettings(currentHomeId?: string) {
           setLeavingHomeLoading(true);
           await leaveHome(currentHomeId!);
           router.replace("/home/home");
-        } catch (e) { Alert.alert("שגיאה", "העזיבה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "העזיבה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setLeavingHomeLoading(false); }
       }}
     ]);
@@ -181,7 +196,10 @@ export function useHomeSettings(currentHomeId?: string) {
           setDeletingHomeLoading(true);
           await deleteHome(currentHomeId!);
           router.replace("/home/home");
-        } catch (e) { Alert.alert("שגיאה", "המחיקה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "המחיקה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setDeletingHomeLoading(false); }
       }}
     ]);

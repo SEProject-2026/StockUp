@@ -1,49 +1,41 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "StockUp",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": null,
-    "scheme": "stockup",
+    "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.elbad.frontend"
+      
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": null,
-        "backgroundImage": null,
-        "monochromeImage": null
-      },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.elbad.frontend",
+      "versionCode": 1
     },
     "web": {
-      "output": "static",
-      "favicon": null
+      "output": "static"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": null,
+          "image": "./assets/splash-icon.png", 
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#ffffff"
         }
       ],
       "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

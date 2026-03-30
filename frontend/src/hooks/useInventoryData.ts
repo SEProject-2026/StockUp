@@ -1,10 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
-import { supabase } from "@/src/lib/supabase";
 
 import {
-  filterStockByExpiration,
-  filterStockByLocation,
+  // filterStockByExpiration,
+  // filterStockByLocation,
   getAllStock,
   searchStock,
   updateProductNickname,
@@ -12,6 +11,7 @@ import {
   updateItemQuantity,
   removeItem,
   type ProductDTO,
+  filterStock,
 } from "@/src/api/stock";
 
 import { useDebouncedValue } from "@/src/hooks/useDebouncedValue";
@@ -68,16 +68,10 @@ export function useInventoryData(params: {
         else if (q.length > 0) setIsSearching(true);
 
         let products: ProductDTO[] = [];
-        if (q.length >= 2) {
-          const res = await searchStock(homeId, q);
-          products = res.data ?? [];
-        } else if (statusFilter !== "all") {
-          const expType = statusFilterToExpirationType(statusFilter);
-          const res = await filterStockByExpiration(homeId, expType!);
-          products = res.data ?? [];
-        } else if (effectivelocation !== "all") {
-          const loc = locationToLocationType(effectivelocation);
-          const res = await filterStockByLocation(homeId, loc);
+        if (q.length >= 2 || statusFilter !== "all" || effectivelocation !== "all") {
+          const expType = statusFilter === "all" ? null : statusFilterToExpirationType(statusFilter);
+          const locType = effectivelocation === "all" ? null : locationToLocationType(effectivelocation);
+          const res = await filterStock(homeId, q, locType, expType);
           products = res.data ?? [];
         } else {
           const res = await getAllStock(homeId);
@@ -147,7 +141,7 @@ export function useInventoryData(params: {
     await changeQty(itemId, -item.quantity);
   }, [rows, changeQty]);
 
-const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: string, quantity?: number, expirationDate?: string }) => {
+const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: string | null, quantity?: number, expirationDate?: string | null }) => {
   if (!homeId) return;
   const current = rows.find(r => r.itemId === itemId);
   if (!current) return;
@@ -155,8 +149,9 @@ const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: 
   try {
     // 1. עדכון כינוי - אם המשתמש רוקן את השדה, נשלח "" כדי לאפס
     if (updatedValues.nickname !== undefined && updatedValues.nickname !== current.name) {
+      const cleanNickname = updatedValues.nickname === null ? null : updatedValues.nickname.trim();
       await updateProductNickname(homeId, current.productId, { 
-        nickname: updatedValues.nickname.trim() || "" // אם ריק, יחזור לשם המקורי
+        nickname: cleanNickname // אם ריק, יחזור לשם המקורי
       });
     }
 
@@ -173,8 +168,9 @@ const saveEdit = useCallback(async (itemId: string, updatedValues: { nickname?: 
 
     // 3. עדכון תוקף
     if (updatedValues.expirationDate !== undefined && updatedValues.expirationDate !== current.expirationDate) {
+      const cleanDate = updatedValues.expirationDate === null ? null : updatedValues.expirationDate.trim();
       await updateItemExpiration(homeId, current.productId, itemId, {
-        new_date: updatedValues.expirationDate.trim() || null
+        new_date: cleanDate
       });
     }
 

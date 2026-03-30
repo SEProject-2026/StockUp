@@ -7,7 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
+import { getCurrentUserId } from "@/src/auth/token";
 import { router } from "expo-router"; 
 import { useAuth } from "@/src/context/auth-context"; // שימוש ב-Hook המרכזי שיצרנו
 
