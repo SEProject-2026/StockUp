@@ -48,13 +48,13 @@ def test_assign_admin_unauthorized(home):
     new_admin_id = uuid4()
     home.add_member(new_admin_id)
     
-    with pytest.raises(PermissionError, match="Only current admin can transfer admin rights."):
+    with pytest.raises(PermissionError, match="Only current admin can transfer admin rights"):
         home.assign_admin(intruder_id, new_admin_id)
 
 def test_assign_admin_to_non_member(home):
     stranger_id = uuid4()
     
-    with pytest.raises(ValueError, match="User is not a member of the home."):
+    with pytest.raises(ValueError, match="User is not a member of the home"):
         home.assign_admin(USER_ID, stranger_id)
 
 def test_answer_join_request_unauthorized(home):
@@ -62,13 +62,13 @@ def test_answer_join_request_unauthorized(home):
     intruder_id = uuid4()
     home.add_join_request(requester_id)
     
-    with pytest.raises(PermissionError, match="Only admin can approve or deny join requests."):
+    with pytest.raises(PermissionError, match="Only admin can approve or deny join requests"):
         home.answer_join_request(intruder_id, requester_id, True)
 
 def test_answer_non_existent_join_request(home):
     ghost_user_id = uuid4()
     
-    with pytest.raises(ValueError, match="No such join request found."):
+    with pytest.raises(ValueError, match="No such join request found"):
         home.answer_join_request(USER_ID, ghost_user_id, True)
 
 def test_remove_member_unauthorized(home):
@@ -77,11 +77,11 @@ def test_remove_member_unauthorized(home):
     home.add_member(member_id)
     home.add_member(intruder_id)
     
-    with pytest.raises(PermissionError, match="Only admin can remove members from the home."):
+    with pytest.raises(PermissionError, match="Only admin can remove members from the home"):
         home.remove_member(intruder_id, member_id)
 
 def test_admin_cannot_leave_home(home):
-    with pytest.raises(PermissionError, match="Admin cannot leave the home. Transfer admin rights before leaving."):
+    with pytest.raises(PermissionError, match="Admin cannot leave the home. Transfer admin rights before leaving"):
         home.leave_home(USER_ID)
 
 def test_answer_join_request_deny(home):
@@ -97,7 +97,7 @@ def test_add_existing_member_raises(home):
     member_id = uuid4()
     home.add_member(member_id)
     
-    with pytest.raises(ValueError, match="User is already a member of the home."):
+    with pytest.raises(ValueError, match="User is already a member of the home"):
         home.add_member(member_id)
 
 def test_get_home_details_admin_vs_member(home):
@@ -113,5 +113,5 @@ def test_get_home_details_admin_vs_member(home):
 def test_get_home_details_unauthorized(home):
     stranger_id = uuid4()
     
-    with pytest.raises(ValueError, match="User is not a member of the home."):
+    with pytest.raises(ValueError, match="User is not a member of the home"):
         home.get_home_details(stranger_id)

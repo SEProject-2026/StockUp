@@ -1,8 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes import auth_routes, management_routes, stock_routes, shopping_routes
-from src.infrastructure.db import models
-from src.infrastructure.db.database import engine
 from src.timed_alert_jobs import lifespan
 
 

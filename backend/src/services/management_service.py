@@ -46,7 +46,7 @@ class ManagementService:
 
         if home is None:
             app_logger.warning(f"Join home failed: Invalid join code '{home_code}' used by user {user_id}")
-            raise ValueError("Home not found.")
+            raise ValueError("Home not found")
 
         home.add_join_request(user_id)
         await self._home_repository.update(home)
@@ -140,8 +140,6 @@ class ManagementService:
         """User voluntarily leaves a home."""
         app_logger.debug(f"User {user_id} attempting to leave home {home_id}")
         home = await self._check_access(user_id, home_id)
-        # Check if user is admin and has no member left in this home
-        # if so consider deleting the home
         home.leave_home(user_id)
         await self._home_repository.update(home)
         app_logger.info(f"User {user_id} successfully left home {home_id}")
@@ -230,7 +228,7 @@ class ManagementService:
         app_logger.debug(f"Retrieving all homes for user {user_id}")
         if not user_id:
             app_logger.warning("get_all_homes_for_user failed: user_id is missing")
-            raise ValueError("User ID is required.")
+            raise ValueError("User ID is required")
             
         homes: List[Home] = await self._home_repository.get_homes_by_user_id(user_id)
         return homes
@@ -248,12 +246,12 @@ class ManagementService:
         """Helper to verify user exists, logged in, and member of the home"""
         if not user_id or not home_id:
             app_logger.warning("Access check failed: Missing user_id or home_id")
-            raise ValueError("User ID and Home ID are required.")
+            raise ValueError("User ID and Home ID are required")
             
         home = await self._home_repository.get_by_id(home_id)
         if not home:
             app_logger.warning(f"Access check failed: Home {home_id} does not exist")
-            raise ValueError("Home retrieval failed.")
+            raise ValueError("Home retrieval failed")
             
         if not home.is_member(user_id):
             app_logger.warning(f"SECURITY WARNING: User {user_id} attempted to access home {home_id} without membership")

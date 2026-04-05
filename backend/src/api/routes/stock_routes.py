@@ -212,57 +212,6 @@ async def remove_item(
 
 # --- Search & Filter Routes ---
 
-# @router.get("/filter/location", response_model=GeneralResponse)
-# async def filter_by_location(
-#     location: LocationType,
-#     service: StockServiceDep,
-#     home_id: UUID = Header(..., alias="X-Home-ID"),
-#     user_id: UUID = Depends(get_current_user_id),
-# ):
-#     app_logger.info(f"Filter by location ({location}) request received from user {user_id}")
-#     try:
-#         results = await service.filter_by_location(user_id, home_id, location)
-#         return GeneralResponse(status="success", data=results)
-#     except ValueError as e:
-#         app_logger.warning(f"Filter by location failed for user {user_id} - Reason: {str(e)}")
-#         translated_message = translate_error(str(e))
-#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
-
-
-# @router.get("/filter/expiration", response_model=GeneralResponse)
-# async def filter_by_expiration(
-#     type: ExpirationType,
-#     service: StockServiceDep,
-#     home_id: UUID = Header(..., alias="X-Home-ID"),
-#     user_id: UUID = Depends(get_current_user_id),
-# ):
-#     app_logger.info(f"Filter by expiration ({type}) request received from user {user_id}")
-#     try:
-#         results = await service.filter_by_expiration_type(user_id, home_id, type)
-#         return GeneralResponse(status="success", data=results)
-#     except ValueError as e:
-#         app_logger.warning(f"Filter by expiration failed for user {user_id} - Reason: {str(e)}")
-#         translated_message = translate_error(str(e))
-#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
-
-
-# @router.get("/search", response_model=GeneralResponse)
-# async def search_products(
-#     query: str,
-#     service: StockServiceDep,
-#     home_id: UUID = Header(..., alias="X-Home-ID"),
-#     user_id: UUID = Depends(get_current_user_id),
-# ):
-#     app_logger.info(f"Search products request received from user {user_id} with query '{query}'")
-#     try:
-#         results = await service.search_product(user_id, home_id, query)
-#         dtos = [ProductDTO.from_domain(p) for p in results]
-#         return GeneralResponse(status="success", data=dtos)
-#     except ValueError as e:
-#         app_logger.warning(f"Search products failed for query '{query}' - Reason: {str(e)}")
-#         translated_message = translate_error(str(e))
-#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
-
 @router.get("/filter", response_model=GeneralResponse)
 async def filter_products(
     service: StockServiceDep,

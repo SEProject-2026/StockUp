@@ -2,12 +2,11 @@ from datetime import date, timedelta
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload, contains_eager
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.repositories.i_product_repository import IProductRepository
 from src.domain.product.product import Product, ProductItem
 from src.domain.enums import ExpirationType, ExpirationType, LocationType
 from src.infrastructure.db.models import ProductModel, ProductItemModel
-from sqlalchemy import select, or_, and_
+from sqlalchemy import or_, and_
 
 class DbProductRepository(IProductRepository):
     def __init__(self, db: Session):
@@ -74,19 +73,6 @@ class DbProductRepository(IProductRepository):
             self.db.delete(leftover_item)
 
         self.db.flush()
-
-        # db_product.items = []
-        # db_product.items = [
-        #     ProductItemModel(
-        #         id=str(item.id),
-        #         product_id=str(product.id),
-        #         quantity=item.quantity,
-        #         expiration_date=item.expiration_date,
-        #         location=item.location if item.location else "OTHER"
-        #     ) for item in product.items
-        # ]
-        # # Flush ensures the SQL is sent to the DB buffer
-        # self.db.flush()
 
     async def get_by_id(self, product_id: UUID) -> Optional[Product]:
         db_product = (

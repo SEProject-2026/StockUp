@@ -35,13 +35,13 @@ class InMemoryProductRepository(IProductRepository):
         if product.id in self._products_db:
             self._products_db[product.id] = product
         else:
-            raise KeyError(f"Product {product.id} not found for update.")
+            raise KeyError(f"Product {product.id} not found for update")
             
     async def delete(self, product_id: uuid.UUID) -> None:
         if product_id in self._products_db:
             del self._products_db[product_id]
         else:
-            raise KeyError(f"Product {product_id} not found for deletion.")
+            raise KeyError(f"Product {product_id} not found for deletion")
 
     async def list_all_by_home(self, home_id: uuid.UUID) -> List[Product]:
         return [
