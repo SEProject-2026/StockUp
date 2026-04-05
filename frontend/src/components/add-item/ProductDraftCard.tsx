@@ -70,7 +70,7 @@ export default function ProductDraftCard(props: {
         </TouchableOpacity>
       </View>
 
-      <Field label="שם מוצר (חיפוש)" required>
+      <Field label="שם מוצר (חיפוש)">
         <View style={styles.inputRow}>
           <TextInput
             value={props.name}
@@ -126,7 +126,7 @@ export default function ProductDraftCard(props: {
 
       <View style={styles.row2}>
         <View style={{ flex: 1 }}>
-          <Field label="כמות" required>
+          <Field label="כמות">
             <TextInput
               value={props.quantity}
               onChangeText={props.onChangeQuantity}
@@ -147,7 +147,7 @@ export default function ProductDraftCard(props: {
                 {formatDateLabel(props.expiresAt)}
               </Text>
 
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8 }}>
                 {!!props.expiresAt && (
                   <TouchableOpacity onPress={props.onClearDate} activeOpacity={0.85} style={styles.clearBtn}>
                     <Ionicons name="close" size={14} color={BRAND_MUTED} />
@@ -188,13 +188,10 @@ export default function ProductDraftCard(props: {
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>
-        {label}
-        {required && <Text style={{ color: "#EF4444" }}> *</Text>}
-        </Text>
+      <Text style={styles.label}>{label}</Text>
       {children}
     </View>
   );
@@ -210,13 +207,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   topRow: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
   chip: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 8,
     paddingVertical: 8,
@@ -229,7 +226,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: "800", color: BRAND_TEXT },
 
   iconChip: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 6,
     paddingVertical: 8,
@@ -256,12 +253,12 @@ const styles = StyleSheet.create({
     color: BRAND_TEXT,
   },
 
-  inputRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  inputRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   loaderWrap: { width: 26, alignItems: "center", justifyContent: "center" },
 
   chipRow: { marginTop: 8, alignItems: "flex-end" },
   selectedChipBox: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 8,
     paddingVertical: 8,
@@ -284,10 +281,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  row2: { flexDirection: "row", alignItems: "flex-start" },
+  row2: { flexDirection: "row-reverse", alignItems: "flex-start" },
 
   dateInput: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
@@ -314,6 +311,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  cancelRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 6 },
+  cancelRow: { flexDirection: "row-reverse", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 6 },
   cancelText: { fontSize: 12, color: BRAND_MUTED, fontWeight: "700" },
 });

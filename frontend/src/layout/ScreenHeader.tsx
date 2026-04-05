@@ -36,7 +36,7 @@ export default function ScreenHeader({ title, onBack, rightSlot }: Props) {
 
 const styles = StyleSheet.create({
   headerRow: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,

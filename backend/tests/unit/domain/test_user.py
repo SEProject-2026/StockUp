@@ -2,35 +2,46 @@ import uuid
 import pytest
 from src.domain.user.user import User
 
-def test_user_initialization(any_user):
-    """
-    Verify that a user is created with correct attributes.
-    'any_user' is injected from global conftest.py
-    """
-    assert isinstance(any_user.id, uuid.UUID)
-    assert "@stockup.com" in any_user.email
-    assert any_user.name == "Test User"
+class TestUserDomain:
 
-def test_user_creation_with_empty_name_fails():
-    """
-    This test still uses the factory directly because it tests 
-    the failure of the creation process itself.
-    """
-    with pytest.raises(ValueError, match="User name cannot be empty"):
-        User(id=uuid.uuid4(), email="test@test.com", name="", push_token="123")
+    # ==========================================
+    # 1. Initialization & Creation
+    # ==========================================
 
-def test_user_update_name(any_user):
-    """Verify the domain logic for updating a user's name."""
-    any_user.update_name("New Name")
-    assert any_user.name == "New Name"
+    def test_user_initialization(self, any_user):
+        """Happy Path: Verify that a user is created with correct attributes via fixture."""
+        assert isinstance(any_user.id, uuid.UUID)
+        assert "@test.com" in any_user.email 
+        assert any_user.name == "Test User"
 
-def test_user_update_name_to_empty_fails(any_user):
-    """Verify validation when updating to an empty name."""
-    with pytest.raises(ValueError, match="User name cannot be empty"):
-        any_user.update_name("   ")
+    def test_user_creation_with_empty_name_fails(self):
+        """Sad Path: Verify validation prevents empty names during initialization."""
+        with pytest.raises(ValueError, match="User name cannot be empty"):
+            User(id=uuid.uuid4(), email="test@test.com", name="", push_token="123")
+        
+        with pytest.raises(ValueError, match="User name cannot be empty"):
+            User(id=uuid.uuid4(), email="test@test.com", name="   ", push_token="123")
 
-def test_user_update_push_token(any_user):
-    """Verify push token update."""
-    new_token = "token_123"
-    any_user.update_push_token(new_token)
-    assert any_user.push_token == new_token
+    # ==========================================
+    # 2. Name Management (update_name)
+    # ==========================================
+
+    def test_user_update_name_success(self, any_user):
+        """Happy Path: Successfully updating a user's name."""
+        any_user.update_name("New Name")
+        assert any_user.name == "New Name"
+
+    def test_user_update_name_to_empty_fails(self, any_user):
+        """Sad Path: Validation when updating to an empty or whitespace name."""
+        with pytest.raises(ValueError, match="User name cannot be empty"):
+            any_user.update_name("  ")
+
+    # ==========================================
+    # 3. Token Management (update_push_token)
+    # ==========================================
+
+    def test_user_update_push_token_success(self, any_user):
+        """Happy Path: Updating the push notification token."""
+        new_token = "token_123"
+        any_user.update_push_token(new_token)
+        assert any_user.push_token == new_token

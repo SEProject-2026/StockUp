@@ -5,108 +5,50 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useShoppingList, type ShoppingItem, type LocationKey } from "@/src/hooks/shopping/useShoppingList";
-import { locationLabel, locationIcon } from "@/src/utils/shoppingUtils";
+import { useShoppingList, type ShoppingItem, type LocationKey } from "@/src/hooks/useShoppingList";
+import { LOCATIONS, locationLabel, locationIcon } from "@/src/hooks/useBaseMode";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
-import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard";
 
 import { styles, BRAND, type SectionLocation } from "@/src/components/shopping/styles";
 import { ShoppingItemRow } from "@/src/components/shopping/ShoppingItemRow";
 import { ShoppingHeader } from "@/src/components/shopping/ShoppingHeader";
 import { AddShoppingItemModal } from "@/src/components/shopping/AddShoppingItemModal";
-import { SuggestionsModal } from "@/src/components/shopping/SuggestionsModal";
-
-const fabStyles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    right: 20,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#F59E0B",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    zIndex: 999,
-  },
-  badge: {
-    position: "absolute",
-    top: -2,
-    left: -2,
-    backgroundColor: "#EF4444",
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: "#fff",
-    zIndex: 1000,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "900",
-  }
-});
 
 export default function ShoppingListScreen() {
   const insets = useSafeAreaInsets();
   const [addOpen, setAddOpen] = useState(false);
   const { homeId, listId, listName } = useLocalSearchParams<{ homeId: string; listId: string; listName: string }>();
-  useMembershipGuard(homeId);
 
   const {
     mode, items, filteredItems, loading, picked, query, setQuery,
-    addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick, 
-    suggestions, dismissSuggestion, suggestionsModalOpen, setSuggestionsModalOpen, isDeleted
+    addItem, removeItem, finishShopping, updateQuantity, enterShoppingMode, modeSubmitting, togglePick
   } = useShoppingList({ homeId: homeId ?? "", listId: listId ?? "" });
-
-  React.useEffect(() => {
-    if (isDeleted) {
-      Alert.alert("הרשימה נמחקה", "רשימת הקניות שבה צפית נמחקה על ידי משתמש אחר.");
-      router.replace({
-        pathname: "/shopping-list/shopping-list",
-        params: { homeId }
-      });
-    }
-  }, [isDeleted, homeId]);
 
   const pickedCount = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
 
   const groupedSections = useMemo(() => {
-    const groups = new Map<string, ShoppingItem[]>();
+    const groups = new Map<SectionLocation, ShoppingItem[]>();
     
     filteredItems.forEach((it) => {
-      const loc = it.location || "OTHER";
+      const loc = (it.location as SectionLocation) || "UNSORTED";
       if (!groups.has(loc)) groups.set(loc, []);
       groups.get(loc)!.push(it);
     });
 
-    const allLocations = Array.from(groups.keys()).sort((a, b) => 
-      a.localeCompare(b, "he")
-    );
+    const sections = (LOCATIONS as LocationKey[])
+      .filter(l => groups.has(l as SectionLocation))
+      .map(l => ({
+        location: l as SectionLocation,
+        title: locationLabel(l as any),
+        items: groups.get(l as SectionLocation)!
+      }));
 
-    return allLocations.map(l => ({
-      location: l,
-      title: locationLabel(l as any),
-      items: groups.get(l)!
-    }));
+    if (groups.has("UNSORTED")) {
+      sections.push({ location: "UNSORTED", title: "ללא מיקום", items: groups.get("UNSORTED")! });
+    }
+    return sections;
   }, [filteredItems]);
-
-  const uniqueCategories = useMemo(() => {
-    const cats = new Set<string>();
-    items.forEach(it => {
-      if (it.location) cats.add(it.location);
-    });
-    return Array.from(cats).sort((a, b) => a.localeCompare(b, "he"));
-  }, [items]);
 
   if (loading) return (
     <SafeAreaView style={styles.safeArea}>
@@ -115,7 +57,7 @@ export default function ShoppingListScreen() {
     </SafeAreaView>
   );
 
-  return (
+return (
     <View style={{ flex: 1 }}>
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient colors={["#E5F3FF", BRAND.BG]} style={StyleSheet.absoluteFill} />
@@ -124,7 +66,7 @@ export default function ShoppingListScreen() {
         <FlatList
           data={groupedSections}
           keyExtractor={s => s.location}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 + insets.bottom }} // צמצמתי מרווח תחתון
           ListHeaderComponent={
             <ShoppingHeader 
               isShoppingMode={mode === "SHOPPING"} totalCount={items.length} pickedCount={pickedCount}
@@ -164,34 +106,6 @@ export default function ShoppingListScreen() {
           )}
         />
 
-        {/* Suggestions Modal */}
-        <SuggestionsModal 
-          open={suggestionsModalOpen} 
-          onClose={() => setSuggestionsModalOpen(false)} 
-          suggestions={suggestions}
-          onAdd={(name, location) => {
-            addItem(name, 1, "suggestion", location);
-          }}
-          onDismiss={dismissSuggestion}
-          existingCategories={uniqueCategories}
-        />
-
-        {/* Floating Suggestions Button */}
-        {suggestions.length > 0 && (
-          <TouchableOpacity 
-            style={[
-              fabStyles.container, 
-              { bottom: 85 + insets.bottom } // Above bottom actions
-            ]}
-            onPress={() => setSuggestionsModalOpen(true)}
-          >
-            <View style={fabStyles.badge}>
-              <Text style={fabStyles.badgeText}>{suggestions.length}</Text>
-            </View>
-            <Ionicons name="sparkles" size={24} color="#fff" />
-          </TouchableOpacity>
-        )}
-
         {/* הכפתור הדינמי בתחתית המסך */}
         <View style={[styles.bottomActions, { paddingBottom: 16 + insets.bottom }]}>
           {mode === "SHOPPING" ? (
@@ -222,14 +136,8 @@ export default function ShoppingListScreen() {
           )}
         </View>
 
-        <AddShoppingItemModal 
-          open={addOpen} 
-          onClose={() => setAddOpen(false)} 
-          onAdd={(p) => addItem(p.name, p.qty, "manual", p.location)}
-          existingCategories={uniqueCategories}
-        />
+        <AddShoppingItemModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={(p) => addItem(p.name, p.qty, "manual", p.location)} />
         <View style={[styles.bottomBar, { paddingBottom: 10 + insets.bottom }]}><BottomNavBar activeTab="shopping-list" /></View>
       </SafeAreaView>
     </View>
-  );
-}
+  );}

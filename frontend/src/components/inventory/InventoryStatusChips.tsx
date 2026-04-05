@@ -9,19 +9,23 @@ export default function InventoryStatusChips(props: {
 }) {
   return (
     <View style={styles.filterRow}>
-      <View style={styles.filtersWrapper}>
+      <View style={styles.filtersLeft}>
         <FilterChip label="הכול" active={props.value === "all"} onPress={() => props.onChange("all")} />
         <FilterChip
           label="תוקף קרוב"
           active={props.value === "soon"}
           onPress={() => props.onChange("soon")}
+          style={{ marginLeft: 8 }}
         />
         <FilterChip
           label="פג תוקף"
           active={props.value === "expired"}
           onPress={() => props.onChange("expired")}
+          style={{ marginLeft: 8 }}
         />
       </View>
+
+      <Text style={styles.sortLabel}>מיון לפי מוצר</Text>
     </View>
   );
 }
@@ -30,17 +34,15 @@ function FilterChip({
   label,
   active,
   onPress,
+  style,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  style?: any;
 }) {
   return (
-    <TouchableOpacity 
-      onPress={onPress} 
-      style={[styles.filterChip, active && styles.filterChipActive]} 
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity onPress={onPress} style={[styles.filterChip, active && styles.filterChipActive, style]} activeOpacity={0.85}>
       <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -48,32 +50,27 @@ function FilterChip({
 
 const styles = StyleSheet.create({
   filterRow: {
-    paddingHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  filtersWrapper: { 
-    flexDirection: "row", 
-    backgroundColor: COLORS.BG_DIM,
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
-  },
-  filterChip: {
-    flex: 1,
+    flexDirection: "row-reverse",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    borderRadius: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 4,
   },
-  filterChipActive: { 
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  filtersLeft: { flexDirection: "row-reverse", alignItems: "center" },
+  sortLabel: { fontSize: 13, color: COLORS.BRAND_MUTED, fontWeight: "600", textAlign: "right" },
+
+  filterChip: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.BRAND_BLUE_SOFT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
   },
-  filterChipText: { fontSize: 13, color: COLORS.BRAND_MUTED, fontWeight: "600" },
-  filterChipTextActive: { color: COLORS.ACCENT, fontWeight: "800" },
+  filterChipActive: { backgroundColor: COLORS.ACCENT, borderColor: COLORS.ACCENT },
+  filterChipText: { fontSize: 12, color: COLORS.BRAND_MUTED },
+  filterChipTextActive: { color: "#FFFFFF", fontWeight: "600" },
 });

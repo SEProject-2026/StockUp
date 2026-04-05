@@ -36,11 +36,19 @@ def mock_home_repo():
 
 @pytest.fixture
 def mock_product_repo():
-    return AsyncMock()
+    repo = AsyncMock()
+    # Ensure these return None by default instead of a new Mock object
+    repo.get_by_id.return_value = None
+    repo.get_by_original_name.return_value = None
+    repo.get_by_barcode.return_value = None
+    return repo
 
 @pytest.fixture
 def mock_shopping_repo():
-    return AsyncMock()
+    repo = AsyncMock()
+    repo.get_by_id.return_value = None
+    repo.get_all_by_home.return_value = []
+    return repo
 
 @pytest.fixture
 def mock_catalog_provider():
@@ -49,6 +57,11 @@ def mock_catalog_provider():
 @pytest.fixture
 def mock_scanner():
     return MagicMock()
+
+@pytest.fixture
+def mock_receipt_repo():
+    """Mock for IReceiptRepository."""
+    return AsyncMock()
 
 # --- Service Fixtures (Manual Dependency Injection) ---
 
@@ -61,28 +74,16 @@ def mgmt_service(mock_home_repo, mock_user_repo):
     return ManagementService(home_repository=mock_home_repo, user_repository=mock_user_repo)
 
 @pytest.fixture
-def stock_service(mock_home_repo, mock_product_repo):
-    return StockService(
-        home_repository=mock_home_repo, 
-        product_repository=mock_product_repo,
-        catalog_provider=AsyncMock()
-    )
+def shopping_list_service(mock_shopping_repo):
+    return ShoppingListService(shopping_repo=mock_shopping_repo)
 
 @pytest.fixture
-def shopping_list_service(mock_shopping_repo, mock_product_repo):
-    return ShoppingListService(
-        shopping_repo=mock_shopping_repo,
-        product_repo=mock_product_repo,
-        analytics_repo=AsyncMock()
-    )
-
-
-@pytest.fixture
-def stock_service(mock_home_repo, mock_product_repo, mock_catalog_provider, mock_user_repo, mock_scanner):
+def stock_service(mock_home_repo, mock_product_repo, mock_catalog_provider, mock_user_repo, mock_scanner, mock_receipt_repo):
     return StockService(
         home_repository=mock_home_repo,
         product_repository=mock_product_repo,
         catalog_provider=mock_catalog_provider,
         user_repository=mock_user_repo,
-        receipt_scanner=mock_scanner 
+        receipt_scanner=mock_scanner,
+        receipt_repository=mock_receipt_repo
     )

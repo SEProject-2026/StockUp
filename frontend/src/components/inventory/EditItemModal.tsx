@@ -17,9 +17,9 @@ type Props = {
   item: any | null;
   onClose: () => void;
   onSave: (values: { 
-    nickname?: string | null; 
+    nickname: string; 
     quantity: number; 
-    expirationDate?: string | null
+    expirationDate?: string 
   }) => Promise<void> | void;
 };
 
@@ -65,12 +65,10 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
     if (!canSave) return;
     try {
       setSaving(true);
-      const trimmedNickname = nickname?.trim() ?? null;
-      const trimmedExp = exp?.trim() ?? null;
       await onSave({
-        nickname: trimmedNickname === "" ? (initialNickname !== "" ? null : undefined) : trimmedNickname,
+        nickname: nickname.trim(), // יכול להיות ריק
         quantity: qtyNum,
-        expirationDate: trimmedExp === "" ? (initialExp !== "" ? null : undefined) : trimmedExp,
+        expirationDate: exp.trim(),
       });
     } catch (error) {
       console.error("Save error:", error);
@@ -186,7 +184,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   header: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
@@ -242,7 +240,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   row: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     marginBottom: 24,
   },
   saveBtn: {

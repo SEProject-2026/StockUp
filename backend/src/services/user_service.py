@@ -22,24 +22,25 @@ class UserService:
             app_logger.info(f"User {user_id} already exists locally. Returning existing profile.")
             return existing_user
 
+        normalized_email = email.strip().lower()
         # 2. Check if email is already taken by a different user_id
         # (Safety check in case of email changes or existing manual accounts)
-        if await self.user_repo.get_by_email(email):
-            app_logger.warning(f"Registration failed: Email {email} is already associated with another account")
+        if await self.user_repo.get_by_email(normalized_email):
+            app_logger.warning(f"Registration failed: Email {normalized_email} is already associated with another account")
             raise ValueError("Email already exists in the system")
 
         # 3. Create the new User entity linked to the Supabase UUID
         # Note: hashed_password is removed from the constructor as discussed
         user = User(
             id=user_id, 
-            email=email, 
+            email=normalized_email, 
             name=name
         )
         
         # 4. Save to our local PostgreSQL
         await self.user_repo.save(user)
         
-        app_logger.info(f"User profile synced successfully: {email} (ID: {user_id})")
+        app_logger.info(f"User profile synced successfully: {normalized_email} (ID: {user_id})")
         
         return user
 

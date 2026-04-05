@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     borderColor: BRAND_BORDER,
   },
   header: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     paddingBottom: 8,
@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
   row: { paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12 },
   rowActive: { backgroundColor: BRAND_BLUE_SOFT },
   rowInner: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
-  rowLabelWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rowLabelWrap: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   rowText: { fontSize: 14, color: BRAND_TEXT, textAlign: "right" },
   rowTextActive: { fontWeight: "700", color: BRAND_PRIMARY },
 });

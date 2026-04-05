@@ -197,14 +197,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   header: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
   },
   title: { fontSize: 14, fontWeight: "800", color: BRAND_TEXT, textAlign: "right" },
 
   note: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 8,
     padding: 10,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  inputRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  inputRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   input: {
     flex: 1,
     borderWidth: 1,
@@ -257,10 +257,10 @@ const styles = StyleSheet.create({
   },
   installHintText: { fontSize: 12, color: BRAND_MUTED, fontWeight: "700" },
 
-  footerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  footerRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10, marginTop: 2 },
   secondaryBtn: {
     flex: 1,
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,

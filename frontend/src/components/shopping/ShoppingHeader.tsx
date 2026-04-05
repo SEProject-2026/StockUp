@@ -13,9 +13,7 @@ type Props = {
   setQuery: (q: string) => void;
 };
 
-export const ShoppingHeader = ({ 
-  isShoppingMode, onToggleMode, modeSubmitting, totalCount, pickedCount, query, setQuery
-}: Props) => {
+export const ShoppingHeader = ({ isShoppingMode, onToggleMode, modeSubmitting, totalCount, pickedCount, query, setQuery }: Props) => {
   return (
     <View style={styles.topBlock}>
       <View style={styles.toggleCard}>

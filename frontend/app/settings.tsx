@@ -7,8 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import BottomNavBar from "@/src/layout/BottomNavBar";
-import { useHomeSettings } from "@/src/hooks/home/useHomeSettings";
-import { useRealtimeJoinRequestsRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
+import { useHomeSettings, useRealtimeJoinRequestsRefresh } from "@/src/hooks/useHomeSettings";
 import { Section, SettingsRow, Divider } from "@/src/components/settings/SettingsUI";
 import { 
   ExpiryDaysModal, HomeCodeModal, JoinRequestsModal, 
@@ -16,7 +15,7 @@ import {
 } from "@/src/components/settings/SettingsModals";
 
 import { getHomeJoinCode, getJoinRequests } from "@/src/api/homes";
-import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard"; 
+import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; 
 
 export default function SettingsScreen() {
   const { homeId, openRequests } = useLocalSearchParams<{ homeId?: string; openRequests?: string }>();
@@ -64,7 +63,7 @@ export default function SettingsScreen() {
   };
   
   const refreshJoinRequests = useCallback(async () => {
-    if (!currentHomeId || !state.isHomeAdmin) return;
+    if (!currentHomeId) return;
     try {
       const res = await getJoinRequests(currentHomeId);
       const requests = Object.entries(res.data || {}).map(([id, name]) => ({
@@ -77,7 +76,7 @@ export default function SettingsScreen() {
     }
   }, [currentHomeId, setJoinRequests]); 
 
-  useRealtimeJoinRequestsRefresh(currentHomeId, refreshJoinRequests, state.isHomeAdmin);
+  useRealtimeJoinRequestsRefresh(currentHomeId, refreshJoinRequests);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>

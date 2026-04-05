@@ -31,8 +31,6 @@ class StockService:
         self._user_repository = user_repository
         self._receipt_scanner = receipt_scanner
         self._receipt_repository = receipt_repository
-        self.locaton_filter = None
-        self.expiration_filter = None
 
     # ==========================================
     # 2. Stock Management (Inventory)

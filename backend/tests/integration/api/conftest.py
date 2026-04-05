@@ -1,41 +1,48 @@
 import os
-import uuid
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+import uuid
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from fastapi.testclient import TestClient
 
+from tests.factories import create_home_entity, create_user_entity
 from src.main import app
 from src.infrastructure.db.database import Base, get_db
 from src.api.security import get_current_user_id
 
-# 1. Infrastructure Setup: Load Test DB URL
-# Ensure TEST_DATABASE_URL is set in your .env.test or docker-compose
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+# ==========================================
+# 1. Infrastructure Setup (PostgreSQL)
+# ==========================================
 
-if not TEST_DATABASE_URL:
-    raise ValueError("TEST_DATABASE_URL environment variable is not set")
+TEST_DATABASE_URL = "postgresql://user:password@localhost:5433/stockup_test"
 
-engine = create_engine(TEST_DATABASE_URL)
+engine = create_engine(
+    TEST_DATABASE_URL,
+    pool_pre_ping=True
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# --- Database Fixtures ---
+# ==========================================
+# 2. Database Lifecycle Fixtures
+# ==========================================
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     """
-    Creates all database tables once at the start of the test session.
+    Initializes the database schema once per session.
     """
+    from src.infrastructure.db import models 
+    
     Base.metadata.create_all(bind=engine)
     yield
-    # Tables are preserved for debugging. Use 'drop_all' if a fresh schema is needed per run.
     # Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
 def db_session():
     """
-    Provides an isolated database session for each test using a transaction rollback.
-    This ensures that data created in one test does not leak into another.
+    Provides an isolated database session for each test.
+    Forces a truncate on all tables after execution to ensure 
+    a clean state even if internal commits were triggered.
     """
     connection = engine.connect()
     transaction = connection.begin()
@@ -45,15 +52,23 @@ def db_session():
     
     session.close()
     transaction.rollback()
+    
+    # Active cleanup: Truncate all tables to prevent data leakage
+    with engine.connect() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(text(f'TRUNCATE TABLE "{table.name}" CASCADE;'))
+        conn.commit()
+        
     connection.close()
 
-# --- API & Security Fixtures ---
+# ==========================================
+# 3. FastAPI & Security Fixtures
+# ==========================================
 
 @pytest.fixture
 def client(db_session):
     """
-    Standard FastAPI TestClient with the database dependency overridden
-     to use the isolated test session.
+    Provides a FastAPI TestClient with the database dependency overridden.
     """
     def override_get_db():
         try:
@@ -62,23 +77,37 @@ def client(db_session):
             pass
             
     app.dependency_overrides[get_db] = override_get_db
+    
     with TestClient(app) as c:
         yield c
-    # Clear overrides after the test to avoid side effects
+    
     app.dependency_overrides.clear()
 
 @pytest.fixture
 def auth_user(client):
     """
-    Bypasses Supabase JWT verification and injects a fixed User ID.
-    Usage: Inject 'auth_user' into any test requiring an authenticated user.
+    Injects a fixed User ID into the security dependency.
     """
     fixed_user_id = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
+    app.dependency_overrides[get_current_user_id] = lambda: fixed_user_id
+    return fixed_user_id
+
+@pytest.fixture
+def active_home(db_session, auth_user):
+    """
+    Creates a user and a home in the DB and returns the home entity.
+    Uses flush() instead of commit() to allow the rollback mechanism 
+    to handle cleanup properly.
+    """
+    create_user_entity(db=db_session, user_id=auth_user)
+    home = create_home_entity(db=db_session, admin_user_id=auth_user)
     
-    async def mocked_user_id():
-        return fixed_user_id
-        
-    app.dependency_overrides[get_current_user_id] = mocked_user_id
-    yield fixed_user_id
-    # Ensure security overrides are cleared after the test
-    app.dependency_overrides.clear()
+    db_session.flush()
+    return home
+
+@pytest.fixture
+def home_headers(active_home):
+    """
+    Returns the standard headers required for home-specific routes.
+    """
+    return {"X-Home-ID": str(active_home.id)}

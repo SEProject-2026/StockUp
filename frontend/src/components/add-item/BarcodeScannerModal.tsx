@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   header: {
     height: 56,
     paddingHorizontal: 16,
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   hint: { color: "#fff", textAlign: "center", fontSize: 13 },
   againBtn: {
     alignSelf: "center",
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 14,

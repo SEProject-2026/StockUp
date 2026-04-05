@@ -10,12 +10,11 @@ import BottomNavBar from "@/src/layout/BottomNavBar";
 import { InventoryFiltersBar } from "@/src/components/inventory/InventoryFiltersBar";
 import { GroupedInventoryList } from "@/src/components/inventory/GroupedInventoryList";
 import { EditItemModal } from "@/src/components/inventory/EditItemModal";
-import { COLORS } from "@/src/components/inventory/filters.constants";
 
 import type { locationKey } from "@/src/components/inventory/inventory.utils";
-import { useInventoryData } from "@/src/hooks/inventory/useInventoryData";
-import { useRealtimeInventoryRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
-import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard"; // <--- ייבוא ה-Hook
+import { useInventoryData } from "@/src/hooks/useInventoryData";
+import { useRealtimeInventoryRefresh } from "@/src/hooks/useRealtimeInventoryRefresh";
+import { useMembershipGuard } from "@/src/hooks/useMembershipGuard"; // <--- ייבוא ה-Hook
 
 export function InventoryScreenBase({
   initiallocation = "all",
@@ -61,8 +60,11 @@ export function InventoryScreenBase({
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={["#E5F3FF", COLORS.BG_DIM]}
-        style={StyleSheet.absoluteFill}
+        colors={["#F4F4F4", "#D7F0FF"]}
+        start={{ x: 0.5, y: 0.2 }}
+        end={{ x: 0.5, y: 0 }}
+        style={styles.gradientBackground}
+        pointerEvents="none"
       />
 
       <View style={{ flex: 1 }}>
@@ -131,6 +133,7 @@ export default function InventoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.BG_DIM },
+  safeArea: { flex: 1, backgroundColor: "#F4F4F4" },
+  gradientBackground: { ...StyleSheet.absoluteFillObject },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

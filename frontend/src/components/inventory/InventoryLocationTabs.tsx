@@ -39,6 +39,7 @@ export default function InventorylocationTabs(props: {
             icon={selectedExtra.icon}
             active
             onPress={props.onOpenMore}
+            style={{ borderStyle: "dashed" }}
           />
         )}
 
@@ -47,9 +48,13 @@ export default function InventorylocationTabs(props: {
           icon="chevron-down"
           active={false}
           onPress={props.onOpenMore}
-          isMore
+          style={{ marginRight: 6 }}
         />
       </ScrollView>
+
+      <Text style={styles.selectedHint}>
+        נבחר: <Text style={styles.selectedHintStrong}>{selected.label}</Text>
+      </Text>
     </View>
   );
 }
@@ -59,76 +64,45 @@ function LocationChip({
   icon,
   active,
   onPress,
-  isMore,
+  style,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   active: boolean;
   onPress: () => void;
-  isMore?: boolean;
+  style?: any;
 }) {
   return (
-    <TouchableOpacity 
-      onPress={onPress} 
-      style={[
-        styles.catChip, 
-        active && styles.catChipActive,
-        isMore && { backgroundColor: "transparent", borderWidth: 0 }
-      ]} 
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconCircle, active && styles.iconCircleActive]}>
-        <Ionicons name={icon} size={15} color={active ? "#FFFFFF" : COLORS.BRAND_MUTED} />
-      </View>
+    <TouchableOpacity onPress={onPress} style={[styles.catChip, active && styles.catChipActive, style]} activeOpacity={0.85}>
+      <Ionicons name={icon} size={16} color={active ? "#FFFFFF" : COLORS.BRAND_MUTED} />
       <Text style={[styles.catChipText, active && styles.catChipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  locationContainer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  locationContainer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   locationChipsRow: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     paddingVertical: 4,
   },
   catChip: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: "#FFFFFF",
+    gap: 6,
+    backgroundColor: COLORS.BRAND_BLUE_SOFT,
     borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    // Soft shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  catChipActive: { 
-    backgroundColor: COLORS.ACCENT, 
-    borderColor: COLORS.ACCENT,
-    shadowColor: COLORS.ACCENT,
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.BG_DIM,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconCircleActive: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-  },
-  catChipText: { fontSize: 13, color: COLORS.BRAND_MUTED, fontWeight: "700" },
+  catChipActive: { backgroundColor: COLORS.ACCENT, borderColor: COLORS.ACCENT },
+  catChipText: { fontSize: 12, color: COLORS.BRAND_MUTED, fontWeight: "600" },
   catChipTextActive: { color: "#FFFFFF" },
+
+  selectedHint: { marginTop: 6, textAlign: "right", fontSize: 12, color: COLORS.BRAND_MUTED },
+  selectedHintStrong: { color: COLORS.BRAND_TEXT, fontWeight: "800" },
 });
