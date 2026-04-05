@@ -42,7 +42,7 @@ class TestStockService:
 3.  **Leverage Factories**: Use the existing factory methods in `conftest.py` to seed data. This ensures that changes to model schemas only require a single update in the factory layer.
 
 ## 🚀 Execution Commands
-* **Setup docker container** `docker compose up -d`
+* **Setup docker container** `docker-compose up -d`
 * **Run the full suite**: `pytest`
 * **Unit layer only**: `pytest tests/unit`
 * **Integration layer only**: `pytest tests/integration`
