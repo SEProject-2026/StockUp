@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/app/_layout"; 
+import { useAuth } from "@/app/_layout";
 import {
   updateExpirationRange,
   answerJoinRequest,
@@ -12,33 +12,11 @@ import {
   removeMember,
   deleteHome,
 } from "@/src/api/homes";
-import { useRealtimeContext } from "../providers/RealtimeProvider";
-
-export function useRealtimeJoinRequestsRefresh(
-  homeId: string | undefined,
-  refreshJoinRequests: () => Promise<void>
-) {
-  const { joinRequestsVersionByHome } = useRealtimeContext();
-  const firstRunRef = useRef(true);
-  const currentVersion = homeId ? (joinRequestsVersionByHome[homeId] ?? 0) : 0;
-
-  useEffect(() => {
-    if (!homeId) return;
-
-    if (firstRunRef.current) {
-      firstRunRef.current = false;
-      return;
-    }
-
-    refreshJoinRequests();
-  }, [homeId, currentVersion, refreshJoinRequests]);
-}
+import { useRealtimeContext } from "../../providers/RealtimeProvider";
 
 export function useHomeSettings(currentHomeId?: string) {
-  // שליפת המשתמש המחובר מה-Context
   const { session } = useAuth();
   const currentUserId = session?.user?.id;
-
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expiryAlertsEnabled, setExpiryAlertsEnabled] = useState(true);
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
@@ -66,12 +44,13 @@ export function useHomeSettings(currentHomeId?: string) {
   const [leavingHomeLoading, setLeavingHomeLoading] = useState(false);
   const [deletingHomeLoading, setDeletingHomeLoading] = useState(false);
 
+  const { homeMetaVersionByHome } = useRealtimeContext();
+  const currentHomeMetaVersion = currentHomeId ? (homeMetaVersionByHome[currentHomeId] ?? 0) : 0;
+
   const clampDays = (n: number) => Math.max(0, Math.min(30, n));
 
   const loadHomeData = async () => {
-    //Protection: If there is no home or there is no userId yet (loading), we will not try to pull data
     if (!currentHomeId || !currentUserId) return;
-    
     try {
       setLoadingHomeMeta(true);
       const homesRes = await getMyHomes();
@@ -91,8 +70,7 @@ export function useHomeSettings(currentHomeId?: string) {
       }));
       setHomeMembers(members);
     } catch (e: any) {
-      console.error("[useHomeSettings] Error loading home data:", e);
-      // Alert.alert("שגיאה", "טעינת הנתונים נכשלה");
+      Alert.alert("שגיאה", "טעינת הנתונים נכשלה");
     } finally {
       setLoadingHomeMeta(false);
     }
@@ -109,14 +87,16 @@ export function useHomeSettings(currentHomeId?: string) {
   const isHomeAdmin = useMemo(() => {
     return !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
   }, [homeMeta, currentUserId]);
-
   const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
     try {
       setProcessingRequestId(userId);
       await answerJoinRequest(currentHomeId!, { user_id: userId, approved });
       setJoinRequests(prev => prev.filter(req => req.user_id !== userId));
       await loadHomeData();
-    } catch (e) { Alert.alert("שגיאה", "הפעולה נכשלה"); }
+    } catch (e) { 
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message))? e.message : "הפעולה נכשלה";
+      Alert.alert("שגיאה", message); 
+    }
     finally { setProcessingRequestId(null); }
   };
 
@@ -126,7 +106,10 @@ export function useHomeSettings(currentHomeId?: string) {
       await updateExpirationRange(currentHomeId!, { new_range: expiryLeadDays });
       setDaysModalOpen(false);
       await loadHomeData();
-    } catch (e) { Alert.alert("שגיאה", "העדכון נכשל"); }
+    } catch (e) { 
+      const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "העדכון נכשל";
+      Alert.alert("שגיאה", message); 
+    }
     finally { setSavingDays(false); }
   };
 
@@ -139,7 +122,10 @@ export function useHomeSettings(currentHomeId?: string) {
           await switchHomeHead(currentHomeId!, { new_head_id: uId });
           setSwitchHeadOpen(false);
           await loadHomeData();
-        } catch (e) { Alert.alert("שגיאה", "ההחלפה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message))? e.message : "ההחלפה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setSwitchingHead(false); }
       }}
     ]);
@@ -153,7 +139,10 @@ export function useHomeSettings(currentHomeId?: string) {
           setRemovingMemberId(uId);
           await removeMember(currentHomeId!, uId);
           await loadHomeData();
-        } catch (e) { Alert.alert("שגיאה", "ההסרה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message))? e.message : "ההסרה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setRemovingMemberId(null); }
       }}
     ]);
@@ -167,7 +156,10 @@ export function useHomeSettings(currentHomeId?: string) {
           setLeavingHomeLoading(true);
           await leaveHome(currentHomeId!);
           router.replace("/home/home");
-        } catch (e) { Alert.alert("שגיאה", "העזיבה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "העזיבה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setLeavingHomeLoading(false); }
       }}
     ]);
@@ -181,7 +173,10 @@ export function useHomeSettings(currentHomeId?: string) {
           setDeletingHomeLoading(true);
           await deleteHome(currentHomeId!);
           router.replace("/home/home");
-        } catch (e) { Alert.alert("שגיאה", "המחיקה נכשלה"); }
+        } catch (e) { 
+          const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "המחיקה נכשלה";
+          Alert.alert("שגיאה", message); 
+        }
         finally { setDeletingHomeLoading(false); }
       }}
     ]);

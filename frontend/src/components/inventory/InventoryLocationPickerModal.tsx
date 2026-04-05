@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
 
   sheetHeader: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingBottom: 8,
@@ -76,12 +76,12 @@ const styles = StyleSheet.create({
   sheetRowActive: { backgroundColor: COLORS.BRAND_BLUE_SOFT },
 
   sheetRowRight: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
-  sheetRowLabelWrap: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  sheetRowLabelWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
 
   sheetRowText: { fontSize: 14, color: COLORS.BRAND_TEXT, textAlign: "right" },
   sheetRowTextActive: { fontWeight: "700", color: COLORS.ACCENT },

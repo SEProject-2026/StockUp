@@ -2,14 +2,14 @@ import { useState, useCallback } from "react";
 import { Alert } from "react-native";
 import { location, DraftItem } from "@/src/components/add-item/types";
 import { CatalogItem } from "@/src/api/catalog";
-import { uid } from "../utils/batch-add-utils";
+import { uid } from "../../utils/batch-add-utils";
 
 export function useBatchAddItems(initialLocation: location) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [barcode, setBarcode] = useState("");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [loc, setLoc] = useState<location>(initialLocation);
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
@@ -22,7 +22,7 @@ export function useBatchAddItems(initialLocation: location) {
     setBarcode("");
     setName("");
     setNickname("");
-    setQuantity("");
+    setQuantity("1");
     if (!keepLocation) setLoc(initialLocation);
     setExpiresAt(undefined);
     setSelectedCatalogItem(null);

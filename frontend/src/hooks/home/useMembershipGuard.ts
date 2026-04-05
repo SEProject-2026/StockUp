@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { router } from "expo-router";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
 import { useRealtimeContext } from "@/src/providers/RealtimeProvider";
 
 export function useMembershipGuard(homeId: string | undefined) {
@@ -9,7 +9,6 @@ export function useMembershipGuard(homeId: string | undefined) {
 
   useEffect(() => {
     const checkAccess = async () => {
-      // אם אנחנו עדיין בגרסה הראשונה של המסך או שאין ID - אל תבדוק
       if (homesVersion === initialVersionRef.current || !homeId) return;
 
       try {

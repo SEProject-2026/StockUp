@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from 'expo-notifications';
 import { Session } from "@supabase/supabase-js";
 
-import { supabase } from "@/src/lib/supabase"; 
+import { supabase } from "@/src/config/supabase"; 
 import { InventoryProvider } from "../src/context/inventory-context";
 import { RealtimeProvider } from "../src/providers/RealtimeProvider";
 import { approveJoinRequest, rejectJoinRequest } from "@/src/api/homes";

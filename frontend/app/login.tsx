@@ -17,7 +17,7 @@ import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
 
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from "expo-auth-session";

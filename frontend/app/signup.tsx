@@ -18,7 +18,7 @@ import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
 import { registerBackend } from "@/src/api/auth";
 
 export default function SignupScreen() {

@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   right: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },

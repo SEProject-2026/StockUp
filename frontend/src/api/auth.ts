@@ -1,5 +1,5 @@
 import { authFetch } from "@/src/api/client";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
 import { setSelectedHomeId } from "../utils/selected-home";
 
 export type GeneralResponse<T = any> = {

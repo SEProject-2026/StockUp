@@ -153,7 +153,7 @@ export async function updateItemLocation(
 export async function updateProductNickname(
   homeId: string,
   productId: string,
-  payload: { nickname: string }
+  payload: { nickname?: string | null }
 ) {
   return stockFetch<GeneralResponse<ProductDTO>>(
     homeId,
@@ -190,20 +190,26 @@ export async function searchStock(homeId: string, query: string) {
   );
 }
 
-export async function filterStockByLocation(homeId: string, location: LocationType) {
-  const q = encodeURIComponent(location);
-  return stockFetch<GeneralResponse<ProductDTO[]>>(
-    homeId,
-    `/stock/filter/location?location=${q}`,
-    { method: "GET" }
-  );
-}
+export async function filterStock(homeId: string, query: string | null, location: LocationType | null, expirationType: ExpirationType | null) {
+  const params = new URLSearchParams();
+  
+  if (query && query.trim() !== "") {
+    params.append("query", query);
+  }
+  
+  if (location && location.trim() !== "") {
+    params.append("location", location);
+  }
+  
+  if (expirationType && expirationType.trim() !== "") {
+    params.append("expirationType", expirationType); 
+  }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : "";
 
-export async function filterStockByExpiration(homeId: string, type: ExpirationType) {
-  const q = encodeURIComponent(type);
   return stockFetch<GeneralResponse<ProductDTO[]>>(
     homeId,
-    `/stock/filter/expiration?type=${q}`,
+    `/stock/filter${queryString}`,
     { method: "GET" }
   );
 }

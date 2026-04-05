@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { styles, BRAND } from "./styles";
-import { type ShoppingItem } from "@/src/hooks/useShoppingList";
+import { type ShoppingItem } from "@/src/hooks/shopping/useShoppingList";
 
 type Props = {
   item: ShoppingItem;

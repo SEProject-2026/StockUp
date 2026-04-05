@@ -7,28 +7,29 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
+import { useAuth } from "@/src/context/auth-context";
 import { router } from "expo-router"; 
-import { useAuth } from "@/src/context/auth-context"; // שימוש ב-Hook המרכזי שיצרנו
 
 type RealtimeContextValue = {
   homesVersion: number;
   inventoryVersionByHome: Record<string, number>;
   joinRequestsVersionByHome: Record<string, number>;
+  homeMetaVersionByHome: Record<string, number>;
   bumpInventoryVersion: (homeId: string) => void;
   bumpJoinRequestsVersion: (homeId: string) => void;
+  bumpHomeMetaVersion: (homeId: string) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
-  // שוליפים את ה-session מה-Provider שעוטף אותנו ב-RootLayout
   const { session } = useAuth();
   const userId = session?.user?.id;
-
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
   const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
+  const [homeMetaVersionByHome, setHomeMetaVersionByHome] = useState<Record<string, number>>({});
 
   const channelsRef = useRef<any[]>([]);
 
@@ -62,6 +63,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const bumpHomeMetaVersion = useCallback((homeId: string) => {
+    if (!homeId) return;
+    setHomeMetaVersionByHome((prev) => ({
+      ...prev,
+      [homeId]: (prev[homeId] ?? 0) + 1,
+    }));
+  }, []);
+
   useEffect(() => {
     // אם אין משתמש מחובר, אנחנו לא מנסים להירשם לערוצים
     if (!userId) {
@@ -74,28 +83,47 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const setup = async () => {
       try {
         // 1. User Home Channel
+
+
+
+
+
+
+
+
+
         const userHomeChannel = supabase
           .channel(`rt-user-home-${userId}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "user_home" },
+
+
+
+
             (payload) => {
               console.log("[Realtime] user_home payload:", payload);
               const next = payload.new as { user_id?: string } | null;
               const oldRow = payload.old as { user_id?: string } | null;
+
               const rowUserId = next?.user_id ?? oldRow?.user_id;
 
               if (rowUserId === userId) {
+
                 if (payload.eventType === "DELETE") {
                   console.log("[Realtime] User removed from home, redirecting...");
                   router.replace("/home/home"); 
                   return;
                 }
+
+
                 bumpHomesVersion();
               }
             }
           )
           .subscribe();
+
+
 
         // 2. Products Channel
         const productsChannel = supabase
@@ -103,12 +131,19 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "products" },
+
+
+
+
             (payload) => {
+
+
               const next = payload.new as { home_id?: string } | null;
               const oldRow = payload.old as { home_id?: string } | null;
               const changedHomeId = next?.home_id ?? oldRow?.home_id;
 
               if (payload.eventType === "DELETE" && !changedHomeId) {
+
                 bumpAllInventoryVersions();
               } else if (changedHomeId) {
                 bumpInventoryVersion(changedHomeId);
@@ -117,19 +152,29 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
+
+
         // 3. Product Items Channel
         const productItemsChannel = supabase
           .channel(`rt-product-items-${userId}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "product_items" },
+
+
+
+
             async (payload) => {
+
+
               if (payload.eventType === "DELETE") {
                  bumpAllInventoryVersions();
                  return;
               }
+
               const next = payload.new as { product_id?: string } | null;
               const productId = next?.product_id;
+
               if (!productId) return;
 
               const { data } = await supabase
@@ -138,12 +183,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                 .eq("id", productId)
                 .single();
 
+
               if (data?.home_id) {
                 bumpInventoryVersion(data.home_id);
+
+
+
+
+
+
+
+
+
               }
             }
           )
           .subscribe();
+
+
 
         // 4. Join Requests Channel
         const joinRequestsChannel = supabase
@@ -151,16 +208,25 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "home_join_requests" },
+
+
+
+
             (payload) => {
               const next = payload.new as { home_id?: string } | null;
               const oldRow = payload.old as { home_id?: string } | null;
+
+
               const changedHomeId = next?.home_id ?? oldRow?.home_id;
+
               if (changedHomeId) {
                 bumpJoinRequestsVersion(changedHomeId);
               }
             }
           )
           .subscribe();
+
+
 
         channelsRef.current = [
           userHomeChannel,
@@ -180,20 +246,33 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       console.log("[Realtime] Cleaning up channels for user:", userId);
       channelsRef.current.forEach((channel) => {
         supabase.removeChannel(channel);
+
+
+
+
       });
       channelsRef.current = [];
     };
   }, [userId, bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion, bumpAllInventoryVersions]);
-
   const value = useMemo(
     () => ({
       homesVersion,
       inventoryVersionByHome,
       joinRequestsVersionByHome,
+      homeMetaVersionByHome,
       bumpInventoryVersion,
       bumpJoinRequestsVersion,
+      bumpHomeMetaVersion,
     }),
-    [homesVersion, inventoryVersionByHome, joinRequestsVersionByHome, bumpInventoryVersion, bumpJoinRequestsVersion]
+    [
+      homesVersion,
+      inventoryVersionByHome,
+      joinRequestsVersionByHome,
+      homeMetaVersionByHome,
+      bumpInventoryVersion,
+      bumpJoinRequestsVersion,
+      bumpHomeMetaVersion,
+    ]
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

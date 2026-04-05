@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useRealtimeHomesRefresh } from "@/src/hooks/useRealtimeHomesRefresh";
+import { useRealtimeHomesRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
+import { logout } from "@/src/api/auth";
 
 // UI Components
 import HomeCard from "@/src/components/homes/HomeCard";
@@ -14,8 +15,7 @@ import HomesEmptyState from "@/src/components/home-selector/HomesEmptyState";
 import CreateOrJoinHomeModal from "@/src/components/home-selector/CreateOrJoinHomeModal";
 
 // Logic Hook & Types
-import { useHomes, Home } from "@/src/hooks/useHomes";
-import { logout } from "@/src/api/auth"; // ייבוא פונקציית הלוגאאוט החדשה
+import { useHomes, Home } from "@/src/hooks/home/useHomes";
 
 type GridItem =
   | { kind: "home"; home: Home }
@@ -28,6 +28,7 @@ const MUTED = "#6B7280";
 const DANGER = "#DC2626";
 
 export default function HomesScreen() {
+  // שימוש ב-Hook הלוגי (מכיל את ה-loading, refreshing, saving וכו')
   const { homes, loading, refreshing, saving, loadHomes, handleHomeAction } = useHomes();
   
   const [modalOpen, setModalOpen] = useState(false);
@@ -41,8 +42,9 @@ export default function HomesScreen() {
   }, [loadHomes]);
 
   useRealtimeHomesRefresh(loadHomes);
-
+  // ארגון נתוני הגריד (כולל ה-Spacer לאיזון עמודות)
   const gridData = useMemo(() => {
+    // מיון אלפביתי כפי שהופיע ב-Main
     const sorted = [...homes].sort((a, b) => a.name.localeCompare(b.name, "he"));
     
     const data: GridItem[] = [
@@ -56,8 +58,11 @@ export default function HomesScreen() {
     return data;
   }, [homes]);
 
+  // שליחת טופס (יצירה או הצטרפות)
   const onActionSubmit = async () => {
     const value = modalMode === "create" ? newName : joinCode;
+    
+    // במידה וזה הצטרפות, ב-Main הופיע Alert הצלחה ספציפי
     const homeId = await handleHomeAction(modalMode, value);
     
     if (homeId) {
@@ -73,12 +78,11 @@ export default function HomesScreen() {
     }
   };
 
-  // --- תיקון לוגיקת ההתנתקות ---
+  // פונקציית התנתקות (מה-Main)
   const performLogout = useCallback(async () => {
     try {
       setLoggingOut(true);
-      await logout(); // קריאה לפונקציה המרכזית שמנקה את סופבייס ואת הבית הנבחר
-      // אין צורך ב-router.replace כי ה-AuthGuard ב-RootLayout יזהה שהסשן נגמר ויעביר אותנו לבד
+      await logout();
     } catch (e) {
       Alert.alert("שגיאה", "לא הצלחתי להתנתק כרגע.");
     } finally {
@@ -124,6 +128,7 @@ export default function HomesScreen() {
       <HomesHeader title="הבתים שלי" />
 
       <View style={styles.body}>
+        {/* כפתור התנתקות */}
         <View style={styles.headerActionsRow}>
           <TouchableOpacity
             onPress={onLogoutPress}
@@ -202,7 +207,7 @@ export default function HomesScreen() {
         primaryDisabled={
           modalMode === "create" 
             ? newName.trim().length < 2 
-            : joinCode.trim().length < 8
+            : joinCode.trim().length < 8 // שינוי ל-8 תווים כפי שמוגדר ב-Main
         }
       />
     </SafeAreaView>

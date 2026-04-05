@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../config/supabase';
 import { Session } from '@supabase/supabase-js';
 
 const AuthContext = createContext<{ session: Session | null; loading: boolean }>({

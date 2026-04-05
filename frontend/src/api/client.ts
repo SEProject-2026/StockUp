@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "@/src/config/api";
 import { getSelectedHomeId } from "../utils/selected-home";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../config/supabase";
 
 type FastApiDetailItem = {
   loc?: (string | number)[];

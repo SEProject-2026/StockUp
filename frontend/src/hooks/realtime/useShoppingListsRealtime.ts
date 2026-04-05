@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/src/config/supabase";
 
 export function useShoppingListsRealtime(
   homeId: string | undefined,
@@ -8,13 +8,12 @@ export function useShoppingListsRealtime(
   useEffect(() => {
     if (!homeId) return;
 
-    // הגדרת ערוץ האזנה לשינויים בטבלת shopping_lists
     const channel = supabase
       .channel(`public:shopping_lists:home_id=${homeId}`)
       .on(
         "postgres_changes",
         {
-          event: "*", // מאזין להכל: INSERT, UPDATE, DELETE
+          event: "*", 
           schema: "public",
           table: "shopping_lists",
           filter: `home_id=eq.${homeId}`,
