@@ -34,6 +34,7 @@ Group tests within classes named after the feature or method being validated. Th
 class TestStockService:
     async def test_add_product_success(self, stock_service, auth_setup, ...):
         # Use auth_setup for a pre-linked home and user
+```
 
 ### Development Guidelines
 1.  **Flush, don't Commit**: In integration tests, use `db_session.flush()`. This makes data visible to the API while allowing the global rollback/truncate mechanism to handle cleanup.
