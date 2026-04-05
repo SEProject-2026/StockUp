@@ -214,24 +214,6 @@ export async function filterStock(homeId: string, query: string | null, location
   );
 }
 
-// export async function filterStockByLocation(homeId: string, location: LocationType) {
-//   const q = encodeURIComponent(location);
-//   return stockFetch<GeneralResponse<ProductDTO[]>>(
-//     homeId,
-//     `/stock/filter/location?location=${q}`,
-//     { method: "GET" }
-//   );
-// }
-
-// export async function filterStockByExpiration(homeId: string, type: ExpirationType) {
-//   const q = encodeURIComponent(type);
-//   return stockFetch<GeneralResponse<ProductDTO[]>>(
-//     homeId,
-//     `/stock/filter/expiration?type=${q}`,
-//     { method: "GET" }
-//   );
-// }
-
 // ----------------------
 // Receipt scan (FIXED: infer type/name from URI when null)
 // ----------------------
