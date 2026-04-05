@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useRealtimeHomesRefresh } from "@/src/hooks/useRealtimeHomesRefresh";
+import { useRealtimeHomesRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // UI Components
@@ -15,7 +15,7 @@ import HomesEmptyState from "@/src/components/home-selector/HomesEmptyState";
 import CreateOrJoinHomeModal from "@/src/components/home-selector/CreateOrJoinHomeModal";
 
 // Logic Hook & Types
-import { useHomes, Home } from "@/src/hooks/useHomes";
+import { useHomes, Home } from "@/src/hooks/home/useHomes";
 
 type GridItem =
   | { kind: "home"; home: Home }

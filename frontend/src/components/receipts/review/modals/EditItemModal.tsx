@@ -91,7 +91,8 @@ export default function EditItemModal(props: {
 }) {
   const { item, onClose, onSave, onDelete } = props;
 
-  const [name, setName] = useState("");
+  const [originalName, setOriginalName] = useState("");
+  const [nickname, setNickname] = useState(""); // שדה הכינוי החדש
   const [quantity, setQuantity] = useState("1");
   const [unitText, setUnitText] = useState("UNIT");
   const [location, setLocation] = useState<LocationKey>("other");
@@ -102,7 +103,8 @@ export default function EditItemModal(props: {
   useEffect(() => {
     if (!item) return;
 
-    setName(item.name ?? "");
+    setOriginalName(item.name ?? "");
+    setNickname(item.nickname ?? ""); // טעינת כינוי קיים אם יש
     setLocation(item.location ?? "other");
 
     if (hasWeightFn(item)) {
@@ -137,13 +139,9 @@ export default function EditItemModal(props: {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={closeModal}>
-      {/* לחיצה מחוץ לכרטיס => סגירת מודל */}
       <Pressable style={styles.modalOverlay} onPress={closeModal}>
-        {/* מונעים סגירת מודל בלחיצה בתוך הכרטיס */}
         <Pressable style={styles.modalCard} onPress={() => {}}>
-          {/* לחיצה על שטח ריק בתוך הכרטיס => סגירת מקלדת */}
           <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            {/* ScrollView כדי שלא “ייחסם” אזור ריק, וגם עוזר אם הכפתור מוסתר */}
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -152,16 +150,27 @@ export default function EditItemModal(props: {
               <View style={styles.modalHeaderRow}>
                 <View style={styles.modalTitleWrap}>
                   <Text style={styles.modalTitle}>עריכת מוצר</Text>
-                  <Text style={styles.modalSubtitle}>
-                    {hasWeight ? "עדכן שם / יחידות / מיקום" : "עדכן שם / כמות / יחידה / מיקום"}
-                  </Text>
+                  <Text style={styles.modalSubtitle}>עדכן כינוי, כמות ומיקום</Text>
                 </View>
                 <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
                   <Ionicons name="close" size={18} color={BRAND.TEXT} />
                 </Pressable>
               </View>
 
-              <Field label="שם מוצר" value={name} onChangeText={setName} placeholder="למשל: ביצים L" />
+              {/* שם מוצר מקורי - נעול לעריכה */}
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.fieldLabel}>שם מוצר (לא ניתן לשינוי)</Text>
+                <View style={styles.readOnlyNameField}>
+                   <Text style={styles.readOnlyNameText}>{originalName}</Text>
+                </View>
+              </View>
+
+              {/* שדה כינוי חדש */}
+              <Field 
+                label="כינוי למוצר" 
+                value={nickname} 
+                onChangeText={setNickname} 
+              />
 
               {hasWeight ? (
                 <>
@@ -235,11 +244,13 @@ export default function EditItemModal(props: {
                   onPress={() => {
                     Keyboard.dismiss();
 
-                    const nameOk = name.trim();
-                    if (!nameOk) {
-                      Alert.alert("שגיאה", "ודאי שהשם לא ריק.");
-                      return;
-                    }
+                    // אובייקט בסיס לעדכון
+                    const baseUpdate = {
+                      ...item,
+                      name: originalName, // השם המקורי נשאר כפי שהוא
+                      nickname: nickname.trim(), // הכינוי החדש
+                      location,
+                    };
 
                     if (hasWeight) {
                       const u = Number(String(unitsCount).replace(",", "."));
@@ -249,9 +260,7 @@ export default function EditItemModal(props: {
                       }
 
                       onSave({
-                        ...item,
-                        name: nameOk,
-                        location,
+                        ...baseUpdate,
                         units_count: Math.round(u),
                         quantity: Math.round(u),
                         unit: UnitType.KG,
@@ -268,11 +277,9 @@ export default function EditItemModal(props: {
                     const normalizedUnit = normalizeUnitType(unitText);
 
                     onSave({
-                      ...item,
-                      name: nameOk,
+                      ...baseUpdate,
                       quantity: Math.round(q),
                       unit: normalizedUnit,
-                      location,
                     });
                   }}
                   leftIcon={<Ionicons name="save-outline" size={18} color={BRAND.TEXT} />}
@@ -289,7 +296,6 @@ export default function EditItemModal(props: {
 const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 16 },
 
-  // טיפ קטן: אם יש מצב שהמקלדת מסתירה תחתית, maxHeight יעזור ל-scroll
   modalCard: {
     backgroundColor: BRAND.CARD,
     borderRadius: 22,
@@ -327,6 +333,24 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: BRAND.TEXT,
+  },
+
+  // סגנון חדש לשדה השם הנעול
+  readOnlyNameField: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: BRAND.BORDER,
+    backgroundColor: "#F3F4F6", // צבע רקע אפור יותר
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    opacity: 0.8,
+  },
+  readOnlyNameText: {
+    fontSize: 14,
+    color: BRAND.MUTED,
+    textAlign: "right",
+    fontWeight: "600",
   },
 
   readOnlyRow: {

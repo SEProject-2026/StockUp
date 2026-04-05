@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Alert } from "react-native";
-import { LOCATIONS, locationLabel } from "@/src/hooks/useBaseMode";
 import {
   getShoppingList,
   addItemToShoppingList,
@@ -8,17 +7,15 @@ import {
   checkShoppingListItemAsBought,
   enterShoppingMode as enterShoppingModeApi,
   exitShoppingMode as exitShoppingModeApi,
-  type ShoppingListDTO,
-  type LocationType,
   deleteShoppingListItem,
+  getRecommendations,
+  type ShoppingListDTO,
+  type RecommendationDTO,
+  type LocationType,
 } from "@/src/api/shoppingLists";
+import { supabase } from "@/src/config/supabase";
 
-export type LocationKey =
-  | "FRIDGE"
-  | "FREEZER"
-  | "PANTRY"
-  | "CLEANING"
-  | "OTHER";
+export type LocationKey = string;
 
 export type ShoppingItem = {
   id: string;
@@ -33,6 +30,7 @@ export type SuggestionItem = {
   id: string;
   name: string;
   reason?: string;
+  type?: 'staple' | 'pairing';
 };
 
 type UseShoppingListParams = {
@@ -41,16 +39,7 @@ type UseShoppingListParams = {
 };
 
 function normalizeLocation(value?: string | null): LocationKey {
-  switch (value) {
-    case "FRIDGE":
-    case "FREEZER":
-    case "PANTRY":
-    case "CLEANING":
-    case "OTHER":
-      return value;
-    default:
-      return "OTHER";
-  }
+  return value || "OTHER";
 }
 
 function mapDtoToItems(dto: ShoppingListDTO): ShoppingItem[] {
@@ -64,40 +53,17 @@ function mapDtoToItems(dto: ShoppingListDTO): ShoppingItem[] {
   }));
 }
 
-export function useShoppingSections(filteredItems: any[]) {
-  const groupedSections = useMemo(() => {
-    const groups = new Map<string, any[]>();
-
-    for (const item of filteredItems) {
-      const loc = item?.location || "UNSORTED";
-      if (!groups.has(loc)) groups.set(loc, []);
-      groups.get(loc)!.push(item);
-    }
-
-    const orderedKnown = LOCATIONS.filter((loc) => groups.has(loc)).map((loc) => ({
-      location: loc,
-      title: locationLabel(loc as any),
-      items: groups.get(loc) || [],
-    }));
-
-    const unsorted = groups.has("UNSORTED")
-      ? [{ location: "UNSORTED", title: "ללא מיקום", items: groups.get("UNSORTED") }]
-      : [];
-
-    return [...orderedKnown, ...unsorted];
-  }, [filteredItems]);
-
-  return groupedSections;
-}
-
 export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   const [mode, setMode] = useState<"EDIT" | "SHOPPING">("EDIT");
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
+  const [suggestionsModalOpen, setSuggestionsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [modeSubmitting, setModeSubmitting] = useState(false);
+  const [dismissedBarcodes, setDismissedBarcodes] = useState<Set<string>>(new Set());
+  const [isDeleted, setIsDeleted] = useState(false);
 
   const syncFromDto = useCallback((dto: ShoppingListDTO) => {
     const mappedItems = mapDtoToItems(dto);
@@ -127,6 +93,22 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       syncFromDto(dto);
 
       setSuggestions([]);
+      
+      try {
+        console.log(`[useShoppingList] Fetching recommendations for list ${listId}...`);
+        const recs = await getRecommendations(listId);
+        console.log(`[useShoppingList] Received ${recs.length} recommendations:`, recs);
+        const mappedSuggestions = recs.map(r => ({ 
+          id: r.barcode, 
+          name: r.name, 
+          reason: r.reason,
+          type: r.type 
+        }));
+        setSuggestions(mappedSuggestions);
+      } catch (e) {
+        console.warn("[useShoppingList] Failed to fetch recommendations", e);
+      }
+
     } catch (e) {
       const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי לטעון את הרשימה";
 
@@ -142,6 +124,31 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!listId) return;
+
+    const channel = supabase
+      .channel(`shopping_list_detail:${listId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "shopping_lists",
+          filter: `id=eq.${listId}`,
+        },
+        () => {
+          console.log(`[Realtime] Shopping list ${listId} deleted`);
+          setIsDeleted(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [listId]);
 
   const existingNamesSet = useMemo(() => {
     return new Set(items.map((it) => it.name.trim().toLowerCase()));
@@ -176,6 +183,22 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
         });
 
         syncFromDto(dto);
+        
+        // After adding an item, update recommendations
+        try {
+          console.log(`[useShoppingList] Updating recommendations after item addition...`);
+          const recs = await getRecommendations(listId);
+          console.log(`[useShoppingList] New recommendations:`, recs);
+          const mappedSuggestions = recs.map(r => ({ 
+            id: r.barcode, 
+            name: r.name, 
+            reason: r.reason,
+            type: r.type 
+          }));
+          setSuggestions(mappedSuggestions);
+        } catch (e) {
+          console.warn("[useShoppingList] Failed to update recommendations", e);
+        }
       } catch (e) {
           const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי להוסיף את המוצר";
         Alert.alert(
@@ -195,8 +218,21 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       try {
         const dto = await deleteShoppingListItem(listId, current.name);
         syncFromDto(dto);
+
+        // SYNC: Update recommendations after an item is removed
+        try {
+          const recs = await getRecommendations(listId);
+          const mappedSuggestions = recs.map(r => ({ 
+            id: r.barcode, 
+            name: r.name, 
+            reason: r.reason,
+            type: r.type
+          }));
+          setSuggestions(mappedSuggestions);
+        } catch (e) {
+          console.warn("[useShoppingList] Failed to update recommendations on item removal", e);
+        }
       } catch (e) {
-        console.error("Full Error Object:", e); // זה ידפיס ללוג של ה-VSCode/Terminal
         const message = (e instanceof Error && /[\u0590-\u05FF]/.test(e.message)) ? e.message : "לא הצלחתי למחוק את הפריט";
         Alert.alert("שגיאה", message);
         
@@ -283,6 +319,18 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
     [listId, syncFromDto]
   );
 
+  const dismissSuggestion = useCallback((barcode: string) => {
+    setDismissedBarcodes(prev => {
+      const next = new Set(prev);
+      next.add(barcode);
+      return next;
+    });
+  }, []);
+
+  const visibleSuggestions = useMemo(() => {
+    return suggestions.filter(s => !dismissedBarcodes.has(s.id));
+  }, [suggestions, dismissedBarcodes]);
+
   return {
     mode,
     setMode,
@@ -299,5 +347,10 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
     updateQuantity,
     enterShoppingMode,
     modeSubmitting,
+    suggestions: visibleSuggestions,
+    dismissSuggestion,
+    suggestionsModalOpen,
+    setSuggestionsModalOpen,
+    isDeleted,
   };
 }
