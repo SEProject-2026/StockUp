@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.infrastructure.db.database import get_db
 from src.services.shopping_list_service import ShoppingListService
+from src.services.recommendation_service import RecommendationService
 from src.api.schemas.shopping_schemas import (
     ShoppingListDTO, 
     CreateShoppingListRequest, 
@@ -26,7 +27,11 @@ router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 def get_shopping_list_service(db: Session = Depends(get_db)) -> ShoppingListService:
     return AppContainer.get_shopping_list_service(db)
 
+def get_recommendation_service(db: Session = Depends(get_db)) -> RecommendationService:
+    return AppContainer.get_recommendation_service(db)
+
 ShoppingServiceDep = Annotated[ShoppingListService, Depends(get_shopping_list_service)]
+RecommendationServiceDep = Annotated[RecommendationService, Depends(get_recommendation_service)]
 
 # --- Routes Implementation ---
 
@@ -94,6 +99,28 @@ async def add_item(
             list_id, request.item_name, request.quantity, request.location
         )
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
+    except ValueError as e:
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)
+
+@router.get("/{list_id}/recommendations", response_model=GeneralResponse)
+async def get_recommendations(
+    list_id: UUID,
+    shopping_service: ShoppingServiceDep,
+    recommendation_service: RecommendationServiceDep,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    app_logger.info(f"User {user_id} requesting recommendations for list {list_id}")
+    try:
+        shopping_list = await shopping_service.get_shopping_list(list_id)
+        current_items = [item.item_name for item in shopping_list.items] if shopping_list.items else []
+        
+        recommendations = await recommendation_service.get_recommendations(
+            home_id=shopping_list.home_id,
+            current_shopping_list_items=current_items,
+            max_results=10
+        )
+        return GeneralResponse(status="success", data=recommendations)
     except ValueError as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)

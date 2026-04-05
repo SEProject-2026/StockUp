@@ -9,6 +9,8 @@ from src.services.shopping_list_service import ShoppingListService
 from src.services.user_service import UserService
 from src.services.stock_service import StockService
 from src.services.management_service import ManagementService
+from src.services.recommendation_service import RecommendationService
+from src.domain.recommendation.engine import RecommendationEngine
 
 # --- Auth ---
 from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
@@ -17,11 +19,13 @@ from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 from src.infrastructure.repositories.db_user_repository import DbUserRepository
 from src.infrastructure.repositories.db_home_repository import DbHomeRepository
 from src.infrastructure.repositories.db_product_repository import DbProductRepository
+from src.infrastructure.repositories.db_receipt_repository import DbReceiptRepository
 
 # --- Repositories (In-Memory for Tests) ---
 from src.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
+from src.infrastructure.repositories.in_memory_receipt_repository import InMemoryReceiptRepository
 
 # --- Catalog ---
 from src.infrastructure.repositories.csv_catalog_provider import CsvCatalogProvider
@@ -40,6 +44,7 @@ class AppContainer:
     _auth_provider_instance = None
     _catalog_provider_instance = None
     _shopping_list_service_instance = None
+    _recommendation_service_instance = None
 
     @staticmethod
     def get_auth_provider():
@@ -105,7 +110,8 @@ class AppContainer:
                 home_repository=DbHomeRepository(db),
                 product_repository=DbProductRepository(db),
                 catalog_provider=catalog,
-                user_repository=DbUserRepository(db)
+                user_repository=DbUserRepository(db),
+                receipt_repository=DbReceiptRepository(db)
             )
 
         # Testing (In-Memory)
@@ -114,7 +120,8 @@ class AppContainer:
                 home_repository=InMemoryHomeRepository(),
                 product_repository=InMemoryProductRepository(),
                 catalog_provider=catalog,
-                user_repository=InMemoryUserRepository()
+                user_repository=InMemoryUserRepository(),
+                receipt_repository=InMemoryReceiptRepository()
             )
         
         return AppContainer._stock_service_instance
@@ -147,3 +154,28 @@ class AppContainer:
             )
             
         return AppContainer._shopping_list_service_instance
+
+    @staticmethod
+    def get_recommendation_engine(db: Optional[Session] = None):
+        if db:
+            return RecommendationEngine(
+                product_repository=DbProductRepository(db),
+                receipt_repository=DbReceiptRepository(db)
+            )
+        return RecommendationEngine(
+            product_repository=InMemoryProductRepository(),
+            receipt_repository=InMemoryReceiptRepository()
+        )
+
+    @staticmethod
+    def get_recommendation_service(db: Optional[Session] = None):
+        engine = AppContainer.get_recommendation_engine(db)
+        # Production (DB)
+        if db:
+            return RecommendationService(engine=engine)
+        
+        # Testing (In-Memory)
+        if AppContainer._recommendation_service_instance is None:
+            AppContainer._recommendation_service_instance = RecommendationService(engine=engine)
+            
+        return AppContainer._recommendation_service_instance

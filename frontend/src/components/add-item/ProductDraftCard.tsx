@@ -147,7 +147,7 @@ export default function ProductDraftCard(props: {
                 {formatDateLabel(props.expiresAt)}
               </Text>
 
-              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 {!!props.expiresAt && (
                   <TouchableOpacity onPress={props.onClearDate} activeOpacity={0.85} style={styles.clearBtn}>
                     <Ionicons name="close" size={14} color={BRAND_MUTED} />
@@ -210,13 +210,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   topRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
   chip: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingVertical: 8,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: "800", color: BRAND_TEXT },
 
   iconChip: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingVertical: 8,
@@ -256,12 +256,12 @@ const styles = StyleSheet.create({
     color: BRAND_TEXT,
   },
 
-  inputRow: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
+  inputRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   loaderWrap: { width: 26, alignItems: "center", justifyContent: "center" },
 
   chipRow: { marginTop: 8, alignItems: "flex-end" },
   selectedChipBox: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingVertical: 8,
@@ -284,10 +284,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  row2: { flexDirection: "row-reverse", alignItems: "flex-start" },
+  row2: { flexDirection: "row", alignItems: "flex-start" },
 
   dateInput: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
@@ -314,6 +314,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  cancelRow: { flexDirection: "row-reverse", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 6 },
+  cancelRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 6 },
   cancelText: { fontSize: 12, color: BRAND_MUTED, fontWeight: "700" },
 });

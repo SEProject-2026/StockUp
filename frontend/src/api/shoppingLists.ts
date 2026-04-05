@@ -6,14 +6,7 @@ export type GeneralResponse<T = unknown> = {
   data?: T;
 };
 
-export type LocationType =
-  | "FRIDGE"
-  | "FREEZER"
-  | "PANTRY"
-  | "CLEANING"
-  | "BATHROOM"
-  | "LAUNDRY"
-  | "OTHER";
+export type LocationType = string;
 
 export type ShoppingListItemDTO = {
   item_name: string;
@@ -29,6 +22,12 @@ export type ShoppingListDTO = {
   is_active_shopping_mode: boolean;
   items: ShoppingListItemDTO[];
   updated_at: string;
+};
+export type RecommendationDTO = {
+  barcode: string;
+  name: string;
+  reason: string;
+  type: 'staple' | 'pairing';
 };
 
 export type CreateShoppingListRequest = {
@@ -187,4 +186,17 @@ export async function deleteShoppingList(listId: string): Promise<void> {
   await authFetch<void>(`${BASE}/${listId}`, {
     method: "DELETE",
   });
+}
+
+export async function getRecommendations(
+  listId: string
+): Promise<RecommendationDTO[]> {
+  const response = await authFetch<GeneralResponse<RecommendationDTO[]>>(
+    `${BASE}/${listId}/recommendations`,
+    {
+      method: "GET",
+    }
+  );
+
+  return unwrapResponse(response);
 }

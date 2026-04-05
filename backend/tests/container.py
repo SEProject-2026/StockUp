@@ -12,12 +12,14 @@ from src.infrastructure.repositories.in_memory_user_repository import InMemoryUs
 from src.infrastructure.repositories.in_memory_product_repository import InMemoryProductRepository
 from src.infrastructure.repositories.in_memory_home_repository import InMemoryHomeRepository
 from src.infrastructure.repositories.in_memory_shopping_list_repository import InMemoryShoppingListRepository
+from src.infrastructure.repositories.in_memory_receipt_repository import InMemoryReceiptRepository
 
 # DB Repos
 from src.infrastructure.repositories.db_user_repository import DbUserRepository
 from src.infrastructure.repositories.db_product_repository import DbProductRepository
 from src.infrastructure.repositories.db_home_repository import DbHomeRepository
 from src.infrastructure.repositories.db_shopping_list_repository import DbShoppingListRepository
+from src.infrastructure.repositories.db_receipt_repository import DbReceiptRepository
 
 # Services & Auth
 from src.services.user_service import UserService
@@ -60,7 +62,7 @@ class TestingContainer:
     def _configure_services_and_overrides(self):
         """Reloads services with current repositories."""
         self.user_service = UserService(user_repo=self.user_repo, auth_provider=self.auth_provider)
-        self.stock_service = StockService(home_repository=self.home_repo, product_repository=self.stock_repo, catalog_provider=self.catalog_provider, user_repository=self.user_repo)
+        self.stock_service = StockService(home_repository=self.home_repo, product_repository=self.stock_repo, catalog_provider=self.catalog_provider, user_repository=self.user_repo, receipt_repository=self.receipt_repo)
         self.management_service = ManagementService(home_repository=self.home_repo,user_repository=self.user_repo)
         self.shopping_list_service = ShoppingListService(shopping_repo=self.shopping_list_repo)
 
@@ -87,6 +89,7 @@ class TestingContainer:
         self.stock_repo = InMemoryProductRepository()
         self.home_repo = InMemoryHomeRepository()
         self.shopping_list_repo = InMemoryShoppingListRepository()
+        self.receipt_repo = InMemoryReceiptRepository()
         
         app.dependency_overrides[get_db] = lambda: None
         self._configure_services_and_overrides()
@@ -110,6 +113,7 @@ class TestingContainer:
         self.stock_repo = DbProductRepository(self.db_session)
         self.home_repo = DbHomeRepository(self.db_session)
         self.shopping_list_repo = DbShoppingListRepository(self.db_session)
+        self.receipt_repo = DbReceiptRepository(self.db_session)
 
         app.dependency_overrides[get_db] = lambda: self.db_session
         self._configure_services_and_overrides()
@@ -157,6 +161,7 @@ class TestingContainer:
             self.stock_repo = DbProductRepository(self.db_session)
             self.home_repo = DbHomeRepository(self.db_session)
             self.shopping_list_repo = DbShoppingListRepository(self.db_session)
+            self.receipt_repo = DbReceiptRepository(self.db_session)
             # 6. Update FastAPI Override and Services
             app.dependency_overrides[get_db] = lambda: self.db_session
             self._configure_services_and_overrides()
