@@ -14,7 +14,6 @@ from src.services.recommendation_service import RecommendationService
 from src.domain.recommendation.engine import RecommendationEngine
 
 # --- Auth ---
-from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
 from src.infrastructure.auth.supabase_auth_provider import SupabaseAuthProvider
 
 # --- Repositories (DB Implementation) ---
