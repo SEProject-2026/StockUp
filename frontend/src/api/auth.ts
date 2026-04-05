@@ -1,4 +1,4 @@
-import { authFetch } from "@/src/api/client";
+import { authFetch, apiFetch} from "@/src/api/client";
 import { supabase } from "@/src/config/supabase";
 import { setSelectedHomeId } from "../utils/selected-home";
 
@@ -19,10 +19,25 @@ export type RegisterRequest = {
   name: string;
 };
 
-export async function registerBackend(payload: RegisterRequest) {
-  return authFetch<GeneralResponse<UserDTO>>("/auth/register", {
+export async function registerBackend(
+  userData: { user_id: string; email: string; name: string }, 
+  manualToken?: string // הסימן ? הופך אותו לאופציונלי
+) {
+  // אם קיבלנו טוקן ידנית, נשתמש ב-apiFetch רגיל ונזריק את הטוקן ל-Headers
+  if (manualToken) {
+    return apiFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(userData),
+      headers: {
+        Authorization: `Bearer ${manualToken}`,
+      },
+    });
+  }
+
+  // ברירת מחדל: שימוש ב-authFetch שמושך את הטוקן מהסשן הגלובלי
+  return authFetch("/auth/register", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(userData),
   });
 }
 

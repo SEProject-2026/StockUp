@@ -118,7 +118,6 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
 
 export async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  // 2. במקום getAccessToken הישן, אנחנו מושכים את הסשן מסופבייס
   const [sessionRes, homeId] = await Promise.all([
     supabase.auth.getSession(),
     getSelectedHomeId()
@@ -126,12 +125,18 @@ export async function authFetch<T>(path: string, options: RequestInit = {}): Pro
 
   const token = sessionRes.data.session?.access_token;
 
+  // תיקון: אם אין טוקן, אל תנסה אפילו לפנות לשרת
+  if (!token) {
+    console.warn(`[authFetch] No session found for ${path}. Redirecting or throwing...`);
+    // כאן את יכולה להחליט: או לזרוק שגיאה שקטה או שגיאה שתקפיץ לוגין
+    throw new Error("נא להתחבר מחדש כדי להמשיך"); 
+  }
+
   return apiFetch<T>(path, {
     ...options,
     headers: {
       ...(options.headers ?? {}),
-      // הטוקן עכשיו מגיע ישירות מהסשן המנוהל של סופבייס
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token}`, // עכשיו אנחנו בטוחים שיש טוקן
       ...(homeId ? { "X-Home-ID": homeId } : {}),
     },
   });

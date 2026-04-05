@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
 import { supabase } from "@/src/config/supabase";
+import { registerBackend } from "@/src/api/auth";
 
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from "expo-auth-session";
@@ -54,36 +55,53 @@ export default function LoginScreen() {
     }
   }
 
-  // --- GOOGLE ---
   async function onGoogleLogin() {
     try {
       setGoogleLoading(true);
-      
-      const redirectTo = makeRedirectUri({
-        scheme: "stockup", 
-        path: "auth",
-      });
-
+      const redirectTo = makeRedirectUri({ scheme: "stockup", path: "auth" });
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true, 
-        },
+        options: { redirectTo, skipBrowserRedirect: true },
       });
 
       if (error) throw error;
 
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        
-        if (result.type === 'success') {
-          registerForPushNotificationsAsync().catch(console.error);
-          router.replace("/home/home");
+        if (result.type === 'success' && result.url) {
+          const urlParts = result.url.split('#');
+          const hash = urlParts.length > 1 ? urlParts[1] : '';
+          const params: Record<string, string> = {};
+          hash.split('&').forEach(part => {
+            const [key, value] = part.split('=');
+            if (key && value) params[key] = value;
+          });
+
+          const accessToken = params["access_token"];
+          const refreshToken = params["refresh_token"];
+
+          if (accessToken && refreshToken) {
+            const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) throw sessionError;
+            if (session) {
+              try {
+                await registerBackend({
+                  user_id: session.user.id,
+                  email: session.user.email || "",
+                  name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "משתמש גוגל",
+                }, accessToken); 
+              } catch (backendErr) {}
+              registerForPushNotificationsAsync().catch(console.error);
+              router.replace("/home/home");
+            }
+          }
         }
       }
     } catch (e: any) {
-      console.error(e);
       Alert.alert("שגיאה", "ההתחברות עם גוגל נכשלה");
     } finally {
       setGoogleLoading(false);
@@ -95,15 +113,12 @@ export default function LoginScreen() {
       Alert.alert("שגיאה", "אנא הזן/י אימייל כדי לקבל קישור לאיפוס");
       return;
     }
-
     try {
       setLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'stockup://reset-password', // הכתובת שהאפליקציה תפתח
+        redirectTo: 'stockup://reset-password',
       });
-
       if (error) throw error;
-
       Alert.alert("נשלח!", "בדוק/י את תיבת המייל שלך (כולל ספאם)");
     } catch (e: any) {
       Alert.alert("שגיאה", "לא הצלחנו לשלוח מייל איפוס");
@@ -111,21 +126,13 @@ export default function LoginScreen() {
       setLoading(false);
     }
   }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <LinearGradient
-        colors={["#E5F3FF", "#F9FAFB"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.gradient}
-      />
-
+      <LinearGradient colors={["#E5F3FF", "#F9FAFB"]} style={styles.gradient} />
       <ScreenHeader title="התחברות" />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView style={styles.content}>
           <View style={styles.hero}>
             <View style={styles.iconCircle}>
@@ -135,7 +142,6 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.card}>
-            {/* שדות אימייל וסיסמה כרגיל */}
             <Text style={styles.label}>אימייל</Text>
             <View style={styles.inputWrap}>
               <Ionicons name="mail-outline" size={18} color="#6B7280" />
@@ -167,34 +173,12 @@ export default function LoginScreen() {
               />
               <Ionicons name="key-outline" size={18} color="#6B7280" />
             </View>
-            {/* החליפי את הכפתור הזמני שלך בזה: */}
-            <TouchableOpacity 
-              style={{ 
-                padding: 10, 
-                backgroundColor: '#FFEDD5', 
-                borderRadius: 8, 
-                marginTop: 10,
-                alignItems: 'center' 
-              }}
-              onPress={() => {
-                router.replace("/reset-password");
-              }}
-            >
-              <Text style={{ color: '#9A3412', fontWeight: 'bold' }}>🔨 בדיקת מסך איפוס (לחצי כאן)</Text>
-            </TouchableOpacity>
-            {/* <TouchableOpacity
-              onPress={onForgotPassword}
-              style={styles.forgotRow}
-              disabled={loading}
-            >
-              {loading && !password ? ( // אינדיקציה קטנה אם זה טוען רק את המייל
-                <ActivityIndicator size="small" color="#0284C7" />
-              ) : (
-                <Text style={styles.forgotText}>שכחת סיסמה?</Text>
-              )}            
-            </TouchableOpacity> */}
 
-            {/* כפתור התחברות רגיל */}
+            {/* כפתור שכחתי סיסמה */}
+            <TouchableOpacity onPress={onForgotPassword} style={styles.forgotBtn} disabled={loading}>
+              <Text style={styles.forgotText}>שכחת סיסמה?</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={onLogin}
               disabled={!canSubmit || loading}
@@ -214,12 +198,7 @@ export default function LoginScreen() {
               <View style={styles.divider} />
             </View>
 
-            {/* כפתור גוגל החדש */}
-            <TouchableOpacity
-              onPress={onGoogleLogin}
-              disabled={googleLoading}
-              style={styles.googleBtn}
-            >
+            <TouchableOpacity onPress={onGoogleLogin} disabled={googleLoading} style={styles.googleBtn}>
               {googleLoading ? <ActivityIndicator size="small" color="#111827" /> : (
                 <>
                   <FontAwesome name="google" size={18} color="#EA4335" />
@@ -228,10 +207,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => router.push("./signup")}
-              style={[styles.secondaryBtn, { marginTop: 16 }]}
-            >
+            <TouchableOpacity onPress={() => router.push("./signup")} style={[styles.secondaryBtn, { marginTop: 16 }]}>
               <Text style={styles.secondaryBtnText}>אין לך חשבון? הרשמה</Text>
             </TouchableOpacity>
           </View>
@@ -253,7 +229,7 @@ const styles = StyleSheet.create({
   inputWrap: { marginTop: 8, borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB", borderRadius: 14, paddingHorizontal: 12, height: 46, flexDirection: "row", alignItems: "center", gap: 10 },
   input: { flex: 1, fontSize: 14, color: "#111827" },
   eyeBtn: { padding: 4 },
-  forgotRow: { marginTop: 10, alignSelf: "flex-start" },
+  forgotBtn: { marginTop: 10, alignSelf: "flex-start" },
   forgotText: { fontSize: 12, color: "#0284C7", fontWeight: "600" },
   primaryBtn: { marginTop: 14, height: 46, borderRadius: 999, backgroundColor: "#0284C7", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   primaryBtnDisabled: { opacity: 0.5 },
@@ -263,21 +239,6 @@ const styles = StyleSheet.create({
   dividerText: { fontSize: 12, color: "#6B7280" },
   secondaryBtn: { height: 44, borderRadius: 999, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
   secondaryBtnText: { color: "#1D4ED8", fontSize: 13, fontWeight: "800" },
-
-  googleBtn: {
-    height: 46,
-    borderRadius: 999,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    elevation: 1,
-  },
+  googleBtn: { height: 46, borderRadius: 999, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   googleBtnText: { color: "#111827", fontSize: 14, fontWeight: "700" },
 });

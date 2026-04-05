@@ -5,7 +5,7 @@ from src.infrastructure.db import models
 from src.infrastructure.db.database import engine
 from src.timed_alert_jobs import lifespan
 
-#models.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="StockUp API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
