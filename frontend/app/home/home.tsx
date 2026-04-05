@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useRealtimeHomesRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { logout } from "@/src/api/auth";
 
 // UI Components
 import HomeCard from "@/src/components/homes/HomeCard";
@@ -82,8 +82,7 @@ export default function HomesScreen() {
   const performLogout = useCallback(async () => {
     try {
       setLoggingOut(true);
-      await AsyncStorage.multiRemove(["access_token", "refresh_token", "user"]);
-      router.replace("/login");
+      await logout();
     } catch (e) {
       Alert.alert("שגיאה", "לא הצלחתי להתנתק כרגע.");
     } finally {

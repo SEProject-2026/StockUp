@@ -237,3 +237,4 @@ async def get_join_requests(
         # If the user is not the head of the house, return 403 Forbidden
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
+    

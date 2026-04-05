@@ -17,9 +17,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ScreenHeader from "@/src/layout/ScreenHeader";
 import AuthTextField from "@/src/components/ui/inputs/AuthTextField";
-import { register, login } from "@/src/api/auth";
 import { registerForPushNotificationsAsync } from '../src/api/notifications';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "@/src/config/supabase";
+import { registerBackend } from "@/src/api/auth";
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
@@ -39,37 +39,59 @@ export default function SignupScreen() {
     };
   }, [name, email, password, confirm, loading]);
 
-  async function onSignup() {
-    if (!validation.canSubmit) {
-      return;
-    }
+async function onSignup() {
+  if (!validation.canSubmit) return;
 
-    try {
-      setLoading(true);
-      const cleanEmail = email.trim().toLowerCase();
-      await register({
+  try {
+    setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. יצירת המשתמש ב-Supabase
+    const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
-      name: name.trim(),
-      password,
-      password_confirm: confirm,
+      password: password,
+      options: {
+        data: {
+          full_name: name.trim(),
+        },
+        emailRedirectTo: 'stockup://auth',
+      },
     });
 
-    const loginRes = await login({ email: cleanEmail, password });
-    
-    await AsyncStorage.setItem("userToken", loginRes.access_token);
+    if (error) throw error;
 
-    registerForPushNotificationsAsync().catch(console.error);
-
-    Alert.alert("נרשמת בהצלחה!", "ברוך הבא! החשבון שלך מוכן.", [
-      { text: "המשך", onPress: () => router.replace("/home/home") },
-      ]);
-
-    } catch (e: any) {
-      Alert.alert("הרשמה נכשלה", e?.message ?? "נסה/י שוב");
-    } finally {
-      setLoading(false);
+    if (data.user) {
+      try {
+        await registerBackend({
+          user_id: data.user.id,
+          email: cleanEmail,
+          name: name.trim(),
+        });
+        console.log("[Signup] Backend registration successful");
+      } catch (backendError) {
+        console.error("[Signup] Backend registration failed:", backendError);
+      }
     }
+
+    if (data.session) {
+      registerForPushNotificationsAsync().catch(console.error);
+      Alert.alert("נרשמת בהצלחה!", "ברוך הבא! החשבון שלך מוכן.", [
+        { text: "המשך", onPress: () => router.replace("/home/home") },
+      ]);
+    } else {
+      Alert.alert(
+        "כמעט סיימנו", 
+        "שלחנו לך אימייל לאישור החשבון. אנא אשרי אותו כדי שתוכלי להתחבר.",
+        [{ text: "הבנתי", onPress: () => router.replace("/login") }]
+      );
+    }
+
+  } catch (e: any) {
+    Alert.alert("הרשמה נכשלה", e?.message ?? "נסה/י שוב");
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <SafeAreaView style={styles.safeArea}>

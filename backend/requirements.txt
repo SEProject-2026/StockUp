@@ -19,6 +19,7 @@ email-validator==2.3.0
 exponent_server_sdk==2.2.0
 fastapi==0.124.4
 fsspec==2026.2.0
+freezegun>=1.5.1
 google-api-core==2.30.0
 google-auth==2.49.1
 google-cloud-vision==3.12.1

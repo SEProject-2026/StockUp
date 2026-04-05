@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "@/src/config/api";
-import { getAccessToken } from "@/src/auth/token";
 import { getSelectedHomeId } from "../utils/selected-home";
+import { supabase } from "../config/supabase";
 
 type FastApiDetailItem = {
   loc?: (string | number)[];
@@ -118,13 +118,25 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
 
 export async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const [token, homeId] = await Promise.all([getAccessToken(), getSelectedHomeId()]);
+  const [sessionRes, homeId] = await Promise.all([
+    supabase.auth.getSession(),
+    getSelectedHomeId()
+  ]);
+
+  const token = sessionRes.data.session?.access_token;
+
+  // תיקון: אם אין טוקן, אל תנסה אפילו לפנות לשרת
+  if (!token) {
+    console.warn(`[authFetch] No session found for ${path}. Redirecting or throwing...`);
+    // כאן את יכולה להחליט: או לזרוק שגיאה שקטה או שגיאה שתקפיץ לוגין
+    throw new Error("נא להתחבר מחדש כדי להמשיך"); 
+  }
 
   return apiFetch<T>(path, {
     ...options,
     headers: {
       ...(options.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token}`, // עכשיו אנחנו בטוחים שיש טוקן
       ...(homeId ? { "X-Home-ID": homeId } : {}),
     },
   });

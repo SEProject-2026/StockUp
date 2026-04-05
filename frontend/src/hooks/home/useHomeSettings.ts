@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { getCurrentUserId } from "@/src/auth/token";
+import { useAuth } from "@/app/_layout";
 import {
   updateExpirationRange,
   answerJoinRequest,
@@ -15,7 +15,8 @@ import {
 import { useRealtimeContext } from "../../providers/RealtimeProvider";
 
 export function useHomeSettings(currentHomeId?: string) {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { session } = useAuth();
+  const currentUserId = session?.user?.id;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expiryAlertsEnabled, setExpiryAlertsEnabled] = useState(true);
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
@@ -49,7 +50,7 @@ export function useHomeSettings(currentHomeId?: string) {
   const clampDays = (n: number) => Math.max(0, Math.min(30, n));
 
   const loadHomeData = async () => {
-    if (!currentHomeId) return;
+    if (!currentHomeId || !currentUserId) return;
     try {
       setLoadingHomeMeta(true);
       const homesRes = await getMyHomes();
@@ -75,11 +76,17 @@ export function useHomeSettings(currentHomeId?: string) {
     }
   };
 
-  useEffect(() => { getCurrentUserId().then(setCurrentUserId); }, []);
-  useEffect(() => { loadHomeData(); }, [currentHomeId, currentUserId, currentHomeMetaVersion]);
+  // Automatically load when home or user changes
+  useEffect(() => { 
+    if (currentHomeId && currentUserId) {
+      loadHomeData(); 
+    }
+  }, [currentHomeId, currentUserId]);
 
-  const isHomeAdmin = !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
-
+  // Real-time management permission calculation
+  const isHomeAdmin = useMemo(() => {
+    return !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
+  }, [homeMeta, currentUserId]);
   const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
     try {
       setProcessingRequestId(userId);

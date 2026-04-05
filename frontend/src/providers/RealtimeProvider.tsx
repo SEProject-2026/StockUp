@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 import { supabase } from "@/src/config/supabase";
-import { getCurrentUserId } from "@/src/auth/token";
+import { useAuth } from "@/src/context/auth-context";
 import { router } from "expo-router"; 
 
 type RealtimeContextValue = {
@@ -24,6 +24,8 @@ type RealtimeContextValue = {
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth();
+  const userId = session?.user?.id;
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
   const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
@@ -70,97 +72,100 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
+    // אם אין משתמש מחובר, אנחנו לא מנסים להירשם לערוצים
+    if (!userId) {
+      console.log("[Realtime] No active session, skipping channel setup.");
+      return;
+    }
+
+    console.log("[Realtime] Setting up channels for user:", userId);
 
     const setup = async () => {
       try {
-        const userId = await getCurrentUserId();
+        // 1. User Home Channel
 
-        console.log("[Realtime] stored userId:", userId);
 
-        if (!mounted || !userId) {
-          console.log("[Realtime] no stored user_id");
-          return;
-        }
 
-        // 1. User Home Channel - Responsible for the list of houses and removal from the house
+
+
+
+
+
+
         const userHomeChannel = supabase
           .channel(`rt-user-home-${userId}`)
           .on(
             "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "user_home",
-            },
+            { event: "*", schema: "public", table: "user_home" },
+
+
+
+
             (payload) => {
               console.log("[Realtime] user_home payload:", payload);
+              const next = payload.new as { user_id?: string } | null;
+              const oldRow = payload.old as { user_id?: string } | null;
 
-              const next = payload.new as { user_id?: string; home_id?: string } | null;
-              const oldRow = payload.old as { user_id?: string; home_id?: string } | null;
               const rowUserId = next?.user_id ?? oldRow?.user_id;
-              const rowHomeId = next?.home_id ?? oldRow?.home_id;
 
               if (rowUserId === userId) {
+
                 if (payload.eventType === "DELETE") {
-                  console.log("[Realtime] User was removed from home, redirecting to home list...");
+                  console.log("[Realtime] User removed from home, redirecting...");
                   router.replace("/home/home"); 
                   return;
                 }
-                
-                bumpHomesVersion();
-              }
 
-              if (rowHomeId) {
-                bumpHomeMetaVersion(rowHomeId);
+
+                bumpHomesVersion();
               }
             }
           )
-          .subscribe((status) => {
-            console.log("[Realtime] user_home status:", status);
-          });
+          .subscribe();
+
+
 
         // 2. Products Channel
         const productsChannel = supabase
           .channel(`rt-products-${userId}`)
           .on(
             "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "products",
-            },
+            { event: "*", schema: "public", table: "products" },
+
+
+
+
             (payload) => {
-              console.log("[Realtime] products payload:", payload);
+
 
               const next = payload.new as { home_id?: string } | null;
               const oldRow = payload.old as { home_id?: string } | null;
               const changedHomeId = next?.home_id ?? oldRow?.home_id;
 
               if (payload.eventType === "DELETE" && !changedHomeId) {
-                console.log("[Realtime] DELETE detected without home_id, bumping all homes");
+
                 bumpAllInventoryVersions();
               } else if (changedHomeId) {
                 bumpInventoryVersion(changedHomeId);
               }
             }
           )
-          .subscribe((status) => {
-            console.log("[Realtime] products status:", status);
-          });
+          .subscribe();
+
+
 
         // 3. Product Items Channel
         const productItemsChannel = supabase
           .channel(`rt-product-items-${userId}`)
           .on(
             "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "product_items",
-            },
+            { event: "*", schema: "public", table: "product_items" },
+
+
+
+
             async (payload) => {
-              console.log("[Realtime] product_items payload:", payload);
+
 
               if (payload.eventType === "DELETE") {
                  bumpAllInventoryVersions();
@@ -172,46 +177,46 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
               if (!productId) return;
 
-              try {
-                const { data, error } = await supabase
-                  .from("products")
-                  .select("home_id")
-                  .eq("id", productId)
-                  .single();
+              const { data } = await supabase
+                .from("products")
+                .select("home_id")
+                .eq("id", productId)
+                .single();
 
-                if (error) {
-                  console.log("[Realtime] failed to resolve home_id from product_id:", error);
-                  return;
-                }
 
-                const changedHomeId = data?.home_id;
-                if (changedHomeId) {
-                  bumpInventoryVersion(changedHomeId);
-                }
-              } catch (error) {
-                console.log("[Realtime] product_items handler error:", error);
+              if (data?.home_id) {
+                bumpInventoryVersion(data.home_id);
+
+
+
+
+
+
+
+
+
               }
             }
           )
-          .subscribe((status) => {
-            console.log("[Realtime] product_items status:", status);
-          });
+          .subscribe();
+
+
 
         // 4. Join Requests Channel
         const joinRequestsChannel = supabase
           .channel(`rt-home-join-requests-${userId}`)
           .on(
             "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "home_join_requests",
-            },
-            (payload) => {
-              console.log("[Realtime] home_join_requests payload:", payload);
+            { event: "*", schema: "public", table: "home_join_requests" },
 
-              const next = payload.new as { home_id?: string; user_id?: string } | null;
-              const oldRow = payload.old as { home_id?: string; user_id?: string } | null;
+
+
+
+            (payload) => {
+              const next = payload.new as { home_id?: string } | null;
+              const oldRow = payload.old as { home_id?: string } | null;
+
+
               const changedHomeId = next?.home_id ?? oldRow?.home_id;
 
               if (changedHomeId) {
@@ -219,63 +224,36 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               }
             }
           )
-          .subscribe((status) => {
-            console.log("[Realtime] home_join_requests status:", status);
-          });
+          .subscribe();
 
-        // 5. Homes Channel - Responsible for changes in the home itself (name, admin, etc.)
-        const homesChannel = supabase
-          .channel(`rt-homes-${userId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "homes",
-            },
-            (payload) => {
-              console.log("[Realtime] homes payload:", payload);
 
-              const next = payload.new as { id?: string } | null;
-              const oldRow = payload.old as { id?: string } | null;
-              const changedHomeId = next?.id ?? oldRow?.id;
-
-              if (changedHomeId) {
-                bumpHomeMetaVersion(changedHomeId);
-              }
-            }
-          )
-          .subscribe((status) => {
-            console.log("[Realtime] homes status:", status);
-          });
 
         channelsRef.current = [
           userHomeChannel,
           productsChannel,
           productItemsChannel,
           joinRequestsChannel,
-          homesChannel,
         ];
       } catch (error) {
-        console.log("[Realtime] setup error:", error);
+        console.error("[Realtime] Setup error:", error);
       }
     };
 
     setup();
 
+    // פונקציית ניקוי - רצה כשהמשתמש מתנתק או כשהקומפוננטה יורדת
     return () => {
-      mounted = false;
+      console.log("[Realtime] Cleaning up channels for user:", userId);
       channelsRef.current.forEach((channel) => {
-        try {
-          supabase.removeChannel(channel);
-        } catch (error) {
-          console.log("[Realtime] remove channel error:", error);
-        }
+        supabase.removeChannel(channel);
+
+
+
+
       });
       channelsRef.current = [];
     };
-  }, [bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion, bumpAllInventoryVersions]);
-
+  }, [userId, bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion, bumpAllInventoryVersions]);
   const value = useMemo(
     () => ({
       homesVersion,

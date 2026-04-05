@@ -35,6 +35,7 @@ class ShoppingList(BaseModel):
                 del self.items[i]
                 self._refresh_timestamp()
                 return
+        raise ValueError(f"Item not found: {item_name}")
 
     def update_quantity(self, item_name: str, new_quantity: int) -> None:
         """Updates the quantity for a specific item name."""

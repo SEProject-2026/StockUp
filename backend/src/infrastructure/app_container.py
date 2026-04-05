@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 # --- Services ---
+from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
 from src.infrastructure.repositories.db_shopping_list_repository import DbShoppingListRepository
 from src.infrastructure.repositories.in_memory_shopping_list_repository import InMemoryShoppingListRepository
 from src.services.shopping_list_service import ShoppingListService
@@ -13,7 +14,7 @@ from src.services.recommendation_service import RecommendationService
 from src.domain.recommendation.engine import RecommendationEngine
 
 # --- Auth ---
-from src.infrastructure.auth.jwt_auth_provider import JwtAuthProvider
+from src.infrastructure.auth.supabase_auth_provider import SupabaseAuthProvider
 
 # --- Repositories (DB Implementation) ---
 from src.infrastructure.repositories.db_user_repository import DbUserRepository
@@ -45,12 +46,20 @@ class AppContainer:
     _catalog_provider_instance = None
     _shopping_list_service_instance = None
     _recommendation_service_instance = None
+    _receipt_scanner_instance = None
 
     @staticmethod
     def get_auth_provider():
         if AppContainer._auth_provider_instance is None:
-            AppContainer._auth_provider_instance = JwtAuthProvider()
+            #AppContainer._auth_provider_instance = JwtAuthProvider()
+            AppContainer._auth_provider_instance = SupabaseAuthProvider()
         return AppContainer._auth_provider_instance
+    
+    @staticmethod
+    def get_receipt_scanner():
+        if AppContainer._receipt_scanner_instance is None:
+                AppContainer._receipt_scanner_instance = ReceiptScanner()
+        return AppContainer._receipt_scanner_instance
 
     @staticmethod
     def get_catalog_provider(db: Optional[Session] = None):
@@ -86,23 +95,23 @@ class AppContainer:
         - If 'db' is provided: Returns a new instance connected to the DB (Production).
         - If 'db' is None: Returns a singleton instance with InMemory repository (Testing).
         """
-        auth = AppContainer.get_auth_provider()
 
         # Production (DB)
         if db:
             repo = DbUserRepository(db)
-            return UserService(user_repo=repo, auth_provider=auth)
+            return UserService(user_repo=repo)
 
         # Testing (In-Memory)
         if AppContainer._user_service_instance is None:
             repo = InMemoryUserRepository()
-            AppContainer._user_service_instance = UserService(user_repo=repo, auth_provider=auth)
+            AppContainer._user_service_instance = UserService(user_repo=repo)
         
         return AppContainer._user_service_instance
 
     @staticmethod
     def get_stock_service(db: Optional[Session] = None) -> StockService:
         catalog = AppContainer.get_catalog_provider(db)
+        scanner = AppContainer.get_receipt_scanner()
 
         # Production (DB)
         if db:
@@ -111,7 +120,8 @@ class AppContainer:
                 product_repository=DbProductRepository(db),
                 catalog_provider=catalog,
                 user_repository=DbUserRepository(db),
-                receipt_repository=DbReceiptRepository(db)
+                receipt_repository=DbReceiptRepository(db),
+                receipt_scanner=scanner
             )
 
         # Testing (In-Memory)
@@ -121,7 +131,8 @@ class AppContainer:
                 product_repository=InMemoryProductRepository(),
                 catalog_provider=catalog,
                 user_repository=InMemoryUserRepository(),
-                receipt_repository=InMemoryReceiptRepository()
+                receipt_repository=InMemoryReceiptRepository(),
+                receipt_scanner=scanner
             )
         
         return AppContainer._stock_service_instance
