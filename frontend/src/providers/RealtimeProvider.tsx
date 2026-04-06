@@ -16,9 +16,14 @@ type RealtimeContextValue = {
   inventoryVersionByHome: Record<string, number>;
   joinRequestsVersionByHome: Record<string, number>;
   homeMetaVersionByHome: Record<string, number>;
+  shoppingListsVersionByHome: Record<string, number>;
+  shoppingListsVersion: number;
+  shoppingListItemsVersionByList: Record<string, number>;
   bumpInventoryVersion: (homeId: string) => void;
   bumpJoinRequestsVersion: (homeId: string) => void;
   bumpHomeMetaVersion: (homeId: string) => void;
+  bumpShoppingListsVersion: (homeId: string) => void;
+  bumpShoppingListItemsVersion: (listId: string) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -26,10 +31,14 @@ const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  console.log("[Realtime] Provider state - userId:", userId, "hasSession:", !!session);
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
   const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
   const [homeMetaVersionByHome, setHomeMetaVersionByHome] = useState<Record<string, number>>({});
+  const [shoppingListsVersionByHome, setShoppingListsVersionByHome] = useState<Record<string, number>>({});
+  const [shoppingListsVersion, setShoppingListsVersion] = useState(0);
+  const [shoppingListItemsVersionByList, setShoppingListItemsVersionByList] = useState<Record<string, number>>({});
 
   const channelsRef = useRef<any[]>([]);
 
@@ -57,6 +66,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpJoinRequestsVersion = useCallback((homeId: string) => {
     if (!homeId) return;
+    console.log("[RealtimeProvider] Bumping JoinRequestsVersion for home:", homeId);
     setJoinRequestsVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
@@ -65,9 +75,28 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpHomeMetaVersion = useCallback((homeId: string) => {
     if (!homeId) return;
+    console.log("[RealtimeProvider] Bumping HomeMetaVersion for home:", homeId);
     setHomeMetaVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
+    }));
+  }, []);
+
+  const bumpShoppingListsVersion = useCallback((homeId: string) => {
+    if (!homeId) return;
+    console.log("[RealtimeProvider] Bumping ShoppingListsVersion for home:", homeId);
+    setShoppingListsVersionByHome((prev) => ({
+      ...prev,
+      [homeId]: (prev[homeId] ?? 0) + 1,
+    }));
+  }, []);
+
+  const bumpShoppingListItemsVersion = useCallback((listId: string) => {
+    if (!listId) return;
+    console.log("[RealtimeProvider] Bumping ShoppingListItemsVersion for list:", listId);
+    setShoppingListItemsVersionByList((prev) => ({
+      ...prev,
+      [listId]: (prev[listId] ?? 0) + 1,
     }));
   }, []);
 
@@ -202,37 +231,60 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
 
 
-        // 4. Join Requests Channel
+        // 4. Join Requests (Separate Table: user_id, home_id)
         const joinRequestsChannel = supabase
-          .channel(`rt-home-join-requests-${userId}`)
+          .channel(`rt-join-requests-${userId}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "home_join_requests" },
-
-
-
-
             (payload) => {
-              const next = payload.new as { home_id?: string } | null;
-              const oldRow = payload.old as { home_id?: string } | null;
-
-
-              const changedHomeId = next?.home_id ?? oldRow?.home_id;
-
-              if (changedHomeId) {
-                bumpJoinRequestsVersion(changedHomeId);
-              }
+              const homeId = (payload.new as any)?.home_id || (payload.old as any)?.home_id;
+              console.log("[Realtime] Join Request change detected for home:", homeId);
+              if (homeId) bumpJoinRequestsVersion(homeId);
             }
           )
           .subscribe();
 
+        // 5. Homes Channel (metadata, ownership, members)
+        const homesChannel = supabase
+          .channel(`rt-homes-${userId}`)
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "homes" },
+            (payload) => {
+              const homeId = (payload.new as any)?.id || (payload.old as any)?.id;
+              console.log("[Realtime] Home change detected:", { event: payload.eventType, homeId });
+              if (homeId) bumpHomeMetaVersion(homeId);
+            }
+          )
+          .subscribe();
 
+        // 6. Shopping Lists (Table contains 'items' JSON column)
+        const shoppingListsChannel = supabase
+          .channel(`rt-shopping-lists-${userId}`)
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "shopping_lists" },
+            (payload) => {
+              const homeId = (payload.new as any)?.home_id || (payload.old as any)?.home_id;
+              const listId = (payload.new as any)?.id || (payload.old as any)?.id;
+              
+              console.log("[Realtime] Shopping list change detected:", { listId, homeId });
+              
+              setShoppingListsVersion((v) => v + 1); // Global reload trigger
+              if (homeId) bumpShoppingListsVersion(homeId);
+              if (listId) bumpShoppingListItemsVersion(listId);
+            }
+          )
+          .subscribe();
 
         channelsRef.current = [
           userHomeChannel,
           productsChannel,
           productItemsChannel,
           joinRequestsChannel,
+          homesChannel,
+          shoppingListsChannel,
         ];
       } catch (error) {
         console.error("[Realtime] Setup error:", error);
@@ -253,25 +305,44 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       });
       channelsRef.current = [];
     };
-  }, [userId, bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion, bumpAllInventoryVersions]);
+  }, [
+    userId, 
+    bumpHomesVersion, 
+    bumpInventoryVersion, 
+    bumpJoinRequestsVersion, 
+    bumpHomeMetaVersion,
+    bumpShoppingListsVersion,
+    bumpShoppingListItemsVersion,
+    bumpAllInventoryVersions
+  ]);
   const value = useMemo(
     () => ({
       homesVersion,
       inventoryVersionByHome,
       joinRequestsVersionByHome,
       homeMetaVersionByHome,
+      shoppingListsVersionByHome,
+      shoppingListsVersion,
+      shoppingListItemsVersionByList,
       bumpInventoryVersion,
       bumpJoinRequestsVersion,
       bumpHomeMetaVersion,
+      bumpShoppingListsVersion,
+      bumpShoppingListItemsVersion,
     }),
     [
       homesVersion,
       inventoryVersionByHome,
       joinRequestsVersionByHome,
       homeMetaVersionByHome,
+      shoppingListsVersionByHome,
+      shoppingListsVersion,
+      shoppingListItemsVersionByList,
       bumpInventoryVersion,
       bumpJoinRequestsVersion,
       bumpHomeMetaVersion,
+      bumpShoppingListsVersion,
+      bumpShoppingListItemsVersion,
     ]
   );
 

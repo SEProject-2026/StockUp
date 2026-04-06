@@ -31,7 +31,7 @@ export default function SettingsScreen() {
   const currentHomeId = homeId ? String(homeId) : undefined;
 
   useMembershipGuard(currentHomeId);
-  const { setJoinRequests } = actions;
+  const { refreshJoinRequests, handleAnswerJoinRequest, loadHomeData } = actions;
 
   const handleOpenCode = async () => {
       if (!currentHomeId) return;
@@ -51,33 +51,8 @@ export default function SettingsScreen() {
   const handleOpenJoinRequests = async () => {
     if (!currentHomeId) return;
     actions.setJoinRequestsOpen(true);
-    actions.setLoadingJoinRequests(true);
-    try {
-      const res = await getJoinRequests(currentHomeId);
-      const requests = Object.entries(res.data || {}).map(([id, name]) => ({ user_id: id, name }));
-      setJoinRequests(requests);
-    } catch (e) { 
-      Alert.alert("שגיאה", "טעינת בקשות נכשלה"); 
-    } finally { 
-      actions.setLoadingJoinRequests(false); 
-    }
+    await actions.refreshJoinRequests();
   };
-  
-  const refreshJoinRequests = useCallback(async () => {
-    if (!currentHomeId || !state.isHomeAdmin) return;
-    try {
-      const res = await getJoinRequests(currentHomeId);
-      const requests = Object.entries(res.data || {}).map(([id, name]) => ({
-        user_id: id,
-        name,
-      }));
-      setJoinRequests(requests);
-    } catch (e) {
-      console.log("[JoinRequests] refresh failed", e);
-    }
-  }, [currentHomeId, setJoinRequests]); 
-
-  useRealtimeJoinRequestsRefresh(currentHomeId, refreshJoinRequests, state.isHomeAdmin);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -93,13 +68,6 @@ export default function SettingsScreen() {
         
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           <Section title="התראות">
-            <SettingsRow 
-              icon="notifications-outline" 
-              title="התראות כלליות" 
-              subtitle="התראות מערכת ועדכונים" 
-              right={<Switch value={state.notificationsEnabled} onValueChange={actions.setNotificationsEnabled} trackColor={{ true: "#0284C7" }} />} 
-            />
-            <Divider />
             <SettingsRow 
               icon="calendar-outline" 
               title="התראה לפני פג תוקף" 
@@ -128,7 +96,7 @@ export default function SettingsScreen() {
             </Section>
           )}
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace("/login")}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={actions.handleLogout}>
             <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
             <Text style={styles.logoutText}>התנתקות מהמערכת</Text>
           </TouchableOpacity>

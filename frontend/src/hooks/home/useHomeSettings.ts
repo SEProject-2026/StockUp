@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/src/context/auth-context";
 import {
   updateExpirationRange,
   answerJoinRequest,
@@ -11,14 +11,17 @@ import {
   switchHomeHead,
   removeMember,
   deleteHome,
+  getJoinRequests,
 } from "@/src/api/homes";
 import { useRealtimeContext } from "../../providers/RealtimeProvider";
+import { 
+  useRealtimeHomeMetaRefresh, 
+  useRealtimeJoinRequestsRefresh 
+} from "../realtime/useRealtimeRefresh";
 
 export function useHomeSettings(currentHomeId?: string) {
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const currentUserId = session?.user?.id;
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [expiryAlertsEnabled, setExpiryAlertsEnabled] = useState(true);
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
 
   const [daysModalOpen, setDaysModalOpen] = useState(false);
@@ -80,6 +83,7 @@ export function useHomeSettings(currentHomeId?: string) {
   useEffect(() => { 
     if (currentHomeId && currentUserId) {
       loadHomeData(); 
+      refreshJoinRequests();
     }
   }, [currentHomeId, currentUserId]);
 
@@ -87,6 +91,29 @@ export function useHomeSettings(currentHomeId?: string) {
   const isHomeAdmin = useMemo(() => {
     return !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
   }, [homeMeta, currentUserId]);
+
+  const refreshJoinRequests = async () => {
+    if (!currentHomeId || !isHomeAdmin) return;
+    try {
+      setLoadingJoinRequests(true);
+      const res = await getJoinRequests(currentHomeId);
+      const requests = Object.entries(res.data || {}).map(([id, name]) => ({
+        user_id: id,
+        name,
+      }));
+      setJoinRequests(requests);
+    } catch (e) {
+      console.log("[useHomeSettings] refreshJoinRequests failed", e);
+    } finally {
+      setLoadingJoinRequests(false);
+    }
+  };
+
+  // Real-time synchronization for metadata and admin changes
+  useRealtimeHomeMetaRefresh(currentHomeId, loadHomeData);
+  
+  // Real-time synchronization for join requests
+  useRealtimeJoinRequestsRefresh(currentHomeId, refreshJoinRequests, isHomeAdmin);
   const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
     try {
       setProcessingRequestId(userId);
@@ -181,20 +208,28 @@ export function useHomeSettings(currentHomeId?: string) {
       }}
     ]);
   };
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch (e) {
+      Alert.alert("שגיאה", "ההתנתקות נכשלה");
+    }
+  };
 
   return {
     state: {
-      currentUserId, notificationsEnabled, expiryAlertsEnabled, expiryLeadDays,
+      currentUserId, expiryLeadDays,
       daysModalOpen, homeCodeOpen, joinRequestsOpen, switchHeadOpen, membersOpen,
       homeInviteCode, loadingHomeCode, savingDays, homeMeta, homeMembers,
       loadingHomeMeta, joinRequests, loadingJoinRequests, processingRequestId,
       switchingHead, removingMemberId, leavingHomeLoading, deletingHomeLoading, isHomeAdmin
     },
     actions: {
-      setNotificationsEnabled, setExpiryAlertsEnabled, setExpiryLeadDays,
+      setExpiryLeadDays,
       setDaysModalOpen, setHomeCodeOpen, setJoinRequestsOpen, setSwitchHeadOpen, setMembersOpen,
-      clampDays, loadHomeData, setHomeInviteCode, setLoadingHomeCode, setJoinRequests, setLoadingJoinRequests,
-      handleAnswerJoinRequest, handleSaveExpiration, handleSwitchHead, handleRemoveMember, handleLeaveHome, handleDeleteHome
+      clampDays, loadHomeData, refreshJoinRequests, setHomeInviteCode, setLoadingHomeCode, setJoinRequests, setLoadingJoinRequests,
+      handleAnswerJoinRequest, handleSaveExpiration, handleSwitchHead, handleRemoveMember, handleLeaveHome, handleDeleteHome, handleLogout
     }
   };
 }

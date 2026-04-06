@@ -13,6 +13,7 @@ import {
   deleteShoppingList 
 } from "@/src/api/shoppingLists";
 import { useMembershipGuard } from "@/src/hooks/home/useMembershipGuard";
+import { useRealtimeShoppingListsRefresh } from "@/src/hooks/realtime/useRealtimeRefresh";
 
 import { ShoppingListCard } from "@/src/components/shopping/ShoppingListCard";
 import { ShoppingListsHeader } from "@/src/components/shopping/ShoppingListsHeader";
@@ -60,33 +61,12 @@ export default function ShoppingListsScreen() {
   }, [homeId]);
 
   // --- הגדרת Realtime ---
+  useRealtimeShoppingListsRefresh(homeId, loadLists);
+
   useEffect(() => {
     if (!homeId) return;
-
     // טעינה ראשונית
     loadLists();
-
-    // יצירת ערוץ האזנה לשינויים בטבלה
-    const channel = supabase
-      .channel(`realtime:shopping_lists:${homeId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // INSERT, UPDATE, DELETE
-          schema: "public",
-          table: "shopping_lists",
-          filter: `home_id=eq.${homeId}`,
-        },
-        () => {
-          // כשמשהו משתנה ב-DB, נטען מחדש
-          loadLists();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [homeId, loadLists]);
 
   // --- פונקציות עזר ---

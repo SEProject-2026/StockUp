@@ -14,6 +14,7 @@ import {
   type LocationType,
 } from "@/src/api/shoppingLists";
 import { supabase } from "@/src/config/supabase";
+import { useRealtimeShoppingListItemsRefresh } from "../realtime/useRealtimeRefresh";
 
 export type LocationKey = string;
 
@@ -77,7 +78,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
     setPicked(nextPicked);
   }, []);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isRealtime = false) => {
     if (!homeId || !listId) {
       setItems([]);
       setSuggestions([]);
@@ -87,7 +88,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
     }
 
     try {
-      setLoading(true);
+      setLoading(!isRealtime); // Only show spinner if not a background update
 
       const dto = await getShoppingList(listId);
       syncFromDto(dto);
@@ -124,6 +125,9 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Real-time synchronization for list items
+  useRealtimeShoppingListItemsRefresh(listId, () => loadData(true));
 
   useEffect(() => {
     if (!listId) return;

@@ -71,3 +71,67 @@ export function useRealtimeJoinRequestsRefresh(
     void refreshRef.current();
   }, [homeId, currentVersion]);
 }
+
+// --- Home Meta Refresh (Settings, Admin, etc) ---
+export function useRealtimeHomeMetaRefresh(
+  homeId: string | undefined,
+  refreshHomeMeta: () => Promise<void>
+) {
+  const { homeMetaVersionByHome } = useRealtimeContext();
+  const lastVersionRef = useRef<number>(0);
+
+  const currentVersion = homeId ? (homeMetaVersionByHome[homeId] ?? 0) : 0;
+
+  useEffect(() => {
+    if (!homeId) return;
+    if (currentVersion === lastVersionRef.current) return;
+
+    console.log("[HomeMetaRefresh] Triggering refresh for version:", currentVersion);
+    lastVersionRef.current = currentVersion;
+    void refreshHomeMeta();
+  }, [homeId, currentVersion, refreshHomeMeta]);
+}
+
+// --- Shopping List Items Refresh ---
+export function useRealtimeShoppingListItemsRefresh(
+  listId: string | undefined,
+  refreshItems: () => Promise<void>
+) {
+  const { shoppingListItemsVersionByList } = useRealtimeContext();
+  const lastVersionRef = useRef<number>(0);
+
+  const currentVersion = listId ? (shoppingListItemsVersionByList[listId] ?? 0) : 0;
+
+  useEffect(() => {
+    if (!listId) return;
+    if (currentVersion === lastVersionRef.current) return;
+
+    console.log("[ShoppingListRefresh] Triggering refresh for version:", currentVersion);
+    lastVersionRef.current = currentVersion;
+    void refreshItems();
+  }, [listId, currentVersion, refreshItems]);
+}
+
+// --- Shopping Lists Refresh (List of lists in a home) ---
+export function useRealtimeShoppingListsRefresh(
+  homeId: string | undefined,
+  refreshLists: () => Promise<void>
+) {
+  const { shoppingListsVersionByHome, shoppingListsVersion } = useRealtimeContext();
+  const lastVersionRef = useRef<number>(0);
+  const lastGlobalVersionRef = useRef<number>(0);
+
+  const currentVersion = homeId ? (shoppingListsVersionByHome[homeId] ?? 0) : 0;
+
+  useEffect(() => {
+    if (!homeId) return;
+    
+    // Refresh if home-specific version OR global version changed
+    if (currentVersion !== lastVersionRef.current || shoppingListsVersion !== lastGlobalVersionRef.current) {
+      console.log("[ShoppingListsRefresh] Triggering refresh:", { homeVersion: currentVersion, globalVersion: shoppingListsVersion });
+      lastVersionRef.current = currentVersion;
+      lastGlobalVersionRef.current = shoppingListsVersion;
+      void refreshLists();
+    }
+  }, [homeId, currentVersion, shoppingListsVersion, refreshLists]);
+}

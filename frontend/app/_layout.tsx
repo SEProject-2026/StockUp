@@ -2,22 +2,20 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/src/config/supabase"; 
 import { InventoryProvider } from "../src/context/inventory-context";
 import { RealtimeProvider } from "../src/providers/RealtimeProvider";
+import { AuthProvider, useAuth } from "@/src/context/auth-context"; // <--- Centralize Auth
 import { approveJoinRequest, rejectJoinRequest } from "@/src/api/homes";
 
-// --- 1. Auth Context (נשאר כאן זמנית, אך מומלץ להעביר לקובץ נפרד ב-src/context) ---
-const AuthContext = createContext<{ session: Session | null; loading: boolean }>({
-  session: null,
-  loading: true,
-});
-
-export const useAuth = () => useContext(AuthContext);
+// --- 1. Auth Context (Merged into src/context/auth-context.tsx) ---
 
 // --- 2. Navigation Guard ---
+SplashScreen.preventAutoHideAsync();
+
 function NavigationGuard() {
   const { session, loading } = useAuth();
   const segments = useSegments();
@@ -59,23 +57,8 @@ function NavigationGuard() {
 
 export default function RootLayout() {
   const router = useRouter();
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // A. ניהול Auth
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  // A. ניהול Auth - Moved to AuthProvider in RootLayout return
 
   // B. ניהול התראות
   useEffect(() => {
@@ -112,15 +95,25 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, [router]);
 
+  // C. הסתרת ה-Splash Screen לאחר השהייה
+  useEffect(() => {
+    const hideSplash = async () => {
+      // נחכה 2 שניות (או 1.5 שניות לבידור)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await SplashScreen.hideAsync();
+    };
+    hideSplash();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthContext.Provider value={{ session, loading }}>
+      <AuthProvider>
         <RealtimeProvider>
           <InventoryProvider>
             <NavigationGuard />
           </InventoryProvider>
         </RealtimeProvider>
-      </AuthContext.Provider>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }
