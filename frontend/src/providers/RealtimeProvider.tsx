@@ -64,6 +64,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpJoinRequestsVersion = useCallback((homeId: string) => {
     if (!homeId) return;
+    console.log("[RealtimeProvider] Bumping JoinRequestsVersion for home:", homeId);
     setJoinRequestsVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
@@ -72,6 +73,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpHomeMetaVersion = useCallback((homeId: string) => {
     if (!homeId) return;
+    console.log("[RealtimeProvider] Bumping HomeMetaVersion for home:", homeId);
     setHomeMetaVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
@@ -80,6 +82,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpShoppingListsVersion = useCallback((homeId: string) => {
     if (!homeId) return;
+    console.log("[RealtimeProvider] Bumping ShoppingListsVersion for home:", homeId);
     setShoppingListsVersionByHome((prev) => ({
       ...prev,
       [homeId]: (prev[homeId] ?? 0) + 1,
@@ -88,6 +91,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   const bumpShoppingListItemsVersion = useCallback((listId: string) => {
     if (!listId) return;
+    console.log("[RealtimeProvider] Bumping ShoppingListItemsVersion for list:", listId);
     setShoppingListItemsVersionByList((prev) => ({
       ...prev,
       [listId]: (prev[listId] ?? 0) + 1,
@@ -239,14 +243,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
-        // 5. Homes Channel (metadata, ownership)
+        // 5. Homes Channel (metadata, ownership, members)
         const homesChannel = supabase
           .channel(`rt-homes-${userId}`)
           .on(
             "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "homes" },
+            { event: "*", schema: "public", table: "homes" },
             (payload) => {
               const homeId = (payload.new as any)?.id || (payload.old as any)?.id;
+              console.log("[Realtime] Home change detected:", { event: payload.eventType, homeId });
               if (homeId) bumpHomeMetaVersion(homeId);
             }
           )
@@ -297,7 +302,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       });
       channelsRef.current = [];
     };
-  }, [userId, bumpHomesVersion, bumpInventoryVersion, bumpJoinRequestsVersion, bumpAllInventoryVersions]);
+  }, [
+    userId, 
+    bumpHomesVersion, 
+    bumpInventoryVersion, 
+    bumpJoinRequestsVersion, 
+    bumpHomeMetaVersion,
+    bumpShoppingListsVersion,
+    bumpShoppingListItemsVersion,
+    bumpAllInventoryVersions
+  ]);
   const value = useMemo(
     () => ({
       homesVersion,

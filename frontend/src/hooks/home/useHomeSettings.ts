@@ -11,9 +11,13 @@ import {
   switchHomeHead,
   removeMember,
   deleteHome,
+  getJoinRequests,
 } from "@/src/api/homes";
 import { useRealtimeContext } from "../../providers/RealtimeProvider";
-import { useRealtimeHomeMetaRefresh } from "../realtime/useRealtimeRefresh";
+import { 
+  useRealtimeHomeMetaRefresh, 
+  useRealtimeJoinRequestsRefresh 
+} from "../realtime/useRealtimeRefresh";
 
 export function useHomeSettings(currentHomeId?: string) {
   const { session } = useAuth();
@@ -81,16 +85,37 @@ export function useHomeSettings(currentHomeId?: string) {
   useEffect(() => { 
     if (currentHomeId && currentUserId) {
       loadHomeData(); 
+      refreshJoinRequests();
     }
   }, [currentHomeId, currentUserId]);
-
-  // Real-time synchronization for metadata and admin changes
-  useRealtimeHomeMetaRefresh(currentHomeId, loadHomeData);
 
   // Real-time management permission calculation
   const isHomeAdmin = useMemo(() => {
     return !!homeMeta && !!currentUserId && String(homeMeta.admin_id) === String(currentUserId);
   }, [homeMeta, currentUserId]);
+
+  const refreshJoinRequests = async () => {
+    if (!currentHomeId || !isHomeAdmin) return;
+    try {
+      setLoadingJoinRequests(true);
+      const res = await getJoinRequests(currentHomeId);
+      const requests = Object.entries(res.data || {}).map(([id, name]) => ({
+        user_id: id,
+        name,
+      }));
+      setJoinRequests(requests);
+    } catch (e) {
+      console.log("[useHomeSettings] refreshJoinRequests failed", e);
+    } finally {
+      setLoadingJoinRequests(false);
+    }
+  };
+
+  // Real-time synchronization for metadata and admin changes
+  useRealtimeHomeMetaRefresh(currentHomeId, loadHomeData);
+  
+  // Real-time synchronization for join requests
+  useRealtimeJoinRequestsRefresh(currentHomeId, refreshJoinRequests, isHomeAdmin);
   const handleAnswerJoinRequest = async (userId: string, approved: boolean) => {
     try {
       setProcessingRequestId(userId);
@@ -197,7 +222,7 @@ export function useHomeSettings(currentHomeId?: string) {
     actions: {
       setNotificationsEnabled, setExpiryAlertsEnabled, setExpiryLeadDays,
       setDaysModalOpen, setHomeCodeOpen, setJoinRequestsOpen, setSwitchHeadOpen, setMembersOpen,
-      clampDays, loadHomeData, setHomeInviteCode, setLoadingHomeCode, setJoinRequests, setLoadingJoinRequests,
+      clampDays, loadHomeData, refreshJoinRequests, setHomeInviteCode, setLoadingHomeCode, setJoinRequests, setLoadingJoinRequests,
       handleAnswerJoinRequest, handleSaveExpiration, handleSwitchHead, handleRemoveMember, handleLeaveHome, handleDeleteHome
     }
   };
