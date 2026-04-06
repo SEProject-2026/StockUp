@@ -96,7 +96,7 @@ export default function SettingsScreen() {
             </Section>
           )}
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace("/login")}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={actions.handleLogout}>
             <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
             <Text style={styles.logoutText}>התנתקות מהמערכת</Text>
           </TouchableOpacity>

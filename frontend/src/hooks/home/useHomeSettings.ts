@@ -20,7 +20,7 @@ import {
 } from "../realtime/useRealtimeRefresh";
 
 export function useHomeSettings(currentHomeId?: string) {
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const currentUserId = session?.user?.id;
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
 
@@ -208,6 +208,14 @@ export function useHomeSettings(currentHomeId?: string) {
       }}
     ]);
   };
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch (e) {
+      Alert.alert("שגיאה", "ההתנתקות נכשלה");
+    }
+  };
 
   return {
     state: {
@@ -221,7 +229,7 @@ export function useHomeSettings(currentHomeId?: string) {
       setExpiryLeadDays,
       setDaysModalOpen, setHomeCodeOpen, setJoinRequestsOpen, setSwitchHeadOpen, setMembersOpen,
       clampDays, loadHomeData, refreshJoinRequests, setHomeInviteCode, setLoadingHomeCode, setJoinRequests, setLoadingJoinRequests,
-      handleAnswerJoinRequest, handleSaveExpiration, handleSwitchHead, handleRemoveMember, handleLeaveHome, handleDeleteHome
+      handleAnswerJoinRequest, handleSaveExpiration, handleSwitchHead, handleRemoveMember, handleLeaveHome, handleDeleteHome, handleLogout
     }
   };
 }
