@@ -22,8 +22,6 @@ import {
 export function useHomeSettings(currentHomeId?: string) {
   const { session } = useAuth();
   const currentUserId = session?.user?.id;
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [expiryAlertsEnabled, setExpiryAlertsEnabled] = useState(true);
   const [expiryLeadDays, setExpiryLeadDays] = useState<number>(3);
 
   const [daysModalOpen, setDaysModalOpen] = useState(false);
@@ -213,14 +211,14 @@ export function useHomeSettings(currentHomeId?: string) {
 
   return {
     state: {
-      currentUserId, notificationsEnabled, expiryAlertsEnabled, expiryLeadDays,
+      currentUserId, expiryLeadDays,
       daysModalOpen, homeCodeOpen, joinRequestsOpen, switchHeadOpen, membersOpen,
       homeInviteCode, loadingHomeCode, savingDays, homeMeta, homeMembers,
       loadingHomeMeta, joinRequests, loadingJoinRequests, processingRequestId,
       switchingHead, removingMemberId, leavingHomeLoading, deletingHomeLoading, isHomeAdmin
     },
     actions: {
-      setNotificationsEnabled, setExpiryAlertsEnabled, setExpiryLeadDays,
+      setExpiryLeadDays,
       setDaysModalOpen, setHomeCodeOpen, setJoinRequestsOpen, setSwitchHeadOpen, setMembersOpen,
       clampDays, loadHomeData, refreshJoinRequests, setHomeInviteCode, setLoadingHomeCode, setJoinRequests, setLoadingJoinRequests,
       handleAnswerJoinRequest, handleSaveExpiration, handleSwitchHead, handleRemoveMember, handleLeaveHome, handleDeleteHome

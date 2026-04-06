@@ -69,13 +69,6 @@ export default function SettingsScreen() {
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           <Section title="התראות">
             <SettingsRow 
-              icon="notifications-outline" 
-              title="התראות כלליות" 
-              subtitle="התראות מערכת ועדכונים" 
-              right={<Switch value={state.notificationsEnabled} onValueChange={actions.setNotificationsEnabled} trackColor={{ true: "#0284C7" }} />} 
-            />
-            <Divider />
-            <SettingsRow 
               icon="calendar-outline" 
               title="התראה לפני פג תוקף" 
               subtitle={state.expiryLeadDays === 0 ? "ביום פג התוקף" : `${state.expiryLeadDays} ימים מראש`} 
