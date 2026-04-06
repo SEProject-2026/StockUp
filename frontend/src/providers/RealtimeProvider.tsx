@@ -225,33 +225,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
 
 
-        // 4. Join Requests Channel
+        // 4. Join Requests (Separate Table: user_id, home_id)
         const joinRequestsChannel = supabase
-          .channel(`rt-home-join-requests-${userId}`)
+          .channel(`rt-join-requests-${userId}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "home_join_requests" },
-
-
-
-
             (payload) => {
-              const next = payload.new as { home_id?: string } | null;
-              const oldRow = payload.old as { home_id?: string } | null;
-
-
-              const changedHomeId = next?.home_id ?? oldRow?.home_id;
-
-              if (changedHomeId) {
-                bumpJoinRequestsVersion(changedHomeId);
-              }
+              const homeId = (payload.new as any)?.home_id || (payload.old as any)?.home_id;
+              console.log("[Realtime] Join Request change detected for home:", homeId);
+              if (homeId) bumpJoinRequestsVersion(homeId);
             }
           )
           .subscribe();
 
-
-
-        // 5. Homes Channel (for metadata and ownership)
+        // 5. Homes Channel (metadata, ownership)
         const homesChannel = supabase
           .channel(`rt-homes-${userId}`)
           .on(
@@ -264,7 +252,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
-        // 6. Shopping Lists Channel
+        // 6. Shopping Lists (Table contains 'items' JSON column)
         const shoppingListsChannel = supabase
           .channel(`rt-shopping-lists-${userId}`)
           .on(
@@ -272,19 +260,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             { event: "*", schema: "public", table: "shopping_lists" },
             (payload) => {
               const homeId = (payload.new as any)?.home_id || (payload.old as any)?.home_id;
+              const listId = (payload.new as any)?.id || (payload.old as any)?.id;
+              
+              console.log("[Realtime] Shopping list change detected:", { listId, homeId });
+              
               if (homeId) bumpShoppingListsVersion(homeId);
-            }
-          )
-          .subscribe();
-
-        // 7. Shopping List Items Channel
-        const shoppingListItemsChannel = supabase
-          .channel(`rt-shopping-list-items-${userId}`)
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "shopping_list_items" },
-            (payload: any) => {
-              const listId = payload.new?.shopping_list_id || payload.old?.shopping_list_id;
               if (listId) bumpShoppingListItemsVersion(listId);
             }
           )
@@ -297,7 +277,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           joinRequestsChannel,
           homesChannel,
           shoppingListsChannel,
-          shoppingListItemsChannel,
         ];
       } catch (error) {
         console.error("[Realtime] Setup error:", error);
