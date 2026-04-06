@@ -53,10 +53,10 @@ export default function BatchAddItemsScreen() {
   const debouncedBarcode = useDebouncedValue(draft.barcode.trim(), 300);
 
   // --- search in catalog (הלוגיקה הקיימת שלך) ---
-  
+
   useEffect(() => {
     if (draft.editingId || debouncedBarcode.length < 8) return;
-    
+
     (async () => {
       try {
         const resp = await getCatalogByBarcode(debouncedBarcode);
@@ -67,7 +67,7 @@ export default function BatchAddItemsScreen() {
           setSuggestions([]);
           setters.setName("");
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
   }, [debouncedBarcode, draft.editingId]);
 
@@ -99,7 +99,7 @@ export default function BatchAddItemsScreen() {
     }
 
     if (!currentHomeId) return Alert.alert("שגיאה", "חסר בית פעיל.");
-    if (pending.length === 0) return Alert.alert("אין מוצרים", "הוסיפי מוצרים לרשימה.");
+    if (pending.length === 0) return Alert.alert("אין מוצרים", "הוסף מוצרים לרשימה.");
 
     try {
       const results = await Promise.allSettled(
@@ -130,8 +130,8 @@ export default function BatchAddItemsScreen() {
     }
   };
 
-  const canAdd = (draft.name.trim().length > 0 || draft.selectedCatalogItem !== null) && 
-                (draft.quantity.length > 0 && parseInt(draft.quantity) > 0);
+  const canAdd = (draft.name.trim().length > 0 || draft.selectedCatalogItem !== null) &&
+    (draft.quantity.length > 0 && parseInt(draft.quantity) > 0);
 
   const handleReceiptReturn = () => {
     const drafts = pending.map(p => ({
@@ -144,7 +144,7 @@ export default function BatchAddItemsScreen() {
     }));
 
     if (drafts.length === 0) {
-        return Alert.alert("רשימה ריקה", "נא להוסיף לפחות מוצר אחד.");
+      return Alert.alert("רשימה ריקה", "נא להוסיף לפחות מוצר אחד.");
     }
 
     setLastAddItemReturnDrafts(drafts);
@@ -152,18 +152,18 @@ export default function BatchAddItemsScreen() {
   };
 
   return (
-      <SafeAreaView style={styles.safeArea}>
-        <LinearGradient colors={["#E5F3FF", BRAND_BG]} style={StyleSheet.absoluteFill} />
+    <SafeAreaView style={styles.safeArea}>
+      <LinearGradient colors={["#E5F3FF", BRAND_BG]} style={StyleSheet.absoluteFill} />
 
-        <ScreenHeader 
-          title={isReceiptReviewMode ? "הוספה לקבלה" : "הוספה מרובה"} 
-          onBack={() => router.back()} 
-        />
+      <ScreenHeader
+        title={isReceiptReviewMode ? "הוספה לקבלה" : "הוספה מרובה"}
+        onBack={() => router.back()}
+      />
 
-        <KeyboardAvoidingView 
-          style={{ flex: 1 }} 
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
 
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: 140 + insets.bottom }]}
@@ -199,47 +199,47 @@ export default function BatchAddItemsScreen() {
             onClearSelectedCatalogItem={() => setters.setSelectedCatalogItem(null)}
           />
 
-          <PendingList 
-            items={pending} 
-            locationOptions={location_OPTIONS} 
-            onEdit={actions.loadItemToDraft} 
-            onRemove={actions.removeFromList} 
+          <PendingList
+            items={pending}
+            locationOptions={location_OPTIONS}
+            onEdit={actions.loadItemToDraft}
+            onRemove={actions.removeFromList}
           />
         </ScrollView>
       </KeyboardAvoidingView>
 
-        <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
-          <PrimaryButton
-            title={isReceiptReviewMode ? `סיום וחזרה לקבלה (${pending.length})` : `שמור במלאי (${pending.length})`}
-            onPress={onBulkAdd}
-            disabled={pending.length === 0}
-            style={pending.length === 0 && { opacity: 0.6 }}
-          />
-        </View>
-
-        {/* Modals */}
-        <LocationPickerModal
-          open={modals.location}
-          selected={draft.location}
-          options={location_OPTIONS}
-          onClose={() => setModals(prev => ({ ...prev, location: false }))}
-          onSelect={(c) => { setters.setLoc(c); setModals(prev => ({ ...prev, location: false })); }}
+      <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
+        <PrimaryButton
+          title={isReceiptReviewMode ? `סיום וחזרה לקבלה (${pending.length})` : `שמור במלאי (${pending.length})`}
+          onPress={onBulkAdd}
+          disabled={pending.length === 0}
+          style={pending.length === 0 && { opacity: 0.6 }}
         />
+      </View>
 
-        <BarcodeScannerModal 
-          open={modals.scan} 
-          onClose={() => setModals(prev => ({ ...prev, scan: false }))} 
-          onScanned={(val) => setters.setBarcode(val)} 
-        />
+      {/* Modals */}
+      <LocationPickerModal
+        open={modals.location}
+        selected={draft.location}
+        options={location_OPTIONS}
+        onClose={() => setModals(prev => ({ ...prev, location: false }))}
+        onSelect={(c) => { setters.setLoc(c); setModals(prev => ({ ...prev, location: false })); }}
+      />
 
-        <DatePickerModal
-          open={modals.date}
-          value={draft.expiresAt}
-          onClose={() => setModals(prev => ({ ...prev, date: false }))}
-          onChange={(d) => setters.setExpiresAt(d)}
-          onClear={() => setters.setExpiresAt(undefined)}
-        />
-      </SafeAreaView>
+      <BarcodeScannerModal
+        open={modals.scan}
+        onClose={() => setModals(prev => ({ ...prev, scan: false }))}
+        onScanned={(val) => setters.setBarcode(val)}
+      />
+
+      <DatePickerModal
+        open={modals.date}
+        value={draft.expiresAt}
+        onClose={() => setModals(prev => ({ ...prev, date: false }))}
+        onChange={(d) => setters.setExpiresAt(d)}
+        onClear={() => setters.setExpiresAt(undefined)}
+      />
+    </SafeAreaView>
   );
 }
 

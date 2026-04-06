@@ -83,7 +83,7 @@ export const GroupedInventoryList: React.FC<Props> = ({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.addTitle}>הוספת מוצר חדש</Text>
-              <Text style={styles.addSubtitle}>הוסיפי פריט נוסף למלאי שלך בצורה פשוטה.</Text>
+              <Text style={styles.addSubtitle}>הוסף פריט נוסף למלאי שלך בצורה פשוטה.</Text>
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -120,12 +120,12 @@ function ProductGroupCard(props: {
 
   return (
     <View style={[styles.groupCard, expanded && styles.groupCardExpanded]}>
-      <Pressable 
-        style={({ pressed }) => [styles.cardHeader, pressed && { backgroundColor: COLORS.BG_DIM }]} 
+      <Pressable
+        style={({ pressed }) => [styles.cardHeader, pressed && { backgroundColor: COLORS.BG_DIM }]}
         onPress={onToggle}
       >
         <View style={[styles.accentStrip, { backgroundColor: mainLocationColor }]} />
-        
+
         <View style={styles.headerContent}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
@@ -150,10 +150,10 @@ function ProductGroupCard(props: {
                 {group.sections.length === 1 ? locationLabel(group.sections[0].location) : `${group.sections.length} אזורים`}
               </Text>
             </View>
-            <Ionicons 
-              name={expanded ? "chevron-up" : "chevron-down"} 
-              size={18} 
-              color={COLORS.BRAND_MUTED} 
+            <Ionicons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={COLORS.BRAND_MUTED}
               style={{ marginLeft: "auto" }}
             />
           </View>
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   itemName: { fontSize: 15, fontWeight: "800", color: COLORS.BRAND_TEXT, textAlign: "right" },
   itemSubtitle: { fontSize: 12, color: COLORS.BRAND_MUTED, textAlign: "right", marginTop: 2 },
-  
+
   qtyBadge: {
     backgroundColor: COLORS.BRAND_BLUE_SOFT,
     paddingHorizontal: 10,
@@ -349,26 +349,26 @@ const styles = StyleSheet.create({
   batchInfo: { flex: 1, alignItems: "flex-start", gap: 6 },
   batchDateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   batchDateText: { fontSize: 12, color: COLORS.BRAND_TEXT, fontWeight: "600" },
-  
+
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   statusBadgeText: { fontSize: 11, fontWeight: "800" },
 
   batchActions: { alignItems: "center", gap: 10 },
-  qtyControl: { 
-    flexDirection: "row", 
-    alignItems: "center", 
+  qtyControl: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.BG_DIM,
     borderRadius: 10,
     padding: 2,
     gap: 8,
   },
-  qtyBtn: { 
-    width: 24, 
-    height: 24, 
-    borderRadius: 8, 
-    backgroundColor: COLORS.ACCENT, 
-    alignItems: "center", 
-    justifyContent: "center" 
+  qtyBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: COLORS.ACCENT,
+    alignItems: "center",
+    justifyContent: "center"
   },
   qtyValueText: { fontSize: 13, fontWeight: "800", color: COLORS.BRAND_TEXT, minWidth: 20, textAlign: "center" },
 

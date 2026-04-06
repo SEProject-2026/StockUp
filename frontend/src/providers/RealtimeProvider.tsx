@@ -26,6 +26,7 @@ const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  console.log("[Realtime] Provider state - userId:", userId, "hasSession:", !!session);
   const [homesVersion, setHomesVersion] = useState(0);
   const [inventoryVersionByHome, setInventoryVersionByHome] = useState<Record<string, number>>({});
   const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
