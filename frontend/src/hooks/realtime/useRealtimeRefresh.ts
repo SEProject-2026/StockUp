@@ -117,17 +117,21 @@ export function useRealtimeShoppingListsRefresh(
   homeId: string | undefined,
   refreshLists: () => Promise<void>
 ) {
-  const { shoppingListsVersionByHome } = useRealtimeContext();
+  const { shoppingListsVersionByHome, shoppingListsVersion } = useRealtimeContext();
   const lastVersionRef = useRef<number>(0);
+  const lastGlobalVersionRef = useRef<number>(0);
 
   const currentVersion = homeId ? (shoppingListsVersionByHome[homeId] ?? 0) : 0;
 
   useEffect(() => {
     if (!homeId) return;
-    if (currentVersion === lastVersionRef.current) return;
-
-    console.log("[ShoppingListsRefresh] Triggering refresh for version:", currentVersion);
-    lastVersionRef.current = currentVersion;
-    void refreshLists();
-  }, [homeId, currentVersion, refreshLists]);
+    
+    // Refresh if home-specific version OR global version changed
+    if (currentVersion !== lastVersionRef.current || shoppingListsVersion !== lastGlobalVersionRef.current) {
+      console.log("[ShoppingListsRefresh] Triggering refresh:", { homeVersion: currentVersion, globalVersion: shoppingListsVersion });
+      lastVersionRef.current = currentVersion;
+      lastGlobalVersionRef.current = shoppingListsVersion;
+      void refreshLists();
+    }
+  }, [homeId, currentVersion, shoppingListsVersion, refreshLists]);
 }

@@ -17,6 +17,7 @@ type RealtimeContextValue = {
   joinRequestsVersionByHome: Record<string, number>;
   homeMetaVersionByHome: Record<string, number>;
   shoppingListsVersionByHome: Record<string, number>;
+  shoppingListsVersion: number;
   shoppingListItemsVersionByList: Record<string, number>;
   bumpInventoryVersion: (homeId: string) => void;
   bumpJoinRequestsVersion: (homeId: string) => void;
@@ -36,6 +37,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [joinRequestsVersionByHome, setJoinRequestsVersionByHome] = useState<Record<string, number>>({});
   const [homeMetaVersionByHome, setHomeMetaVersionByHome] = useState<Record<string, number>>({});
   const [shoppingListsVersionByHome, setShoppingListsVersionByHome] = useState<Record<string, number>>({});
+  const [shoppingListsVersion, setShoppingListsVersion] = useState(0);
   const [shoppingListItemsVersionByList, setShoppingListItemsVersionByList] = useState<Record<string, number>>({});
 
   const channelsRef = useRef<any[]>([]);
@@ -269,6 +271,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               
               console.log("[Realtime] Shopping list change detected:", { listId, homeId });
               
+              setShoppingListsVersion((v) => v + 1); // Global reload trigger
               if (homeId) bumpShoppingListsVersion(homeId);
               if (listId) bumpShoppingListItemsVersion(listId);
             }
@@ -319,6 +322,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       joinRequestsVersionByHome,
       homeMetaVersionByHome,
       shoppingListsVersionByHome,
+      shoppingListsVersion,
       shoppingListItemsVersionByList,
       bumpInventoryVersion,
       bumpJoinRequestsVersion,
@@ -332,6 +336,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       joinRequestsVersionByHome,
       homeMetaVersionByHome,
       shoppingListsVersionByHome,
+      shoppingListsVersion,
       shoppingListItemsVersionByList,
       bumpInventoryVersion,
       bumpJoinRequestsVersion,

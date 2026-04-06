@@ -66,13 +66,10 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   const [dismissedBarcodes, setDismissedBarcodes] = useState<Set<string>>(new Set());
   const [isDeleted, setIsDeleted] = useState(false);
 
-  const syncFromDto = useCallback((dto: ShoppingListDTO, options?: { preserveMode?: boolean }) => {
+  const syncFromDto = useCallback((dto: ShoppingListDTO) => {
     const mappedItems = mapDtoToItems(dto);
     setItems(mappedItems);
-    
-    if (!options?.preserveMode) {
-      setMode(dto.is_active_shopping_mode ? "SHOPPING" : "EDIT");
-    }
+    setMode(dto.is_active_shopping_mode ? "SHOPPING" : "EDIT");
 
     const nextPicked: Record<string, boolean> = {};
     for (const item of mappedItems) {
@@ -94,7 +91,7 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
       setLoading(!isRealtime); // Only show spinner if not a background update
 
       const dto = await getShoppingList(listId);
-      syncFromDto(dto, { preserveMode: isRealtime });
+      syncFromDto(dto);
 
       setSuggestions([]);
       
