@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/app/_layout";
+import { useAuth } from "@/src/context/auth-context";
 import {
   updateExpirationRange,
   answerJoinRequest,
