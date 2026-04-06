@@ -58,8 +58,6 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
     setSaving(false);
   }, [visible, initialNickname, initialQty, initialExp]);
 
-  if (!visible) return null;
-
   const qtyNum = Number(qty);
   const canSave = !isNaN(qtyNum) && qtyNum >= 0 && !saving;
 
@@ -95,6 +93,8 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
     const d = String(date.getDate()).padStart(2, "0");
     setExp(`${y}-${m}-${d}`);
   };
+
+  if (!visible) return null;
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
