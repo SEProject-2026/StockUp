@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/src/config/supabase"; 
@@ -18,6 +19,8 @@ const AuthContext = createContext<{ session: Session | null; loading: boolean }>
 export const useAuth = () => useContext(AuthContext);
 
 // --- 2. Navigation Guard ---
+SplashScreen.preventAutoHideAsync();
+
 function NavigationGuard() {
   const { session, loading } = useAuth();
   const segments = useSegments();
@@ -111,6 +114,16 @@ export default function RootLayout() {
     const subscription = Notifications.addNotificationResponseReceivedListener(handleNotification);
     return () => subscription.remove();
   }, [router]);
+
+  // C. הסתרת ה-Splash Screen לאחר השהייה
+  useEffect(() => {
+    const hideSplash = async () => {
+      // נחכה 2 שניות (או 1.5 שניות לבידור)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await SplashScreen.hideAsync();
+    };
+    hideSplash();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

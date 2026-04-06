@@ -11,40 +11,42 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DatePickerModal from "../add-item/DatePickerModal";
 
 type Props = {
   visible: boolean;
   item: any | null;
   onClose: () => void;
-  onSave: (values: { 
-    nickname?: string | null; 
-    quantity: number; 
+  onSave: (values: {
+    nickname?: string | null;
+    quantity: number;
     expirationDate?: string | null
   }) => Promise<void> | void;
 };
 
 export function EditItemModal({ visible, item, onClose, onSave }: Props) {
   // השם המקורי שבא מהמערכת - מוצג לקריאה בלבד
-  const originalName = useMemo(() => 
-    item?.originalName || item?.original_name || "ללא שם מקורי", 
-  [item]);
+  const originalName = useMemo(() =>
+    item?.originalName || item?.original_name || "ללא שם מקורי",
+    [item]);
 
   // הכינוי הנוכחי (במערכת שלך הוא מופיע בשדה name של השורה)
-  const initialNickname = useMemo(() => 
-    item?.hasNickname ? (item?.name || "") : "", 
-  [item]);
+  const initialNickname = useMemo(() =>
+    item?.hasNickname ? (item?.name || "") : "",
+    [item]);
 
-  const initialQty = useMemo(() => 
-    item?.quantity !== undefined ? String(item.quantity) : "1", 
-  [item]);
+  const initialQty = useMemo(() =>
+    item?.quantity !== undefined ? String(item.quantity) : "1",
+    [item]);
 
-  const initialExp = useMemo(() => 
-    item?.expirationDate || "", 
-  [item]);
+  const initialExp = useMemo(() =>
+    item?.expirationDate || "",
+    [item]);
 
   const [nickname, setNickname] = useState("");
   const [qty, setQty] = useState("1");
   const [exp, setExp] = useState("");
+  const [isDatePickerOpen, setDatePickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // אתחול השדות בכל פעם שהמודל נפתח
@@ -79,11 +81,26 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
     }
   };
 
+  // Helper: המרת מחרוזת YYYY-MM-DD לאובייקט Date (עבור ה-picker)
+  const expDateObj = useMemo(() => {
+    if (!exp) return undefined;
+    const parts = exp.split("-");
+    if (parts.length !== 3) return undefined;
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }, [exp]);
+
+  const handleDateChange = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    setExp(`${y}-${m}-${d}`);
+  };
+
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : undefined} 
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.kav}
         >
           <View style={styles.card}>
@@ -134,14 +151,16 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
 
               <View style={{ flex: 1.5 }}>
                 <Text style={styles.label}>תוקף (YYYY-MM-DD)</Text>
-                <TextInput
-                  value={exp}
-                  onChangeText={setExp}
-                  placeholder="2025-12-31"
-                  placeholderTextColor="#9CA3AF"
-                  style={styles.input}
-                  textAlign="right"
-                />
+                <TouchableOpacity 
+                  onPress={() => setDatePickerOpen(true)}
+                  style={styles.dateInputTrigger}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#6B7280" />
+                  <Text style={[styles.dateText, !exp && { color: "#9CA3AF" }]}>
+                    {exp || "2026-12-31"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -157,6 +176,17 @@ export function EditItemModal({ visible, item, onClose, onSave }: Props) {
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        <DatePickerModal
+          open={isDatePickerOpen}
+          value={expDateObj}
+          onClose={() => setDatePickerOpen(false)}
+          onChange={handleDateChange}
+          onClear={() => {
+            setExp("");
+            setDatePickerOpen(false);
+          }}
+        />
       </View>
     </Modal>
   );
@@ -240,6 +270,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: "#111827",
+  },
+  dateInputTrigger: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateText: {
+    fontSize: 16,
+    color: "#111827",
+    textAlign: "right",
   },
   row: {
     flexDirection: "row",
