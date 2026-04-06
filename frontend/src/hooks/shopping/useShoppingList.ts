@@ -14,6 +14,7 @@ import {
   type LocationType,
 } from "@/src/api/shoppingLists";
 import { supabase } from "@/src/config/supabase";
+import { useRealtimeShoppingListItemsRefresh } from "../realtime/useRealtimeRefresh";
 
 export type LocationKey = string;
 
@@ -124,6 +125,9 @@ export function useShoppingList({ homeId, listId }: UseShoppingListParams) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Real-time synchronization for list items
+  useRealtimeShoppingListItemsRefresh(listId, loadData);
 
   useEffect(() => {
     if (!listId) return;

@@ -13,6 +13,7 @@ import {
   deleteHome,
 } from "@/src/api/homes";
 import { useRealtimeContext } from "../../providers/RealtimeProvider";
+import { useRealtimeHomeMetaRefresh } from "../realtime/useRealtimeRefresh";
 
 export function useHomeSettings(currentHomeId?: string) {
   const { session } = useAuth();
@@ -82,6 +83,9 @@ export function useHomeSettings(currentHomeId?: string) {
       loadHomeData(); 
     }
   }, [currentHomeId, currentUserId]);
+
+  // Real-time synchronization for metadata and admin changes
+  useRealtimeHomeMetaRefresh(currentHomeId, loadHomeData);
 
   // Real-time management permission calculation
   const isHomeAdmin = useMemo(() => {
