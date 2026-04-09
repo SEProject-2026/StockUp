@@ -32,6 +32,7 @@ The project is organized into two primary layers to maintain a clean separation 
 ### **Frontend (`/frontend`)**
 * `app/`: Navigation-based screens and user flows.
 * `src/components/`: Reusable UI components.
+* `src/hooks/`: Reusable stateful logic extracted from components to promote code modularity.
 * `src/context/`: Global state management for authentication and home context.
 * `src/api/`: Typed API clients for backend communication.
 
