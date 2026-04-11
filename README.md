@@ -2,6 +2,13 @@
 
 **StockUp** is a distributed mobile application designed to simplify household inventory management. By leveraging advanced image processing and real-time synchronization, it ensures that every household member has a clear, updated view of their stock and shopping needs.
 
+## 📱 Download the App
+
+[![Android](https://img.shields.io/badge/Android-Download%20APK-green?logo=android&logoColor=white)](INSERT_ANDROID_LINK_HERE)
+[![iOS](https://img.shields.io/badge/iOS-TestFlight-blue?logo=apple&logoColor=white)](INSERT_IOS_LINK_HERE)
+
+> **Note:** For the Android version, you may need to "Allow from unknown sources" in your settings. For iOS, access is provided via Apple TestFlight.
+
 ## 🚀 Key Features
 
 * **Smart Receipt Scanning & Parsing:** Automatically extract raw text from receipts using **Google Cloud Vision API**, processed by a custom-built **Logic Parser** to identify products.
