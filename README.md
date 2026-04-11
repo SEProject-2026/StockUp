@@ -4,8 +4,8 @@
 
 ## 📱 Download the App
 
-[![Android](https://img.shields.io/badge/Android-Download%20APK-green?logo=android&logoColor=white)](INSERT_ANDROID_LINK_HERE)
-[![iOS](https://img.shields.io/badge/iOS-TestFlight-blue?logo=apple&logoColor=white)](INSERT_IOS_LINK_HERE)
+[![Android](https://img.shields.io/badge/Android-Download%20APK-green?logo=android&logoColor=white)](https://expo.dev/accounts/elbad/projects/frontend/builds/973925dd-85da-4c44-ab3a-c5b865de020a)
+[![iOS](https://img.shields.io/badge/iOS-TestFlight-blue?logo=apple&logoColor=white)](https://testflight.apple.com/join/3hUv26E9)
 
 > **Note:** For the Android version, you may need to "Allow from unknown sources" in your settings. For iOS, access is provided via Apple TestFlight.
 
