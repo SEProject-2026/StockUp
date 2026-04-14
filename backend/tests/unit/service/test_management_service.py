@@ -117,6 +117,21 @@ class TestManagementService:
         assert not home.has_request_from(requester_id)
         mock_notifications.assert_called()
 
+    @pytest.mark.asyncio
+    async def test_answer_join_request_unauthorized_member_fails(self, mgmt_service, mock_home_repo, auth_setup):
+        """Sad Path: A regular member cannot approve join requests."""
+        home, admin = auth_setup
+        regular_member_id = uuid.uuid4()
+        requester_id = uuid.uuid4()
+        
+        home.add_member(regular_member_id) # Add a regular member
+        home.add_join_request(requester_id)
+        mock_home_repo.get_by_id.return_value = home
+
+        # Expecting the Domain to raise a PermissionError (or ValueError depending on your Domain logic)
+        with pytest.raises(Exception): 
+            await mgmt_service.answer_join_request(home._id, regular_member_id, requester_id, approved=True)
+
     # ==========================================
     # 4. Member & Role Management
     # ==========================================
@@ -245,3 +260,56 @@ class TestManagementService:
 
         with pytest.raises(ValueError, match="User is not a member"):
             await mgmt_service.delete_home(stranger_id, home._id)
+
+    # ==========================================
+    # 7. Missing Endpoint Coverage
+    # ==========================================
+
+    @pytest.mark.asyncio
+    async def test_get_all_homes_for_user_success(self, mgmt_service, mock_home_repo):
+        """Happy Path: Retrieve all homes for a user."""
+        user_id = uuid.uuid4()
+        mock_home_repo.get_homes_by_user_id.return_value = [MagicMock(), MagicMock()]
+        
+        homes = await mgmt_service.get_all_homes_for_user(user_id)
+        assert len(homes) == 2
+        mock_home_repo.get_homes_by_user_id.assert_called_once_with(user_id)
+
+    @pytest.mark.asyncio
+    async def test_get_all_homes_for_user_missing_id(self, mgmt_service):
+        """Sad Path: Fails when user ID is None."""
+        with pytest.raises(ValueError, match="User ID is required"):
+            await mgmt_service.get_all_homes_for_user(None)
+
+    @pytest.mark.asyncio
+    async def test_get_join_requests_success(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup):
+        """Happy Path: Head of house retrieves join requests names."""
+        home, admin = auth_setup
+        requester_id = uuid.uuid4()
+        home.add_join_request(requester_id) # Add a request
+        mock_home_repo.get_by_id.return_value = home
+        mock_user_repo.get_names_by_ids.return_value = {requester_id: "New Guy"}
+
+        requests = await mgmt_service.get_join_requests(admin.id, home._id)
+        
+        assert requests[requester_id] == "New Guy"
+        mock_user_repo.get_names_by_ids.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_check_access_missing_ids_fails(self, mgmt_service):
+        """Sad Path: Service rejects actions if user_id or home_id is missing."""
+        with pytest.raises(ValueError, match="User ID and Home ID are required"):
+            # Using view_home_code as a proxy to trigger _check_access
+            await mgmt_service.view_home_code(None, uuid.uuid4())
+            
+        with pytest.raises(ValueError, match="User ID and Home ID are required"):
+            await mgmt_service.view_home_code(uuid.uuid4(), None)
+
+    @pytest.mark.asyncio
+    async def test_check_access_home_not_found_fails(self, mgmt_service, mock_home_repo):
+        """Sad Path: Service handles non-existent home gracefully."""
+        mock_home_repo.get_by_id.return_value = None # Simulate DB not finding the home
+        
+        with pytest.raises(ValueError, match="Home retrieval failed"):
+            await mgmt_service.view_home_code(uuid.uuid4(), uuid.uuid4())
+    

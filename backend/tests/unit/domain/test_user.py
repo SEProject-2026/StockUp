@@ -21,6 +21,14 @@ class TestUserDomain:
         
         with pytest.raises(ValueError, match="User name cannot be empty"):
             User(id=uuid.uuid4(), email="test@test.com", name="   ", push_token="123")
+    
+    def test_user_creation_with_invalid_email_fails(self):
+        """Sad Path: Domain should reject empty or invalid emails."""
+        with pytest.raises(ValueError, match="Invalid email address"):
+            User(id=uuid.uuid4(), email="", name="David")
+            
+        with pytest.raises(ValueError, match="Invalid email address"):
+            User(id=uuid.uuid4(), email="david_no_shtrudel.com", name="David")
 
     # ==========================================
     # 2. Name Management (update_name)
@@ -45,3 +53,15 @@ class TestUserDomain:
         new_token = "token_123"
         any_user.update_push_token(new_token)
         assert any_user.push_token == new_token
+
+    def test_user_clear_push_token_on_logout(self, any_user):
+        """Happy Path: Clearing the push token when a user logs out."""
+        # Setup: User has a token
+        any_user.update_push_token("token_to_be_deleted")
+        assert any_user.push_token is not None
+        
+        # Act: Clear it
+        any_user.update_push_token(None)
+        
+        # Assert
+        assert any_user.push_token is None
