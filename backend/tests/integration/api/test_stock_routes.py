@@ -240,8 +240,7 @@ def test_stock_routes_unauthenticated_fails(client):
 # ==========================================
 
 @pytest.mark.parametrize("method, endpoint, payload", [
-    ("POST", "/stock/add", {"name": "A", "quantity": 1}),
-    ("PATCH", f"/stock/{uuid4()}/items/{uuid4()}/expiration", {"new_date": "2026-01-01"}),
+    ("POST", "/stock/add", {"name": "Valid Name", "quantity": 1, "barcode": "123"}),    ("PATCH", f"/stock/{uuid4()}/items/{uuid4()}/expiration", {"new_date": "2026-01-01"}),
     ("PATCH", f"/stock/{uuid4()}/items/{uuid4()}/location", {"location": "FREEZER"}),
     ("PATCH", f"/stock/{uuid4()}/nickname", {"nickname": "New Name"}),
     ("DELETE", f"/stock/{uuid4()}/items/{uuid4()}", None),
