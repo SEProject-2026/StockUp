@@ -128,9 +128,9 @@ class DbCatalogProvider(ICatalogProvider):
             ).first()
         if db_item:
             # 2. Perform calculation
-            old_total = db_item.weight * db_item.sample_size
+            old_total = db_item.avg_weight * db_item.sample_size
             db_item.sample_size += 1
-            db_item.weight = (old_total + measured_weight) / db_item.sample_size
+            db_item.avg_weight = (old_total + measured_weight) / db_item.sample_size
             
             # 3. Force synchronization
             # Ensure the item is attached to the current session
