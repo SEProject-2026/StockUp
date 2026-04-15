@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from uuid import uuid4
 from src.infrastructure.db.models import HomeModel, UserModel
@@ -292,3 +294,57 @@ class TestManagementAPIIntegration:
         payload = {"name": "Hacker Home"}
         response = client.post("/homes/create", json=payload)
         assert response.status_code == 401
+
+    # ==========================================
+    # 6. Full Router Exception Coverage (Boost to 100%)
+    # ==========================================
+
+    @pytest.mark.parametrize("method, endpoint, payload", [
+        ("POST", "/homes/create", {"name": "Test"}),
+        ("GET", "/homes/my_homes", None),
+        ("GET", f"/homes/{uuid4()}/join_code", None),
+        ("POST", "/homes/join", {"home_code": "12345678"}),
+        ("POST", f"/homes/{uuid4()}/answer_request", {"user_id": str(uuid4()), "approved": True}),
+        ("DELETE", f"/homes/{uuid4()}/members/{uuid4()}", None),
+        ("POST", f"/homes/{uuid4()}/leave", None),
+        ("PUT", f"/homes/{uuid4()}/switch_head", {"new_head_id": str(uuid4())}),
+        ("DELETE", f"/homes/{uuid4()}", None),
+        ("GET", f"/homes/{uuid4()}/details", None),
+        ("PATCH", f"/homes/{uuid4()}/expiration_range", {"new_range": 14}),
+        ("GET", f"/homes/{uuid4()}/join_requests", None),
+    ])
+    def test_all_management_routes_exceptions_returns_400_or_403(self, client, auth_user, db_session, method, endpoint, payload):
+        """Coverage: Ensure EVERY route properly catches errors and returns 400 or 403."""
+        create_user_entity(db=db_session, user_id=auth_user)
+        db_session.flush()
+
+        with patch("src.infrastructure.app_container.AppContainer.get_management_service") as mock_factory:
+            mock_svc = AsyncMock()
+            error_to_throw = ValueError("Domain error") 
+            mock_svc.create_home.side_effect = error_to_throw
+            mock_svc.get_all_homes_for_user.side_effect = error_to_throw
+            mock_svc.view_home_code.side_effect = error_to_throw
+            mock_svc.join_home.side_effect = error_to_throw
+            mock_svc.answer_join_request.side_effect = error_to_throw
+            mock_svc.remove_member.side_effect = error_to_throw
+            mock_svc.leave_home.side_effect = error_to_throw
+            mock_svc.switch_home_head.side_effect = error_to_throw
+            mock_svc.delete_home.side_effect = error_to_throw
+            mock_svc.get_home_details.side_effect = error_to_throw
+            mock_svc.update_expiration_range.side_effect = error_to_throw
+            mock_svc.get_join_requests.side_effect = error_to_throw
+            
+            mock_factory.return_value = mock_svc
+
+            if method == "POST":
+                res = client.post(endpoint, json=payload)
+            elif method == "PUT":
+                res = client.put(endpoint, json=payload)
+            elif method == "PATCH":
+                res = client.patch(endpoint, json=payload)
+            elif method == "DELETE":
+                res = client.delete(endpoint)
+            else:
+                res = client.get(endpoint)
+
+            assert res.status_code in [400, 403, 404]

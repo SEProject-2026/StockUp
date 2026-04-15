@@ -169,3 +169,80 @@ def test_delete_shopping_list_success(client, active_home):
     
     assert response.status_code == 204
     # No json() assertion here because 204 means no body!
+
+# ==========================================
+# 5. Full Router Exception Coverage (Boost to 100%)
+# ==========================================
+
+@pytest.mark.parametrize("method, endpoint, payload", [
+    ("GET", f"/shopping-lists/{uuid4()}", None),
+    ("POST", f"/shopping-lists/{uuid4()}/items", {"item_name": "Milk", "quantity": 1}),
+    ("GET", f"/shopping-lists/{uuid4()}/recommendations", None),
+    ("DELETE", f"/shopping-lists/{uuid4()}/items/Milk", None),
+    ("PATCH", f"/shopping-lists/{uuid4()}/items/Milk/quantity", {"new_quantity": 2}),
+    ("POST", f"/shopping-lists/{uuid4()}/enter-mode", None),
+    ("PATCH", f"/shopping-lists/{uuid4()}/items/Milk/check", None),
+    ("POST", f"/shopping-lists/{uuid4()}/exit-mode", {"clear": True}),
+])
+def test_all_shopping_routes_value_error_returns_404(client, active_home, method, endpoint, payload):
+    """Coverage: Ensure EVERY shopping route properly catches ValueError and returns 404."""
+    with patch("src.infrastructure.app_container.AppContainer.get_shopping_list_service") as mock_factory:
+        mock_svc = AsyncMock()
+        # Make all methods throw ValueError
+        mock_svc.get_shopping_list.side_effect = ValueError("Not found")
+        mock_svc.add_item_to_list.side_effect = ValueError("Not found")
+        mock_svc.remove_item_from_list.side_effect = ValueError("Not found")
+        mock_svc.update_item_quantity.side_effect = ValueError("Not found")
+        mock_svc.enter_shopping_mode.side_effect = ValueError("Not found")
+        mock_svc.check_item_as_bought.side_effect = ValueError("Not found")
+        mock_svc.exit_shopping_mode.side_effect = ValueError("Not found")
+        
+        mock_factory.return_value = mock_svc
+        
+        # Mocking the recommendation service just in case the endpoint hits it
+        with patch("src.infrastructure.app_container.AppContainer.get_recommendation_service") as rec_factory:
+            rec_svc = AsyncMock()
+            rec_svc.get_recommendations.side_effect = ValueError("Not found")
+            rec_factory.return_value = rec_svc
+
+            # Execute the request dynamically
+            if method == "POST":
+                res = client.post(endpoint, json=payload)
+            elif method == "PATCH":
+                res = client.patch(endpoint, json=payload)
+            elif method == "DELETE":
+                res = client.delete(endpoint)
+            else:
+                res = client.get(endpoint)
+
+            assert res.status_code == 404
+            assert "detail" in res.json()
+
+
+def test_create_list_permission_error_returns_403(client, active_home):
+    """Coverage: Ensure create_list catches PermissionError (from ManagementService) and returns 403."""
+    with patch("src.infrastructure.app_container.AppContainer.get_management_service") as mock_mgt:
+        mock_mgt_svc = AsyncMock()
+        mock_mgt_svc.get_home_details.side_effect = PermissionError("Not a member")
+        mock_mgt.return_value = mock_mgt_svc
+        
+        res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Test"})
+        
+        assert res.status_code == 403
+
+
+def test_create_list_general_exception_returns_400(client, active_home):
+    """Coverage: Ensure create_list catches general Exceptions and returns 400."""
+    with patch("src.infrastructure.app_container.AppContainer.get_management_service") as mock_mgt:
+        # Bypass management check
+        mock_mgt.return_value = AsyncMock()
+        
+        with patch("src.infrastructure.app_container.AppContainer.get_shopping_list_service") as mock_shop:
+            mock_shop_svc = AsyncMock()
+            # Throw a general exception
+            mock_shop_svc.create_shopping_list.side_effect = Exception("DB Timeout")
+            mock_shop.return_value = mock_shop_svc
+            
+            res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Test"})
+            
+            assert res.status_code == 400
