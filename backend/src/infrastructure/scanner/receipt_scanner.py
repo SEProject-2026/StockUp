@@ -79,7 +79,7 @@ class ReceiptScanner:
                     sys.path.append(backend_path)
                 
                 from tests.unit.scanner.test_recorder import save_receipt_test_case
-                save_receipt_test_case(chain_name, slices_info)
+                save_receipt_test_case(chain_name, slices_info, final_data)
             except Exception as e:
                 print(f"Warning: Failed to execute test case recorder: {e}")
                 

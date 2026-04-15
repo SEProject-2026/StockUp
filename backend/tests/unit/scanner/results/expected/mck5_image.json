@@ -1,0 +1,160 @@
+{
+    "chain": "mck",
+    "items": [
+        {
+            "barcode": "7290116934150",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110568276",
+            "quantity": 4.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290119375837",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "2868996",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290019635581",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4126674",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116932033",
+            "quantity": 3.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "2824183",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4584351",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "453422",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290013145918",
+            "quantity": 3.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290010003839",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290013145857",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290013145840",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290112348548",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116535951",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "3643004",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "72753",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290113862517",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290103701017",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290012295836",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290016334616",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "618",
+            "quantity": 1.31,
+            "unit": "KG"
+        },
+        {
+            "barcode": "667",
+            "quantity": 1.595,
+            "unit": "KG"
+        },
+        {
+            "barcode": "645",
+            "quantity": 0.605,
+            "unit": "KG"
+        },
+        {
+            "barcode": "515",
+            "quantity": 0.545,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290111344206",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8001090184412",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "289069",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110115364",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "555503",
+            "quantity": 6.0,
+            "unit": "UNIT"
+        }
+    ]
+}
