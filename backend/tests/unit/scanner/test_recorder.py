@@ -60,7 +60,13 @@ def save_receipt_test_case(chain_name: str, slices_info: list, final_data: dict 
                     img_name = f"{base_name}_{idx+1}{ext}"
                     
                 dest_img_path = images_dir / img_name
-                shutil.copy2(image_path, dest_img_path)
+                try:
+                    src_abs = os.path.abspath(image_path)
+                    dest_abs = os.path.abspath(dest_img_path)
+                    if src_abs != dest_abs:
+                        shutil.copy2(src_abs, dest_abs)
+                except Exception as e:
+                    print(f"Warning: Failed to copy image {image_path}: {e}")
                 
             # Convert Raw Text
             try:

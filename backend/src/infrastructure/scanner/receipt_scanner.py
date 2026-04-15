@@ -7,40 +7,7 @@ ENABLE_DEBUG = os.environ.get("ENABLE_DEBUG", "False").lower() == "true"
 
 class ReceiptScanner:
 
-    def _save_scan_debug_json(self, image_paths: list, chain_name: str, scanned_items: dict):
-        """
-        Saves the final scan result to a JSON file for testing and validation.
-        """
-        if not ENABLE_DEBUG:
-            return
-        try:
-            results_dir = os.path.join(os.getcwd(), "results", "expected")
-            os.makedirs(results_dir, exist_ok=True)
 
-            # Create a filename based on the first image processed
-            base_name = os.path.splitext(os.path.basename(image_paths[0]))[0]
-            debug_file_path = os.path.join(results_dir, f"{base_name}_final_result.json")
-
-            # Structure the data for easy testing
-            debug_data = {
-                "chain": chain_name,
-                "items": [
-                    {
-                        "barcode": barcode,
-                        "quantity": data[0],
-                        "unit": data[1]
-                    }
-                    for barcode, data in scanned_items.items()
-                ]
-            }
-
-            with open(debug_file_path, "w", encoding="utf-8") as f:
-                json.dump(debug_data, f, ensure_ascii=False, indent=4)
-            
-            print(f"--- Scan Result JSON saved to: {debug_file_path} ---")
-        except Exception as e:
-            # Using print or a fallback logger if app_logger isn't imported here
-            print(f"Warning: Failed to save scan debug JSON: {e}")
     def parse_receipt(self,all_paths: list) -> tuple[str, dict]:
         """
         Parses one or more receipt images and merges them.
@@ -97,6 +64,6 @@ class ReceiptScanner:
             else:
                 scanned_items[barcode] = (qty, unit_str)
         
-        self._save_scan_debug_json(all_paths, chain_name, scanned_items)
+
 
         return chain_name, scanned_items
