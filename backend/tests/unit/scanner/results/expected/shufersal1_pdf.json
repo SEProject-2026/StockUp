@@ -1,0 +1,95 @@
+{
+    "chain": "shufersal",
+    "items": [
+        {
+            "barcode": "60200",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "72623",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290112494283",
+            "quantity": 6.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8000500071083",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8005110170225",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8423207208680",
+            "quantity": 5.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8423207208697",
+            "quantity": 3.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "48185",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "57088",
+            "quantity": 3.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "72940761",
+            "quantity": 4.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290116930695",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "190853",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7296073106241",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8410104045111",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110115227",
+            "quantity": 4.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290111566752",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "537566",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "9952339",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}
