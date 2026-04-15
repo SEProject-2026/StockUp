@@ -31,6 +31,15 @@ class TestManagementAPIIntegration:
         assert response.status_code == 200
         assert len(response.json()["data"]) == 2
 
+    def test_create_home_empty_name_fails(self, client, auth_user, db_session):
+        """Validation: Catch empty home name strings (422)."""
+        create_user_entity(db=db_session, user_id=auth_user)
+        db_session.flush()
+
+        response = client.post("/homes/create", json={"name": ""})
+        # Pydantic should block it before it hits the service
+        assert response.status_code == 422
+
     # ==========================================
     # 2. Join Codes & Requests
     # ==========================================
@@ -105,6 +114,17 @@ class TestManagementAPIIntegration:
 
         response = client.post(f"/homes/{home.id}/answer_request", json={"user_id": str(applicant.id), "approved": True})
         assert response.status_code == 400
+
+    def test_join_home_invalid_code_fails(self, client, auth_user, db_session):
+        """Sad Path: Trying to join with a non-existent code."""
+        create_user_entity(db=db_session, user_id=auth_user)
+        db_session.flush()
+
+        # "WRONG-CODE" is definitely not a valid 8-char code
+        response = client.post("/homes/join", json={"home_code": "WRONG-CO"}) 
+        
+        assert response.status_code == 400
+        assert "detail" in response.json()
 
     # ==========================================
     # 3. Membership & Roles
@@ -242,3 +262,33 @@ class TestManagementAPIIntegration:
         db_session.flush()
         response = client.get(f"/homes/{uuid4()}/join_code")
         assert response.status_code in [400, 403, 404]
+
+    def test_get_home_details_success(self, client, auth_user, db_session):
+        """Happy Path: Authenticated member retrieves home details."""
+        create_user_entity(db=db_session, user_id=auth_user)
+        home = create_home_entity(db=db_session, admin_user_id=auth_user, name="My Details Home")
+        db_session.flush()
+
+        response = client.get(f"/homes/{home.id}/details")
+        
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["name"] == "My Details Home"
+        assert "join code" in data
+        assert str(auth_user) in data["member_names"]
+
+    # ==========================================
+    # 6. Security (401 Unauthorized Checks)
+    # ==========================================
+
+    def test_get_my_homes_unauthenticated_fails(self, client):
+        """Security: Verify unauthenticated requests are blocked globally in this router."""
+        # Using the client WITHOUT the auth_user fixture/token
+        response = client.get("/homes/my_homes")
+        assert response.status_code == 401
+
+    def test_create_home_unauthenticated_fails(self, client):
+        """Security: Cannot create a home without being logged in."""
+        payload = {"name": "Hacker Home"}
+        response = client.post("/homes/create", json=payload)
+        assert response.status_code == 401

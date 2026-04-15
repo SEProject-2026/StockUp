@@ -19,10 +19,15 @@ from src.infrastructure.app_container import AppContainer
 from src.infrastructure.logger import app_logger
 
 from src.api.routes.translate_notifications import translate_error
+from src.services.management_service import ManagementService
 
 router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 
 # --- Dependency Injection ---
+def get_management_service(db: Session = Depends(get_db)) -> ManagementService:
+    return AppContainer.get_management_service(db)
+
+ManagementServiceDep = Annotated[ManagementService, Depends(get_management_service)]
 
 def get_shopping_list_service(db: Session = Depends(get_db)) -> ShoppingListService:
     return AppContainer.get_shopping_list_service(db)
@@ -39,19 +44,22 @@ RecommendationServiceDep = Annotated[RecommendationService, Depends(get_recommen
 async def create_list(
     request: CreateShoppingListRequest, 
     service: ShoppingServiceDep, 
+    management_service: ManagementServiceDep,
     user_id: UUID = Depends(get_current_user_id)
 ):
     app_logger.info(f"User {user_id} creating list '{request.name}' for home {request.home_id}")
     try:
         # Check if user belongs to home before creating
         # We assume the service or a dedicated validator handles this check
+        await management_service.get_home_details(user_id, request.home_id)
+
         new_list = await service.create_shopping_list(request.home_id, request.name)
         return GeneralResponse(
             status="success", 
             message="List created", 
             data=ShoppingListDTO.model_validate(new_list)
         )
-    except PermissionError as e:
+    except (ValueError, PermissionError) as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except Exception as e:
