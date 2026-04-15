@@ -42,6 +42,7 @@ def scan_receipt(file_path: str) -> dict:
     else:
         result = parse_receipt_google(text)
         
+    result["raw_text"] = text
     return result
 
 def merge_receipts(receipts: list) -> dict:

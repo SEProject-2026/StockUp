@@ -47,11 +47,19 @@ class ReceiptScanner:
         """
         # Scan all slices
         parsed_slices = []
+        slices_info = []
         
         for path in all_paths:
             # Using the core function from your scanner.py
             result = scan_receipt(path)
             parsed_slices.append(result)
+            
+            raw_text = result.get("raw_text", "")
+            slices_info.append({
+                "image_path": path,
+                "raw_text": raw_text,
+                "result": result
+            })
             
         # Merge if there are multiple parts (Panorama Stitching)
         if len(parsed_slices) > 1:
@@ -62,6 +70,19 @@ class ReceiptScanner:
         # The service expects (chain_name, items_dict)
         chain_name = final_data.get("chain", "Unknown")
         
+        if ENABLE_DEBUG:
+            try:
+                import sys
+                from pathlib import Path
+                backend_path = str(Path(__file__).resolve().parent.parent.parent.parent.parent)
+                if backend_path not in sys.path:
+                    sys.path.append(backend_path)
+                
+                from tests.unit.scanner.test_recorder import save_receipt_test_case
+                save_receipt_test_case(chain_name, slices_info)
+            except Exception as e:
+                print(f"Warning: Failed to execute test case recorder: {e}")
+                
         # Transform products list to the dictionary format the service expects:
         # { barcode: (quantity, unit_str) }
         scanned_items = {}
