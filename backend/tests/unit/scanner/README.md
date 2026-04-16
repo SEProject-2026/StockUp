@@ -12,11 +12,11 @@ The tests evaluate the robustness and accuracy of the parsing algorithms (the lo
 
 ## 🛠️ Adding New Test Cases
 
-If you encounter a receipt that is parsed incorrectly and want to add it as a new test case, use the CLI utility located in the `backend/` directory.
+If you encounter a receipt that is parsed incorrectly and want to add it as a new test case, use the CLI utility located in this directory.
 
 Open your terminal in the `backend` folder and run:
 ```bash
-python generate_test_fixture.py "path/to/your/receipt.jpg"
+python tests/unit/scanner/generate_test_fixture.py "path/to/your/receipt.jpg"
 ```
 *(For panoramic receipts composed of multiple images, simply append paths sequentially in the same command).*
 
