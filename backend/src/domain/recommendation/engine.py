@@ -206,8 +206,8 @@ class RecommendationEngine:
         cat_freq = self._calculate_category_frequencies(receipts)
         total_receipts = len(receipts)
         
-        # Identify Staples (>50% freq AND >=3 purchases)
-        staple_cats = {c for c, count in cat_freq.items() if (count/total_receipts) >= 0.5 and count >= 3}
+        # Identify Staples (>50% freq AND >=10 purchases)
+        staple_cats = {c for c, count in cat_freq.items() if (count/total_receipts) >= 0.5 and count >= 10}
         
         # Calculate Category Stock
         cat_stock = defaultdict(float)
@@ -307,8 +307,6 @@ class RecommendationEngine:
             target_f = cat_freq.get(generic, 1)
             idf = math.log10((total_receipts + 1) / (target_f + 0.5)) + 0.5
             score = float(total_count) * idf
-            if metadata.bc_to_loc.get(best_target) == metadata.bc_to_loc.get(best_source):
-                score *= 1.2 # Bonus for same location
             
             recommendations.append({
                 'barcode': best_target,
@@ -322,7 +320,7 @@ class RecommendationEngine:
 
     def _classify_receipt_store_type(self, receipt: ReceiptDTO, bc_to_loc: Dict[str, str]) -> StoreType:
         """Heuristic to determine if a receipt is from a Supermarket, Pharmacy, etc."""
-        chain = (receipt.chain or "") 
+        chain = (receipt.chain or "").lower()
         if any(kw in chain for kw in ["pharm", "be", "pharmacy", "סופר פארם", "ניו פארם"]):
             return StoreType.PHARMACY
         
