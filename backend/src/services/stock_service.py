@@ -189,7 +189,7 @@ class StockService:
             if item.name == "Unknown Product":
                 continue
             
-            if item.unit == UnitType.KG and item.quantity > 0:
+            if item.unit == UnitType.KG and item.quantity > 0 and item.barcode:
                 current_measured_avg = item.weight / item.quantity
                 self._catalog_provider.update_weighted_mem_only(
                     barcode=item.barcode,
