@@ -1,0 +1,198 @@
+==== SCANNER ACCURACY REPORT ====
+
+Case: mck1 (image)
+  - Barcode Identification Rate: 100.0% (14/14)
+  - Quantity Accuracy Rate:    100.0% (14/14)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck1 (pdf)
+  - Barcode Identification Rate: 100.0% (39/39)
+  - Quantity Accuracy Rate:    100.0% (39/39)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck2 (image)
+  - Barcode Identification Rate: 100.0% (15/15)
+  - Quantity Accuracy Rate:    100.0% (15/15)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck2 (pdf)
+  - Barcode Identification Rate: 100.0% (37/37)
+  - Quantity Accuracy Rate:    100.0% (37/37)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck3 (image)
+  - Barcode Identification Rate: 100.0% (45/45)
+  - Quantity Accuracy Rate:    100.0% (45/45)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck3 (pdf)
+  - Barcode Identification Rate: 100.0% (35/35)
+  - Quantity Accuracy Rate:    100.0% (35/35)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck4 (image)
+  - Barcode Identification Rate: 100.0% (26/26)
+  - Quantity Accuracy Rate:    100.0% (26/26)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck4 (pdf)
+  - Barcode Identification Rate: 100.0% (55/55)
+  - Quantity Accuracy Rate:    100.0% (55/55)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck5 (image)
+  - Barcode Identification Rate: 100.0% (31/31)
+  - Quantity Accuracy Rate:    100.0% (31/31)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck5 (pdf)
+  - Barcode Identification Rate: 100.0% (60/60)
+  - Quantity Accuracy Rate:    100.0% (60/60)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck6 (image)
+  - Barcode Identification Rate: 96.9% (31/32)
+  - Quantity Accuracy Rate:    100.0% (31/31)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          97.8/100
+    Missing: ['2057123']
+----------------------------------------
+Case: mck7 (image)
+  - Barcode Identification Rate: 100.0% (18/18)
+  - Quantity Accuracy Rate:    100.0% (18/18)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck8 (image)
+  - Barcode Identification Rate: 97.1% (34/35)
+  - Quantity Accuracy Rate:    94.1% (32/34)
+  - False Positives (Noise):   3
+  >> COMPOSITE SCORE:          94.5/100
+    Missing: ['5740900403215']
+    Extra (False Pos): ['72901073713', '900403215', '7290010119956']
+    Mismatched QTY:
+      [7290110573713] Expected 2.0, Got 1.0
+      [7290010119950] Expected 6.0, Got 5.0
+----------------------------------------
+Case: ramilevi1 (image)
+  - Barcode Identification Rate: 100.0% (5/5)
+  - Quantity Accuracy Rate:    100.0% (5/5)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: ramilevi1 (pdf)
+  - Barcode Identification Rate: 100.0% (42/42)
+  - Quantity Accuracy Rate:    100.0% (42/42)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: ramilevi2 (pdf)
+  - Barcode Identification Rate: 100.0% (37/37)
+  - Quantity Accuracy Rate:    100.0% (37/37)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: ramilevi3 (pdf)
+  - Barcode Identification Rate: 100.0% (62/62)
+  - Quantity Accuracy Rate:    100.0% (62/62)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: ramilevi4 (pdf)
+  - Barcode Identification Rate: 100.0% (72/72)
+  - Quantity Accuracy Rate:    100.0% (72/72)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: ramilevi5 (pdf)
+  - Barcode Identification Rate: 100.0% (30/30)
+  - Quantity Accuracy Rate:    100.0% (30/30)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: shufersal1 (image)
+  - Barcode Identification Rate: 100.0% (3/3)
+  - Quantity Accuracy Rate:    100.0% (3/3)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: shufersal1 (pdf)
+  - Barcode Identification Rate: 100.0% (18/18)
+  - Quantity Accuracy Rate:    100.0% (18/18)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: shufersal2 (image)
+  - Barcode Identification Rate: 100.0% (6/6)
+  - Quantity Accuracy Rate:    100.0% (6/6)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: shufersal2 (pdf)
+  - Barcode Identification Rate: 100.0% (17/17)
+  - Quantity Accuracy Rate:    100.0% (17/17)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: shufersal3 (image)
+  - Barcode Identification Rate: 100.0% (2/2)
+  - Quantity Accuracy Rate:    100.0% (2/2)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: tivtaam1 (image)
+  - Barcode Identification Rate: 87.5% (7/8)
+  - Quantity Accuracy Rate:    100.0% (7/7)
+  - False Positives (Noise):   1
+  >> COMPOSITE SCORE:          88.8/100
+    Missing: ['7290114314626']
+    Extra (False Pos): ['7290114314625']
+----------------------------------------
+Case: victory1 (image)
+  - Barcode Identification Rate: 100.0% (4/4)
+  - Quantity Accuracy Rate:    100.0% (4/4)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: victory1 (pdf)
+  - Barcode Identification Rate: 100.0% (30/30)
+  - Quantity Accuracy Rate:    100.0% (30/30)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: victory2 (image)
+  - Barcode Identification Rate: 100.0% (3/3)
+  - Quantity Accuracy Rate:    100.0% (3/3)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: victory2 (pdf)
+  - Barcode Identification Rate: 100.0% (28/28)
+  - Quantity Accuracy Rate:    100.0% (28/28)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: yohananof1 (image)
+  - Barcode Identification Rate: 100.0% (6/6)
+  - Quantity Accuracy Rate:    100.0% (6/6)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+
+==== GLOBAL OVERALL RESULTS ====
+Total Expected Products: 815
+Global Barcode ID Rate:  99.6% (812/815)
+Global QTY Acc. Rate:    99.8% (810/812)
+Total False Positives:   4
+OVERALL COMPOSITE SCORE: 99.6/100
+(Score weights: 70% Barcode Identification + 30% Quantity Accuracy - 20% penalty per mismatch ratio)
