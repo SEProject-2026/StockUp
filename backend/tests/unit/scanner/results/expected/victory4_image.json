@@ -1,0 +1,30 @@
+{
+    "chain": "victory",
+    "items": [
+        {
+            "barcode": "642135553046",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290010051205",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290106728127",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "2010",
+            "quantity": 0.94,
+            "unit": "KG"
+        },
+        {
+            "barcode": "2036",
+            "quantity": 1.37,
+            "unit": "KG"
+        }
+    ]
+}

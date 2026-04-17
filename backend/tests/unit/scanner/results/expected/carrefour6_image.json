@@ -1,0 +1,90 @@
+{
+    "chain": "carrefour",
+    "items": [
+        {
+            "barcode": "7290001201510",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290005427107",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290119380831",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110566975",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290112330352",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290119384242",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290118521600",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1574",
+            "quantity": 3.07,
+            "unit": "KG"
+        },
+        {
+            "barcode": "1683",
+            "quantity": 1.81,
+            "unit": "KG"
+        },
+        {
+            "barcode": "9351",
+            "quantity": 3.042,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290017947891",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290114310239",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1605",
+            "quantity": 1.27,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290015039338",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1516",
+            "quantity": 1.19,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290013215017",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4444",
+            "quantity": 6.0,
+            "unit": "UNIT"
+        }
+    ]
+}

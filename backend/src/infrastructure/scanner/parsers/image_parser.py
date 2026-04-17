@@ -20,6 +20,7 @@ CHAIN_HPS = {
     "512792714": "tivtaam",
     "513461053": "osherad",
     "511400265": "hazi-hinam",
+    "520036187": "carrefour"
 }
 
 def identify_chain(text: str) -> str:
@@ -39,11 +40,12 @@ def identify_chain(text: str) -> str:
         "יוחננוף": "yohananof",
         "טעם טיב": "tivtaam",
         "ויקטורי": "victory",
-        "חינם חצי": "hazi-hinam"
+        "חינם חצי": "hazi-hinam",
+        "carrefour": "carrefour"
     }
     
     for heb_name, eng_id in chain_names.items():
-        if heb_name in text:
+        if heb_name.lower() in text.lower():
             return eng_id
             
     return "Unknown Chain"

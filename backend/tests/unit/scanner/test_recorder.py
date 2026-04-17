@@ -14,7 +14,7 @@ def save_receipt_test_case(chain_name: str, slices_info: list, final_data: dict 
         base_dir = Path(__file__).resolve().parent
         results_dir = base_dir / "results"
         
-        images_dir = results_dir / "images"
+        images_dir = results_dir / "receipts"
         raw_dir = results_dir / "raw"
         expected_dir = results_dir / "expected"
         

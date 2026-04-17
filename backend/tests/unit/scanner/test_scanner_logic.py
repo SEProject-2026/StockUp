@@ -118,15 +118,63 @@ def calculate_metrics(actual_products, expected_items, qty_tolerance=0.1):
         "composite_score": composite_score
     }
 
+def determine_category_and_files(case_id, source_type):
+    receipts_dir = os.path.join(FIXTURES_BASE, "receipts")
+    if not os.path.exists(receipts_dir):
+        return "General", 0
+    
+    # 1. Search in subdirectories
+    for category in ["digital", "physical", "complicated"]:
+        cat_dir = os.path.join(receipts_dir, category)
+        if os.path.exists(cat_dir):
+            file_count = 0
+            found = False
+            for f in os.listdir(cat_dir):
+                if f.startswith(case_id):
+                    remainder = f[len(case_id):]
+                    if remainder.startswith('.') or remainder.startswith('_'):
+                        is_pdf = f.lower().endswith('.pdf')
+                        if source_type == "pdf" and is_pdf:
+                            found = True
+                            file_count += 1
+                        elif source_type == "image" and not is_pdf:
+                            found = True
+                            file_count += 1
+            if found:
+                return category, file_count
+
+    # 2. Search in root if not in subdirectories (General category)
+    file_count = 0
+    if os.path.exists(receipts_dir):
+        for f in os.listdir(receipts_dir):
+            file_path = os.path.join(receipts_dir, f)
+            if os.path.isfile(file_path):
+                if f.startswith(case_id):
+                    remainder = f[len(case_id):]
+                    if remainder.startswith('.') or remainder.startswith('_'):
+                        is_pdf = f.lower().endswith('.pdf')
+                        if source_type == "pdf" and is_pdf:
+                            file_count += 1
+                        elif source_type == "image" and not is_pdf:
+                            file_count += 1
+    
+    return "General", file_count
+
 def get_test_cases():
     cases = []
     raw_dir = os.path.join(FIXTURES_BASE, "raw")
     if not os.path.exists(raw_dir): return []
+    
     for filename in os.listdir(raw_dir):
         if filename.endswith("_pdf.txt"):
-            cases.append((filename.replace("_pdf.txt", ""), "pdf", filename))
+            case_id = filename.replace("_pdf.txt", "")
+            cat, media_count = determine_category_and_files(case_id, "pdf")
+            cases.append((case_id, "pdf", cat, media_count, filename))
         elif filename.endswith("_image.txt"):
-            cases.append((filename.replace("_image.txt", ""), "image", filename))
+            case_id = filename.replace("_image.txt", "")
+            cat, media_count = determine_category_and_files(case_id, "image")
+            cases.append((case_id, "image", cat, media_count, filename))
+            
     return cases
 
 @pytest.fixture(scope="session", autouse=True)
@@ -142,6 +190,8 @@ def run_report_generator():
     total_correct_qty = 0
     total_false_positives = 0
     
+    category_metrics = {}
+    
     # Generate the string report
     report_lines = []
     report_lines.append("==== SCANNER ACCURACY REPORT ====\n")
@@ -149,16 +199,31 @@ def run_report_generator():
     for rec in TEST_RECORDS:
         case_id = rec["case_id"]
         t = rec["source_type"]
+        cat = rec["category"]
+        media_count = rec["media_count"]
         m = rec["metrics"]
         
+        # Accumulate category metrics
+        if cat not in category_metrics:
+            category_metrics[cat] = {
+                "expected": 0, "found": 0, "correct_qty": 0, "false_positives": 0, "receipt_count": 0, "media_count": 0
+            }
+        category_metrics[cat]["expected"] += m["expected_count"]
+        category_metrics[cat]["found"] += m["found_count"]
+        category_metrics[cat]["correct_qty"] += m["correct_qty_count"]
+        category_metrics[cat]["false_positives"] += m["false_positives"]
+        category_metrics[cat]["receipt_count"] += 1
+        category_metrics[cat]["media_count"] += media_count
+        
+        # Accumulate global metrics
         total_expected += m["expected_count"]
         total_found += m["found_count"]
         total_correct_qty += m["correct_qty_count"]
         total_false_positives += m["false_positives"]
         
-        report_lines.append(f"Case: {case_id} ({t})")
-        report_lines.append(f"  - Barcode Identification Rate: {m['barcode_identification_rate']:.1f}% ({m['found_count']}/{m['expected_count']})")
-        report_lines.append(f"  - Quantity Accuracy Rate:    {m['quantity_accuracy_rate']:.1f}% ({m['correct_qty_count']}/{m['found_count']})")
+        report_lines.append(f"Case: {case_id} ({t}) [Category: {cat.capitalize()}]")
+        report_lines.append(f"  - Barcode ID Rate:           {m['barcode_identification_rate']:.1f}% ({m['found_count']}/{m['expected_count']})")
+        report_lines.append(f"  - Quantity Accuracy Rate:    {m['quantity_accuracy_rate']:.1f}% ({m['correct_qty_count']}/{m['found_count'] if m['found_count'] > 0 else 0})")
         report_lines.append(f"  - False Positives (Noise):   {m['false_positives']}")
         report_lines.append(f"  >> COMPOSITE SCORE:          {m['composite_score']:.1f}/100")
         
@@ -170,6 +235,35 @@ def run_report_generator():
                 report_lines.append(f"      [{item['barcode']}] Expected {item['expected']}, Got {item['actual']}")
         report_lines.append("-" * 40)
         
+    report_lines.append("\n==== CATEGORY RESULTS ====")
+    for cat, metrics in category_metrics.items():
+        cat_expected = metrics["expected"]
+        cat_found = metrics["found"]
+        cat_correct_qty = metrics["correct_qty"]
+        cat_false_positives = metrics["false_positives"]
+        cat_receipt_count = metrics["receipt_count"]
+        cat_media_count = metrics["media_count"]
+        
+        if cat_expected > 0:
+            cat_barcode_rate = (cat_found / cat_expected) * 100
+            cat_qty_rate = (cat_correct_qty / cat_found) * 100 if cat_found > 0 else 0
+            cat_base = (0.7 * cat_barcode_rate) + (0.3 * cat_qty_rate)
+            cat_penalty = (cat_false_positives / cat_expected) * 100 * 0.20
+            cat_composite = max(0.0, cat_base - cat_penalty)
+            
+            report_lines.append(f"Category: {cat.capitalize()}")
+            report_lines.append(f"  - Total Receipts:    {cat_receipt_count} (Total Files: {cat_media_count})")
+            report_lines.append(f"  - Expected Products: {cat_expected}")
+            report_lines.append(f"  - Barcode ID Rate:   {cat_barcode_rate:.1f}% ({cat_found}/{cat_expected})")
+            report_lines.append(f"  - QTY Acc. Rate:     {cat_qty_rate:.1f}% ({cat_correct_qty}/{cat_found})")
+            report_lines.append(f"  - False Positives:   {cat_false_positives}")
+            report_lines.append(f"  >> CATEGORY SCORE:   {cat_composite:.1f}/100")
+            report_lines.append("-" * 40)
+        else:
+             report_lines.append(f"Category: {cat.capitalize()} (No valid expectations)")
+             report_lines.append(f"  - Total Receipts: {cat_receipt_count} (Total Files: {cat_media_count})")
+             report_lines.append("-" * 40)
+             
     # Global metrics
     report_lines.append("\n==== GLOBAL OVERALL RESULTS ====")
     if total_expected > 0:
@@ -198,8 +292,8 @@ def run_report_generator():
         
     print(f"\n[INFO] Detailed scanner report saved to {report_path}")
 
-@pytest.mark.parametrize("case_id, source_type, raw_filename", get_test_cases())
-def test_parsers_accuracy(case_id, source_type, raw_filename):
+@pytest.mark.parametrize("case_id, source_type, category, media_count, raw_filename", get_test_cases())
+def test_parsers_accuracy(case_id, source_type, category, media_count, raw_filename):
     suffix = "_pdf.json" if source_type == "pdf" else "_image.json"
     exp_path = os.path.join(FIXTURES_BASE, "expected", f"{case_id}{suffix}")
     if not os.path.exists(exp_path): pytest.skip(f"Missing JSON: {exp_path}")
@@ -220,12 +314,14 @@ def test_parsers_accuracy(case_id, source_type, raw_filename):
     TEST_RECORDS.append({
         "case_id": case_id,
         "source_type": source_type,
+        "category": category,
+        "media_count": media_count,
         "metrics": metrics
     })
 
     # Error Reporting in terminal
     if metrics["barcode_identification_rate"] < 100 or metrics["quantity_accuracy_rate"] < 100 or metrics["false_positives"] > 0:
-        print(f"\n\n--- [FAILED/INCOMPLETE] {case_id} ({source_type}) ---")
+        print(f"\n\n--- [FAILED/INCOMPLETE] {case_id} ({source_type}) [{category.capitalize()}] ---")
         if metrics["missing"]: print(f"MISSING ITEMS: {metrics['missing']}")
         if metrics["extra"]: print(f"EXTRA ITEMS (Noise): {metrics['extra']}")
         if metrics["mismatched_qty"]:
