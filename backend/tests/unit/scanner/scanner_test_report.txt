@@ -87,10 +87,15 @@ Case: mck1 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: mck1 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (39/39)
-  - Quantity Accuracy Rate:    100.0% (39/39)
+  - Barcode ID Rate:           28.2% (11/39)
+  - Quantity Accuracy Rate:    72.7% (8/11)
   - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  >> COMPOSITE SCORE:          41.6/100
+    Missing: ['2868996', '612', '618', '660', '666', '667', '685', '41659', '632278', '1201596', '2077268', '2105527', '7290010429554', '2395415', '403', '2057468', '629', '7290016334500', '80773443', '7290015014182', '7290016334616', '7296107000453', '4009900536257', '7290110328764', '7290110328788', '7290113862067', '7290109580531', '7290116934402']
+    Mismatched QTY:
+      [4131074] Expected 2.0, Got 3.0
+      [605] Expected 0.6, Got 2.9
+      [2395422] Expected 0.306, Got 306.0
 ----------------------------------------
 Case: mck2 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (15/15)
@@ -99,10 +104,13 @@ Case: mck2 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: mck2 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (37/37)
-  - Quantity Accuracy Rate:    100.0% (37/37)
+  - Barcode ID Rate:           10.8% (4/37)
+  - Quantity Accuracy Rate:    75.0% (3/4)
   - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  >> COMPOSITE SCORE:          30.1/100
+    Missing: ['2868996', '7290100685136', '77245110610', '76133', '7290011254469', '660', '2757757', '64144090051', '7290106577541', '66318', '10002320', '10002498', '3438013', '207063', '262239', '629', '7290016334500', '7290107978453', '7290111930805', '7290111930850', '7290111565656', '7290016334623', '7290010154678', '5202175001539', '8850206250592', '7290111350726', '7290017947105', '7290112494351', '80831402', '7290113861770', '7290113861169', '7290113865365', '7290118426943']
+    Mismatched QTY:
+      [4131074] Expected 1.0, Got 3.0
 ----------------------------------------
 Case: mck3 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (45/45)
@@ -111,10 +119,14 @@ Case: mck3 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: mck3 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (35/35)
-  - Quantity Accuracy Rate:    100.0% (35/35)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           22.9% (8/35)
+  - Quantity Accuracy Rate:    87.5% (7/8)
+  - False Positives (Noise):   2
+  >> COMPOSITE SCORE:          41.1/100
+    Missing: ['4125578', '612', '625', '635', '644', '661', '663', '1201602', '7290013215017', '364872', '690', '3438006', '2057475', '629', '7290016334500', '7290016334456', '7290016334784', '7290111350672', '7290012245329', '7290113190375', '7290108509700', '7290115207989', '7290115208009', '7290115208047', '7290113862005', '3359233', '3359745']
+    Extra (False Pos): ['000', '8351508']
+    Mismatched QTY:
+      [4131074] Expected 4.0, Got 3.0
 ----------------------------------------
 Case: mck4 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (26/26)
@@ -123,10 +135,15 @@ Case: mck4 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: mck4 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (55/55)
-  - Quantity Accuracy Rate:    100.0% (55/55)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           21.8% (12/55)
+  - Quantity Accuracy Rate:    83.3% (10/12)
+  - False Positives (Noise):   2
+  >> COMPOSITE SCORE:          39.5/100
+    Missing: ['4125578', '116204', '7290102032334', '7290010176236', '7290010176229', '7290102393060', '7290102393039', '535', '605', '606', '612', '630', '645', '660', '661', '689', '699', '41447', '1201602', '2757511', '7290013215017', '662', '2057185', '627', '530703', '2057604', '2057468', '629', '7290011276485', '8858271004799', '7290111350726', '7290112342102', '7290112494351', '7290018443040', '7290018443064', '7290108509915', '7290018500361', '7290018443545', '7290113861848', '7290113862067', '7290019666400', '7290019666417', '7290118428374']
+    Extra (False Pos): ['000', '0361']
+    Mismatched QTY:
+      [4125400] Expected 4.0, Got 45.0
+      [2395422] Expected 0.522, Got 522.0
 ----------------------------------------
 Case: mck5 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (31/31)
@@ -135,10 +152,14 @@ Case: mck5 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: mck5 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (60/60)
-  - Quantity Accuracy Rate:    100.0% (60/60)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           13.3% (8/60)
+  - Quantity Accuracy Rate:    87.5% (7/8)
+  - False Positives (Noise):   3
+  >> COMPOSITE SCORE:          34.6/100
+    Missing: ['474502', '446547', '3029792', '530', '535', '540', '563', '575', '585', '605', '606', '625', '630', '633', '635', '645', '660', '665', '666', '667', '680', '685', '687', '699', '632278', '1201602', '7290000000374', '7290013215017', '7290107932080', '6910191800287', '7290015129121', '313290', '690', '601', '178103', '3121090', '1000700396', '629', '7290015855204', '7290015014182', '7290016334784', '729001633489', '7290017864556', '7290113192577', '7290010650996', '7290018443040', '7290017079974', '7290018500361', '7290019644330', '7290113862142', '7290018989609', '3359240']
+    Extra (False Pos): ['000', '7290102395408', '500361']
+    Mismatched QTY:
+      [4125400] Expected 6.0, Got 45.0
 ----------------------------------------
 Case: mck6 (image) [Category: Physical]
   - Barcode ID Rate:           96.9% (31/32)
@@ -198,28 +219,71 @@ Case: ramilevi1 (pdf) [Category: Digital]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: ramilevi2 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (37/37)
-  - Quantity Accuracy Rate:    100.0% (37/37)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           64.9% (24/37)
+  - Quantity Accuracy Rate:    83.3% (20/24)
+  - False Positives (Noise):   1
+  >> COMPOSITE SCORE:          69.9/100
+    Missing: ['4131074', '108', '290010002375', '48185', '7290014455245', '300', '7290103702533', '7290118669975', '4133511', '101', '7290113460607', '7290015164818', '132']
+    Extra (False Pos): ['1000150']
+    Mismatched QTY:
+      [7290018732021] Expected 1.0, Got 8.4
+      [60781] Expected 1.0, Got 3.0
+      [5839313] Expected 3.0, Got 0.95
+      [3550753] Expected 1.0, Got 0.56
 ----------------------------------------
 Case: ramilevi3 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (62/62)
-  - Quantity Accuracy Rate:    100.0% (62/62)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           61.3% (38/62)
+  - Quantity Accuracy Rate:    73.7% (28/38)
+  - False Positives (Noise):   3
+  >> COMPOSITE SCORE:          64.0/100
+    Missing: ['7290018471906', '7290110115227', '4131074', '7290108272819', '2757535', '111186', '138', '48185', '7290013861740', '118', '100', '100700396', '300', '7290105439499', '7290108353068', '104', '60903', '7290016334616', '101', '117', '102', '4127329', '104676', '7290017197630']
+    Extra (False Pos): ['1000150', '2345678901', '8458802']
+    Mismatched QTY:
+      [8008912010270] Expected 1.0, Got 10.11
+      [108] Expected 2.93, Got 1.35
+      [2680376] Expected 1.35, Got 1.0
+      [7290005678332] Expected 1.01, Got 1.77
+      [7290116536347] Expected 2.0, Got 1.91
+      [197982] Expected 1.0, Got 4.07
+      [289] Expected 1.29, Got 0.8
+      [46327] Expected 1.0, Got 14.8
+      [3550753] Expected 1.0, Got 0.75
+      [7290107956901] Expected 1.0, Got 1.33
 ----------------------------------------
 Case: ramilevi4 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (72/72)
-  - Quantity Accuracy Rate:    100.0% (72/72)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           63.9% (46/72)
+  - Quantity Accuracy Rate:    73.9% (34/46)
+  - False Positives (Noise):   1
+  >> COMPOSITE SCORE:          66.6/100
+    Missing: ['43814', '2107798', '7290003359820', '7290100243084', '108', '138', '2680369', '7290011018917', '100', '7290006265500', '4064457', '7290014455245', '300', '7290105439499', '7290108353068', '104', '60903', '7290108272918', '7290103702939', '7290112492593', '2019794', '101', '117', '102', '7290001201602', '364872']
+    Extra (False Pos): ['1000150']
+    Mismatched QTY:
+      [7290112870124] Expected 1.0, Got 11.1
+      [7290108271690] Expected 1.0, Got 2.0
+      [7290000453538] Expected 2.0, Got 1.0
+      [8715700419732] Expected 1.0, Got 0.44
+      [7290119673148] Expected 2.0, Got 1.44
+      [7290116536347] Expected 1.0, Got 0.68
+      [7290002345206] Expected 1.0, Got 0.45
+      [7290019056553] Expected 1.0, Got 13.7
+      [7290112492449] Expected 2.0, Got 8.0
+      [7290108357059] Expected 2.0, Got 0.49
+      [7290017888101] Expected 1.0, Got 1.11
+      [2057369] Expected 1.0, Got 2.0
 ----------------------------------------
 Case: ramilevi5 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (30/30)
-  - Quantity Accuracy Rate:    100.0% (30/30)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           66.7% (20/30)
+  - Quantity Accuracy Rate:    75.0% (15/20)
+  - False Positives (Noise):   2
+  >> COMPOSITE SCORE:          67.8/100
+    Missing: ['4131074', '108', '2680369', '100', '134', '112220', '7290000058047', '46327', '60248', '132']
+    Extra (False Pos): ['1000150', '3000']
+    Mismatched QTY:
+      [7290019014737] Expected 1.0, Got 21.3
+      [7290010154685] Expected 1.0, Got 1.26
+      [7290011018917] Expected 1.0, Got 1.6
+      [7290119673124] Expected 2.0, Got 0.74
+      [7290017406619] Expected 1.0, Got 11.5
 ----------------------------------------
 Case: shufersal1 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (3/3)
@@ -228,10 +292,16 @@ Case: shufersal1 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: shufersal1 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (18/18)
-  - Quantity Accuracy Rate:    100.0% (18/18)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           55.6% (10/18)
+  - Quantity Accuracy Rate:    70.0% (7/10)
+  - False Positives (Noise):   1
+  >> COMPOSITE SCORE:          58.8/100
+    Missing: ['60200', '72623', '8000500071083', '8005110170225', '48185', '190853', '7290110115227', '537566']
+    Extra (False Pos): ['3695518']
+    Mismatched QTY:
+      [8423207208680] Expected 5.0, Got 1.0
+      [8423207208697] Expected 3.0, Got 1.0
+      [8410104045111] Expected 1.0, Got 4.0
 ----------------------------------------
 Case: shufersal2 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (6/6)
@@ -240,10 +310,12 @@ Case: shufersal2 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: shufersal2 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (17/17)
-  - Quantity Accuracy Rate:    100.0% (17/17)
-  - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  - Barcode ID Rate:           70.6% (12/17)
+  - Quantity Accuracy Rate:    100.0% (12/12)
+  - False Positives (Noise):   3
+  >> COMPOSITE SCORE:          75.9/100
+    Missing: ['884912342737', '4126674', '7290019611745', '967684', '1036']
+    Extra (False Pos): ['4066348', '4079389', '3842296']
 ----------------------------------------
 Case: shufersal3 (image) [Category: Complicated]
   - Barcode ID Rate:           100.0% (2/2)
@@ -308,10 +380,31 @@ Case: victory1 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: victory1 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (30/30)
-  - Quantity Accuracy Rate:    100.0% (30/30)
+  - Barcode ID Rate:           73.3% (22/30)
+  - Quantity Accuracy Rate:    13.6% (3/22)
   - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  >> COMPOSITE SCORE:          55.4/100
+    Missing: ['7290008775816', '80176800', '7290112342102', '7290000051710', '7290000072753', '7290118420347', '7290011489595', '7290112495167']
+    Mismatched QTY:
+      [7290010259991] Expected 1.0, Got 8.9
+      [7290000060088] Expected 1.0, Got 12.9
+      [7290104061424] Expected 1.0, Got 12.9
+      [7290104061448] Expected 1.0, Got 12.9
+      [7290000076133] Expected 1.0, Got 2.9
+      [7290106573277] Expected 1.0, Got 13.9
+      [7290106574953] Expected 1.0, Got 12.9
+      [7290106577503] Expected 1.0, Got 14.9
+      [7290112495105] Expected 1.0, Got 15.9
+      [7290112495143] Expected 1.0, Got 16.9
+      [7290107944472] Expected 2.0, Got 10.9
+      [7290004131814] Expected 2.0, Got 19.9
+      [7290017094861] Expected 1.0, Got 11.9
+      [7290004129156] Expected 1.0, Got 17.4
+      [7290019926177] Expected 1.0, Got 12.9
+      [7290115207644] Expected 2.0, Got 12.9
+      [7290011489601] Expected 2.0, Got 2.9
+      [7290116931982] Expected 1.0, Got 17.4
+      [5740900403222] Expected 1.0, Got 18.4
 ----------------------------------------
 Case: victory2 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (3/3)
@@ -320,10 +413,11 @@ Case: victory2 (image) [Category: Physical]
   >> COMPOSITE SCORE:          100.0/100
 ----------------------------------------
 Case: victory2 (pdf) [Category: Digital]
-  - Barcode ID Rate:           100.0% (28/28)
-  - Quantity Accuracy Rate:    100.0% (28/28)
+  - Barcode ID Rate:           71.4% (20/28)
+  - Quantity Accuracy Rate:    100.0% (20/20)
   - False Positives (Noise):   0
-  >> COMPOSITE SCORE:          100.0/100
+  >> COMPOSITE SCORE:          80.0/100
+    Missing: ['2024', '2061', '7290106577503', '7290112495143', '7290112495167', '7290008775816', '7290004129118', '7290011489601']
 ----------------------------------------
 Case: victory3 (image) [Category: Complicated]
   - Barcode ID Rate:           100.0% (24/24)
@@ -376,16 +470,16 @@ Category: Complicated
 Category: Digital
   - Total Receipts:    14 (Total Files: 14)
   - Expected Products: 562
-  - Barcode ID Rate:   100.0% (562/562)
-  - QTY Acc. Rate:     100.0% (562/562)
-  - False Positives:   0
-  >> CATEGORY SCORE:   100.0/100
+  - Barcode ID Rate:   49.3% (277/562)
+  - QTY Acc. Rate:     78.0% (216/277)
+  - False Positives:   18
+  >> CATEGORY SCORE:   57.3/100
 ----------------------------------------
 
 ==== GLOBAL OVERALL RESULTS ====
 Total Expected Products: 1202
-Global Barcode ID Rate:  98.8% (1187/1202)
-Global QTY Acc. Rate:    98.7% (1172/1187)
-Total False Positives:   14
-OVERALL COMPOSITE SCORE: 98.5/100
+Global Barcode ID Rate:  75.0% (902/1202)
+Global QTY Acc. Rate:    91.6% (826/902)
+Total False Positives:   32
+OVERALL COMPOSITE SCORE: 79.5/100
 (Score weights: 70% Barcode Identification + 30% Quantity Accuracy - 20% penalty per mismatch ratio)
