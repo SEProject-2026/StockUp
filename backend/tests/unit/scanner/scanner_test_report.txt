@@ -68,6 +68,18 @@ Case: mck12 (image) [Category: Complicated]
     Mismatched QTY:
       [7290112495150] Expected 2.0, Got 1.0
 ----------------------------------------
+Case: mck13 (image) [Category: Physical]
+  - Barcode ID Rate:           100.0% (3/3)
+  - Quantity Accuracy Rate:    100.0% (3/3)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
+Case: mck14 (image) [Category: Complicated]
+  - Barcode ID Rate:           100.0% (34/34)
+  - Quantity Accuracy Rate:    100.0% (34/34)
+  - False Positives (Noise):   0
+  >> COMPOSITE SCORE:          100.0/100
+----------------------------------------
 Case: mck1 (image) [Category: Physical]
   - Barcode ID Rate:           100.0% (14/14)
   - Quantity Accuracy Rate:    100.0% (14/14)
@@ -346,20 +358,20 @@ Case: yohananof1 (image) [Category: Physical]
 
 ==== CATEGORY RESULTS ====
 Category: Physical
-  - Total Receipts:    16 (Total Files: 22)
-  - Expected Products: 267
-  - Barcode ID Rate:   99.3% (265/267)
-  - QTY Acc. Rate:     100.0% (265/265)
+  - Total Receipts:    17 (Total Files: 23)
+  - Expected Products: 270
+  - Barcode ID Rate:   99.3% (268/270)
+  - QTY Acc. Rate:     100.0% (268/268)
   - False Positives:   1
   >> CATEGORY SCORE:   99.4/100
 ----------------------------------------
 Category: Complicated
-  - Total Receipts:    21 (Total Files: 25)
-  - Expected Products: 336
-  - Barcode ID Rate:   96.1% (323/336)
-  - QTY Acc. Rate:     95.4% (308/323)
+  - Total Receipts:    22 (Total Files: 27)
+  - Expected Products: 370
+  - Barcode ID Rate:   96.5% (357/370)
+  - QTY Acc. Rate:     95.8% (342/357)
   - False Positives:   13
-  >> CATEGORY SCORE:   95.1/100
+  >> CATEGORY SCORE:   95.6/100
 ----------------------------------------
 Category: Digital
   - Total Receipts:    14 (Total Files: 14)
@@ -371,9 +383,9 @@ Category: Digital
 ----------------------------------------
 
 ==== GLOBAL OVERALL RESULTS ====
-Total Expected Products: 1165
-Global Barcode ID Rate:  98.7% (1150/1165)
-Global QTY Acc. Rate:    98.7% (1135/1150)
+Total Expected Products: 1202
+Global Barcode ID Rate:  98.8% (1187/1202)
+Global QTY Acc. Rate:    98.7% (1172/1187)
 Total False Positives:   14
 OVERALL COMPOSITE SCORE: 98.5/100
 (Score weights: 70% Barcode Identification + 30% Quantity Accuracy - 20% penalty per mismatch ratio)
