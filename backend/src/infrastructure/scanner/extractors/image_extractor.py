@@ -152,25 +152,7 @@ def _reconstruct_vision_text(response):
     return json.dumps(lines, ensure_ascii=False)
 
 
-def _save_debug_text(image_path: str, text_json: str, pdf_page_index: int = 0) -> None:
-    if not ENABLE_DEBUG:
-        return
-    try:
-        debug_dir = os.path.join(os.getcwd(),"results", "raw")
-        if not os.path.exists(debug_dir):
-            os.makedirs(debug_dir)
 
-        file_name = os.path.basename(image_path)
-        name_without_ext = os.path.splitext(file_name)[0]
-        debug_file_path = os.path.join(debug_dir, f"{name_without_ext}_ocr_debug_{pdf_page_index}.txt")
-        
-        data = json.loads(text_json)
-        readable_text = "\n".join([line["text"] for line in data])
-        
-        with open(debug_file_path, "w", encoding="utf-8") as f:
-            f.write(readable_text)
-    except Exception as e:
-        app_logger.warning(f"Warning: Failed to save debug text. {e}")
 
 
 def extract_text_from_image(image_path: str) -> str:
@@ -185,7 +167,6 @@ def extract_text_from_image(image_path: str) -> str:
         if response.error.message:
             raise Exception(f"{response.error.message}")
         reconstructed_json = _reconstruct_vision_text(response)
-        _save_debug_text(image_path, reconstructed_json)
         return reconstructed_json
     except Exception as e:
         app_logger.warning(f"Google Vision Error on {image_path}: {e}")
@@ -212,7 +193,6 @@ def extract_text_from_image_pdf(pdf_path: str) -> str:
                 
             page_data = json.loads(_reconstruct_vision_text(response))
             text_content.extend(page_data)
-            _save_debug_text(pdf_path, json.dumps(page_data, ensure_ascii=False), pdf_page_index=idx)
             
     except Exception as e:
         app_logger.warning(f"Error processing image PDF {pdf_path}: {e}")

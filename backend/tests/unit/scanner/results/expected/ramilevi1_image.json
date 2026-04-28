@@ -1,0 +1,30 @@
+{
+    "chain": "ramilevi",
+    "items": [
+        {
+            "barcode": "7290010051168",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290121047791",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290017189123",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290111346828",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "5999",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

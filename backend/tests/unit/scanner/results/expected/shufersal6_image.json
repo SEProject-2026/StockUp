@@ -1,0 +1,40 @@
+{
+    "chain": "shufersal",
+    "items": [
+        {
+            "barcode": "7290110114855",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "9011067",
+            "quantity": 0.58,
+            "unit": "KG"
+        },
+        {
+            "barcode": "4710068006239",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290114311014",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7296073285274",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1201596",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7296073271277",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}
