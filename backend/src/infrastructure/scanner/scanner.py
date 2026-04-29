@@ -11,6 +11,7 @@ from src.infrastructure.scanner.parsers.image_parser import identify_chain, pars
 
 
 HF_SPACE_ID = "orioha/PDFExtractor"
+hf_client = Client(HF_SPACE_ID)
 
 def scan_receipt(file_path: str) -> dict:
     """
@@ -25,7 +26,6 @@ def scan_receipt(file_path: str) -> dict:
     if ext == '.pdf':
         if True: #is_text_pdf(file_path):
             try:
-                hf_client = Client(HF_SPACE_ID)
                 text = hf_client.predict(
                 file=handle_file(file_path),
                 api_name="/api_handler"
