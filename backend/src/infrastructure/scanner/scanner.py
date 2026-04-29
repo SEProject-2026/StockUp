@@ -24,10 +24,12 @@ def scan_receipt(file_path: str) -> dict:
     if ext == '.pdf':
         if True: #is_text_pdf(file_path):
             try:
+                print(f"Attempting native PDF text extraction for: {file_path}"+f" at {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 text = client.predict(
                     file=handle_file(file_path),
                     api_name="/api_handler"
                 )
+                print(f"Native PDF text extraction successful for: {file_path}"+f" at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             except Exception as e:
                 text = ""
             text = extract_text_from_pdf(file_path)
