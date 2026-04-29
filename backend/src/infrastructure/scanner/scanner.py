@@ -9,6 +9,7 @@ from src.infrastructure.scanner.extractors.pdf_extractor import extract_text_fro
 from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image, extract_text_from_image_pdf, extract_first_page_image_text
 from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
 
+client = Client("orioha/PDFExtractor")
 
 def scan_receipt(file_path: str) -> dict:
     """
@@ -23,7 +24,6 @@ def scan_receipt(file_path: str) -> dict:
     if ext == '.pdf':
         if True: #is_text_pdf(file_path):
             try:
-                client = Client("orioha/PDFExtractor")
                 text = client.predict(
                     file=handle_file(file_path),
                     api_name="/api_handler"
