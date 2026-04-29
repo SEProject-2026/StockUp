@@ -1,15 +1,10 @@
 import os
-import re
 import json
-import time
 
-from gradio_client import Client, handle_file
 from src.infrastructure.scanner.parsers.pdf_parser import parse_receipt_pdf
-from src.infrastructure.scanner.extractors.pdf_extractor import extract_text_from_pdf, is_text_pdf
-from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image, extract_text_from_image_pdf, extract_first_page_image_text
-from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
-
-client = Client("orioha/PDFExtractor")
+from src.infrastructure.scanner.parsers.image_parser import parse_receipt_google
+from src.infrastructure.scanner.extractors.pdf_extractor import process_pdf_receipt
+from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image
 
 def scan_receipt(file_path: str) -> dict:
     """
@@ -21,32 +16,20 @@ def scan_receipt(file_path: str) -> dict:
     ext = os.path.splitext(file_path)[-1].lower()
     text = ""
     chain = "Unknown"
+    
+    # 1. Routing by extension to the correct Extractor
     if ext == '.pdf':
-        if True: #is_text_pdf(file_path):
-            try:
-                print(f"Attempting native PDF text extraction for: {file_path}"+f" at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-                text = client.predict(
-                    file=handle_file(file_path),
-                    api_name="/api_handler"
-                )
-                print(f"Native PDF text extraction successful for: {file_path}"+f" at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            except Exception as e:
-                text = ""
-            first_page_ocr = extract_first_page_image_text(file_path)
-            chain=identify_chain(first_page_ocr)
-        else:
-            text = extract_text_from_image_pdf(file_path)
-            chain=identify_chain(text)
-            
+        text, chain = process_pdf_receipt(file_path)
     elif ext in ['.jpeg', '.jpg', '.png']:
         text = extract_text_from_image(file_path)
+        # For pure images, the parser will identify the chain based on the text
     else:
         return {"chain": "Unknown", "products": [], "raw_text": ""}
         
     if not text.strip():
         return {"chain": "Unknown", "products": [], "raw_text": ""}
     
-    # Use the appropriate parser based on the source type
+    # 2. Routing to the correct Parser based on source type
     if ext == '.pdf':
         result = parse_receipt_pdf(text, chain)
     else:

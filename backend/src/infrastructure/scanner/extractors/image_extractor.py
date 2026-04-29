@@ -1,11 +1,8 @@
 import os
 import io
 import json
-import glob
-import platform
 import numpy as np
 import cv2
-from pdf2image import convert_from_path
 from src.infrastructure.logger import app_logger
 
 
@@ -38,30 +35,7 @@ except Exception as e:
     app_logger.warning(f"Warning: Could not initialize Google Vision API client. {e}")
 
 
-def _get_poppler_path():
-    """
-    Dynamically finds Poppler path based on the Operating System.
-    """
-    current_os = platform.system()
-    
-    if current_os == "Windows":
-        user_appdata = os.environ.get('LOCALAPPDATA')
-        if user_appdata:
-            search_pattern = os.path.join(
-                user_appdata, 'Microsoft', 'WinGet', 'Packages', 
-                'oschwartz10612.Poppler*', 'poppler-*', 'Library', 'bin'
-            )
-            results = glob.glob(search_pattern)
-            if results:
-                return results[0]
-                
-    elif current_os == "Darwin":  # macOS
-        brew_path = "/opt/homebrew/bin"
-        if os.path.exists(os.path.join(brew_path, "pdftoppm")):
-            return brew_path
-            
-    # For Linux (Render/Docker), returns None to use global PATH
-    return None
+
 
 
 def _preprocess_image(image_bytes: bytes) -> bytes:
@@ -173,57 +147,3 @@ def extract_text_from_image(image_path: str) -> str:
         return "[]"
 
 
-def extract_text_from_image_pdf(pdf_path: str) -> str:
-    if not client:
-        return "[]"
-    text_content = []
-    try:
-        poppler_path = _get_poppler_path()
-        images = convert_from_path(pdf_path, poppler_path=poppler_path)
-        for idx, img in enumerate(images):
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='JPEG')
-            content = img_byte_arr.getvalue()
-            processed_content = _preprocess_image(content)
-            image = vision.Image(content=processed_content)
-            response = client.document_text_detection(image=image)
-            
-            if response.error.message:
-                continue
-                
-            page_data = json.loads(_reconstruct_vision_text(response))
-            text_content.extend(page_data)
-            
-    except Exception as e:
-        app_logger.warning(f"Error processing image PDF {pdf_path}: {e}")
-    return json.dumps(text_content, ensure_ascii=False)
-
-
-def extract_first_page_image_text(pdf_path: str) -> str:
-    if not client:
-        return "[]"
-    try:
-        poppler_path = _get_poppler_path()
-        images = convert_from_path(pdf_path, poppler_path=poppler_path, first_page=1, last_page=1)
-        if images:
-            open_cv_image = np.array(images[0])
-            open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2BGR)
-            height = open_cv_image.shape[0]
-            cropped_image = open_cv_image[0:int(height * 0.25), :]
-            
-            is_success, buffer = cv2.imencode(".jpg", cropped_image)
-            if not is_success:
-                return "[]"
-                
-            content = buffer.tobytes()
-            processed_content = _preprocess_image(content)
-            image = vision.Image(content=processed_content)
-            response = client.document_text_detection(image=image)
-            
-            if response.error.message:
-                return "[]"
-                
-            return _reconstruct_vision_text(response)
-    except Exception as e:
-        app_logger.warning(f"Error processing first page of PDF {pdf_path}: {e}")
-    return "[]"
