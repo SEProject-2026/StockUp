@@ -92,6 +92,43 @@ def _extract_digital_pdf(file_path: str) -> str:
         app_logger.warning(f"HF extraction failed: {e}")
         return ""
 
+def _parse_documentai_result(document) -> str:
+    """Helper to convert Document AI result to expected JSON string format."""
+    all_lines = []
+    for page in document.pages:
+        rows = {}
+        threshold = 0.005 
+
+        for token in page.tokens:
+            vertices = token.layout.bounding_poly.normalized_vertices
+            if not vertices:
+                continue
+            y_center = sum(v.y for v in vertices) / len(vertices)
+            
+            found_row = None
+            for row_y in rows.keys():
+                if abs(row_y - y_center) < threshold:
+                    found_row = row_y
+                    break
+            
+            start_index = token.layout.text_anchor.text_segments[0].start_index
+            end_index = token.layout.text_anchor.text_segments[0].end_index
+            text = document.text[int(start_index):int(end_index)].replace('\n', '').strip()
+
+            if found_row is not None:
+                rows[found_row].append({'x': vertices[0].x, 'text': text})
+            else:
+                rows[y_center] = [{'x': vertices[0].x, 'text': text}]
+
+        for y in sorted(rows.keys()):
+            sorted_tokens = sorted(rows[y], key=lambda i: i['x'])
+            combined_line = " ".join(t['text'] for t in sorted_tokens)
+            if combined_line.strip():
+                all_lines.append({"text": combined_line})
+
+    return json.dumps(all_lines, ensure_ascii=False)
+
+
 def _extract_scanned_pdf(file_path: str) -> str:
     """
     Extract text from an image-based PDF using Google Cloud Document AI.
@@ -112,87 +149,47 @@ def _extract_scanned_pdf(file_path: str) -> str:
         request = documentai.ProcessRequest(name=name, raw_document=raw_document)
         result = doc_client.process_document(request=request)
         
-        document = result.document
-        all_lines = []
-
-        for page in document.pages:
-            # Dictionary to group tokens by their vertical center position
-            rows = {}
-            # Threshold for grouping (how many inches/pixels apart to consider same line)
-            threshold = 0.005 
-
-            for token in page.tokens:
-                # Get the vertical center of the token
-                vertices = token.layout.bounding_poly.normalized_vertices
-                if not vertices:
-                    continue
-                y_center = sum(v.y for v in vertices) / len(vertices)
-                
-                # Find if a row already exists within the threshold
-                found_row = None
-                for row_y in rows.keys():
-                    if abs(row_y - y_center) < threshold:
-                        found_row = row_y
-                        break
-                
-                # Get token text
-                start_index = token.layout.text_anchor.text_segments[0].start_index
-                end_index = token.layout.text_anchor.text_segments[0].end_index
-                text = document.text[int(start_index):int(end_index)].replace('\n', '').strip()
-
-                if found_row is not None:
-                    rows[found_row].append({'x': vertices[0].x, 'text': text})
-                else:
-                    rows[y_center] = [{'x': vertices[0].x, 'text': text}]
-
-            # Sort rows by Y (top to bottom) and tokens within rows by X (left to right / right to left)
-            for y in sorted(rows.keys()):
-                # Sort tokens by X to maintain horizontal order
-                sorted_tokens = sorted(rows[y], key=lambda i: i['x'])
-                combined_line = " ".join(t['text'] for t in sorted_tokens)
-                if combined_line.strip():
-                    # Format exactly like the vision parser output expects: {"text": combined_line}
-                    all_lines.append({"text": combined_line})
-
-        return json.dumps(all_lines, ensure_ascii=False)
+        return _parse_documentai_result(result.document)
 
     except Exception as e:
         app_logger.warning(f"Document AI Extraction error: {e}")
         return "[]"
 
 
-def _extract_first_page_vision(file_path: str) -> str:
+def _extract_first_page_documentai(file_path: str) -> str:
     """
-    Extracts ONLY the first page using Google Vision.
+    Extracts ONLY the first page using Google Cloud Document AI.
     Useful for digital PDFs where the chain logo/HP is embedded as an image.
     """
-    if not vision_client:
+    if not documentai or not PROJECT_ID or not PROCESSOR_ID:
+        app_logger.warning("Document AI not configured or installed.")
         return "[]"
-    
+        
     try:
-        with io.open(file_path, 'rb') as f:
-            content = f.read()
-            
-        input_config = vision.InputConfig(content=content, mime_type="application/pdf")
-        features = [vision.Feature(type_=vision.Feature.Type.DOCUMENT_TEXT_DETECTION)]
+        options = {"api_endpoint": f"{LOCATION}-documentai.googleapis.com"}
+        doc_client = documentai.DocumentProcessorServiceClient(client_options=options)
+        name = doc_client.processor_path(PROJECT_ID, LOCATION, PROCESSOR_ID)
+
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+
+        raw_document = documentai.RawDocument(content=file_content, mime_type='application/pdf')
         
-        requests = [
-            vision.AnnotateFileRequest(
-                input_config=input_config,
-                features=features,
-                pages=[1]
-            )
-        ]
+        # Process only the first page
+        process_options = documentai.ProcessOptions(
+            individual_page_selector=documentai.ProcessOptions.IndividualPageSelector(pages=[1])
+        )
+        request = documentai.ProcessRequest(
+            name=name, 
+            raw_document=raw_document, 
+            process_options=process_options
+        )
+        result = doc_client.process_document(request=request)
         
-        response = vision_client.batch_annotate_files(requests=requests)
-        
-        for file_response in response.responses:
-            for page_response in file_response.responses:
-                if not page_response.error.message:
-                    return _reconstruct_vision_text(page_response)
+        return _parse_documentai_result(result.document)
                     
     except Exception as e:
-        app_logger.warning(f"Error extracting first page of PDF {file_path} with Vision: {e}")
+        app_logger.warning(f"Error extracting first page of PDF {file_path} with Document AI: {e}")
         
     return "[]"
 
@@ -208,7 +205,7 @@ def process_pdf_receipt(file_path: str) -> tuple[str, str]:
         
         # Fallback: if the chain is unknown, the logo/HP might be an image at the top of the first page.
         if chain in ["Unknown", "Unknown Chain"]:
-            first_page_ocr = _extract_first_page_vision(file_path)
+            first_page_ocr = _extract_first_page_documentai(file_path)
             chain = identify_chain(first_page_ocr)
     else:
         text = _extract_scanned_pdf(file_path)
