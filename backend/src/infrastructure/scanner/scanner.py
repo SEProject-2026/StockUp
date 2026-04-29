@@ -32,7 +32,6 @@ def scan_receipt(file_path: str) -> dict:
                 print(f"Native PDF text extraction successful for: {file_path}"+f" at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             except Exception as e:
                 text = ""
-            text = extract_text_from_pdf(file_path)
             first_page_ocr = extract_first_page_image_text(file_path)
             chain=identify_chain(first_page_ocr)
         else:
