@@ -10,8 +10,6 @@ from src.infrastructure.scanner.extractors.image_extractor import extract_text_f
 from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
 
 
-client = Client("orioha/PDFExtractor")
-
 def scan_receipt(file_path: str) -> dict:
     """
     Main entry point to scan any receipt and return structured data.
@@ -25,6 +23,7 @@ def scan_receipt(file_path: str) -> dict:
     if ext == '.pdf':
         if True: #is_text_pdf(file_path):
             try:
+                client = Client("orioha/PDFExtractor")
                 text = client.predict(
                     file=handle_file(file_path),
                     api_name="/api_handler"
