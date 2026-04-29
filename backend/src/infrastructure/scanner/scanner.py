@@ -23,7 +23,7 @@ def scan_receipt(file_path: str) -> dict:
     text = ""
     chain = "Unknown"
     if ext == '.pdf':
-        if is_text_pdf(file_path):
+        if True: #is_text_pdf(file_path):
             try:
                 hf_client = Client(HF_SPACE_ID)
                 text = hf_client.predict(
