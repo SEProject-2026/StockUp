@@ -10,8 +10,7 @@ from src.infrastructure.scanner.extractors.image_extractor import extract_text_f
 from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
 
 
-HF_SPACE_ID = "orioha/PDFExtractor"
-hf_client = Client(HF_SPACE_ID)
+client = Client("orioha/PDFExtractor")
 
 def scan_receipt(file_path: str) -> dict:
     """
@@ -26,10 +25,10 @@ def scan_receipt(file_path: str) -> dict:
     if ext == '.pdf':
         if True: #is_text_pdf(file_path):
             try:
-                text = hf_client.predict(
-                file=handle_file(file_path),
-                api_name="/api_handler"
-            )
+                text = client.predict(
+                    file=handle_file(file_path),
+                    api_name="/api_handler"
+                )
             except Exception as e:
                 text = ""
             text = extract_text_from_pdf(file_path)
