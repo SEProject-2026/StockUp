@@ -5,8 +5,8 @@ import time
 
 from gradio_client import Client, handle_file
 from src.infrastructure.scanner.parsers.pdf_parser import parse_receipt_pdf
-from src.infrastructure.scanner.extractors.pdf_extractor import extract_text_from_pdf, is_text_pdf
-from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image, extract_text_from_image_pdf, extract_first_page_image_text
+from src.infrastructure.scanner.extractors.pdf_extractor import extract_text_from_pdf
+from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image
 from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
 
 
@@ -22,6 +22,7 @@ def scan_receipt(file_path: str) -> dict:
     ext = os.path.splitext(file_path)[-1].lower()
     text = ""
     chain = "Unknown"
+    
     if ext == '.pdf':
         if is_text_pdf(file_path):
             try:
@@ -41,10 +42,11 @@ def scan_receipt(file_path: str) -> dict:
             
     elif ext in ['.jpeg', '.jpg', '.png']:
         text = extract_text_from_image(file_path)
+        chain = identify_chain(text) # Note: image parser identifies chain internally, but good for consistency
     else:
         return {"chain": "Unknown", "products": [], "raw_text": ""}
         
-    if not text.strip():
+    if not text.strip() or text.strip() == "[]":
         return {"chain": "Unknown", "products": [], "raw_text": ""}
     
     # Use the appropriate parser based on the source type
