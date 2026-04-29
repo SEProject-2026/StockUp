@@ -3,11 +3,14 @@ import re
 import json
 import time
 
+from gradio_client import Client, handle_file
 from src.infrastructure.scanner.parsers.pdf_parser import parse_receipt_pdf
 from src.infrastructure.scanner.extractors.pdf_extractor import extract_text_from_pdf
 from src.infrastructure.scanner.extractors.image_extractor import extract_text_from_image
 from src.infrastructure.scanner.parsers.image_parser import identify_chain, parse_receipt_google
 
+
+HF_SPACE_ID = "orioha/PDFExtractor"
 
 def scan_receipt(file_path: str) -> dict:
     """
@@ -21,8 +24,22 @@ def scan_receipt(file_path: str) -> dict:
     chain = "Unknown"
     
     if ext == '.pdf':
-        text = extract_text_from_pdf(file_path)
-        chain = identify_chain(text)
+        if is_text_pdf(file_path):
+            try:
+                hf_client = Client(HF_SPACE_ID)
+                text = hf_client.predict(
+                file=handle_file(file_path),
+                api_name="/api_handler"
+            )
+            except Exception as e:
+                text = ""
+            text = extract_text_from_pdf(file_path)
+            first_page_ocr = extract_first_page_image_text(file_path)
+            chain=identify_chain(first_page_ocr)
+        else:
+            text = extract_text_from_image_pdf(file_path)
+            chain=identify_chain(text)
+            
     elif ext in ['.jpeg', '.jpg', '.png']:
         text = extract_text_from_image(file_path)
         chain = identify_chain(text) # Note: image parser identifies chain internally, but good for consistency
