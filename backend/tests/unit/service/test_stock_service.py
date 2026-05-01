@@ -22,7 +22,6 @@ async def test_add_product_success(stock_service, mock_home_repo, mock_product_r
     """
     # Arrange
     home, admin = auth_setup
-    mock_home_repo.get_by_id.return_value = home
     mock_product_repo.get_by_original_name.return_value = None
     
     product_name = "Milk"
@@ -63,7 +62,6 @@ async def test_add_product_merges_with_existing(stock_service, mock_home_repo, m
     """
     # Arrange
     home, admin = auth_setup
-    mock_home_repo.get_by_id.return_value = home
     
     # Setup: Product already has 10 units in the Fridge
     any_product.add_item(quantity=10, location=LocationType.FRIDGE)
@@ -87,7 +85,7 @@ async def test_add_product_merges_with_existing(stock_service, mock_home_repo, m
 
 
 @pytest.mark.asyncio
-async def test_add_product_fails_if_home_not_found(stock_service, mock_home_repo,mock_product_repo, auth_setup):
+async def test_add_product_fails_if_home_not_found(stock_service, mock_home_repo,mock_product_repo, auth_setup, mock_security_check):
     """
     Scenario: User attempts to add a product to a non-existent Home ID.
     Verify: Service raises ValueError and stops execution.
@@ -95,7 +93,7 @@ async def test_add_product_fails_if_home_not_found(stock_service, mock_home_repo
     # Arrange
     _, admin = auth_setup
     fake_home_id = uuid.uuid4()
-    mock_home_repo.get_by_id.return_value = None # Simulate missing home
+    mock_security_check.side_effect = ValueError("Home retrieval failed")
     
     # Act & Assert
     with pytest.raises(ValueError, match="Home retrieval failed"): 
@@ -139,7 +137,6 @@ async def test_add_same_product_accumulates_quantity(stock_service, mock_home_re
     """
     # Arrange
     home, admin = auth_setup
-    mock_home_repo.get_by_id.return_value = home
     barcode = "111"
     
     # 1. Add first batch (No Date, Pantry)
@@ -635,7 +632,7 @@ async def test_update_nickname_fails_product_not_found(stock_service, mock_home_
 
 
 @pytest.mark.asyncio
-async def test_filter_products_delegates_to_repo(stock_service, mock_home_repo, mock_product_repo, auth_setup, any_product):
+async def test_filter_products_delegates_to_repo(stock_service, mock_home_repo, mock_product_repo, auth_setup, any_product, mock_security_check):
     """
     Scenario: User filters by location and expiration.
     Verify: The service fetches warning_days from the home and passes all 
@@ -644,7 +641,7 @@ async def test_filter_products_delegates_to_repo(stock_service, mock_home_repo, 
     # Arrange
     home, admin = auth_setup
     home._expiration_range = 10 # Set custom warning days
-    mock_home_repo.get_by_id.return_value = home
+    mock_security_check.return_value = home
     
     # We mock the REPO'S filter method to return our product
     mock_product_repo.filter_products.return_value = [any_product]
@@ -671,7 +668,7 @@ async def test_filter_products_delegates_to_repo(stock_service, mock_home_repo, 
     )
 
 @pytest.mark.asyncio
-async def test_filter_products_with_query_string(stock_service, mock_home_repo, mock_product_repo, auth_setup):
+async def test_filter_products_with_query_string(stock_service, mock_home_repo, mock_product_repo, auth_setup, mock_security_check):
     """
     Scenario: User searches for "Milk" via the filter method.
     Verify: The query string is passed to the repository.
@@ -814,14 +811,14 @@ async def test_get_home_products_success(stock_service, mock_home_repo, mock_pro
 # ==========================================
 
 @pytest.mark.asyncio
-async def test_add_receipt_success(stock_service, mock_home_repo, mock_product_repo, auth_setup):
+async def test_add_receipt_success(stock_service, mock_home_repo, mock_product_repo, auth_setup, mock_security_check):
     """
     Scenario: Committing a receipt with multiple items.
     Verify: The service uses the repository's bulk save functionality.
     """
     # Arrange
     home, admin = auth_setup
-    mock_home_repo.get_by_id.return_value = home
+    mock_security_check.return_value = home
     
     # Ensure name searches return None (new products)
     mock_product_repo.get_by_original_name.return_value = None
@@ -842,14 +839,14 @@ async def test_add_receipt_success(stock_service, mock_home_repo, mock_product_r
 
 
 @pytest.mark.asyncio
-async def test_add_receipt_merges_with_existing_inventory(stock_service, mock_home_repo, mock_product_repo, auth_setup, any_product):
+async def test_add_receipt_merges_with_existing_inventory(stock_service, mock_home_repo, mock_product_repo, auth_setup, any_product, mock_security_check):
     """
     Scenario: Receipt contains an item that already exists in the inventory.
     Verify: The service finds the existing entity and merges quantities.
     """
     # Arrange
     home, admin = auth_setup
-    mock_home_repo.get_by_id.return_value = home
+    mock_security_check.return_value = home
 
     # 1. Setup the existing product object using Domain methods
     product_name = "Butter"
@@ -891,7 +888,7 @@ async def test_add_receipt_merges_with_existing_inventory(stock_service, mock_ho
     mock_product_repo.save_all.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_add_receipt_fails_unauthorized(stock_service, mock_home_repo, auth_setup):
+async def test_add_receipt_fails_unauthorized(stock_service, mock_home_repo, auth_setup, mock_security_check):
     """
     Scenario: Commit a receipt to a home where the user is not a member.
     Verify: ValueError is raised and no items are processed.
@@ -899,7 +896,7 @@ async def test_add_receipt_fails_unauthorized(stock_service, mock_home_repo, aut
     # Arrange
     home, _ = auth_setup
     stranger_id = uuid.uuid4()
-    mock_home_repo.get_by_id.return_value = home # Home exists, but stranger is not a member
+    mock_security_check.side_effect = ValueError("User is not a member")
 
     receipt_dto = ReceiptDTO(
         id=uuid.uuid4(), home_id=home._id, user_id=stranger_id,

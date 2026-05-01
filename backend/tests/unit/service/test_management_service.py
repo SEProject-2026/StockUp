@@ -18,10 +18,10 @@ class TestManagementService:
         mock_home_repo.save.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_view_home_code_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_view_home_code_success(self, mgmt_service, auth_setup, mock_security_check):
         """Happy Path: Admin can retrieve the home join code."""
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         code = await mgmt_service.view_home_code(admin.id, home._id)
         
@@ -29,10 +29,10 @@ class TestManagementService:
         assert code == home.get_join_code()
 
     @pytest.mark.asyncio
-    async def test_view_home_code_access_denied(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_view_home_code_access_denied(self, mgmt_service, auth_setup, mock_security_check):
         """Security: Non-members are blocked from viewing the home join code."""
         home, _ = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.side_effect = ValueError("User is not a member")
         stranger_id = uuid.uuid4()
         
         with pytest.raises(ValueError, match="User is not a member"):
@@ -88,12 +88,12 @@ class TestManagementService:
     # ==========================================
 
     @pytest.mark.asyncio
-    async def test_answer_join_request_approve(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup, mock_notifications):
+    async def test_answer_join_request_approve(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup, mock_notifications, mock_security_check):
         """Happy Path: Admin approves request."""
         home, admin = auth_setup
         requester_id = uuid.uuid4()
         home.add_join_request(requester_id)
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
         mock_user_repo.get_by_id.return_value = MagicMock(push_token="token123")
 
         await mgmt_service.answer_join_request(home._id, admin.id, requester_id, approved=True)
@@ -103,12 +103,12 @@ class TestManagementService:
         mock_notifications.assert_called()
 
     @pytest.mark.asyncio
-    async def test_answer_join_request_deny(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup, mock_notifications):
+    async def test_answer_join_request_deny(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup, mock_notifications, mock_security_check):
         """Happy Path: Admin denies request."""
         home, admin = auth_setup
         requester_id = uuid.uuid4()
         home.add_join_request(requester_id)
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
         mock_user_repo.get_by_id.return_value = MagicMock(push_token="token123")
 
         await mgmt_service.answer_join_request(home._id, admin.id, requester_id, approved=False)
@@ -122,22 +122,21 @@ class TestManagementService:
     # ==========================================
 
     @pytest.mark.asyncio
-    async def test_switch_home_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_switch_home_success(self, mgmt_service, auth_setup, mock_security_check):
         """Coverage Fix: Test switching context between homes."""
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
         
         result = await mgmt_service.switch_home(admin.id, home._id)
-        # Fix: Using get_id() or _id to match domain object
         assert result.get_id() == home.get_id()
 
     @pytest.mark.asyncio
-    async def test_remove_member_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_remove_member_success(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         """Happy Path: Admin can remove a member."""
         home, admin = auth_setup
         member_id = uuid.uuid4()
         home.add_member(member_id)
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         await mgmt_service.remove_member(admin.id, home._id, member_id)
 
@@ -145,24 +144,24 @@ class TestManagementService:
         mock_home_repo.update.assert_called()
 
     @pytest.mark.asyncio
-    async def test_remove_member_unauthorized(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_remove_member_unauthorized(self, mgmt_service, auth_setup, mock_security_check):
         """Sad Path: Stranger attempts to remove a member."""
         home, _ = auth_setup
         member_id = uuid.uuid4()
         stranger_id = uuid.uuid4()
         home.add_member(member_id)
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.side_effect = ValueError("User is not a member")
 
         with pytest.raises(ValueError, match="User is not a member"):
             await mgmt_service.remove_member(stranger_id, home._id, member_id)
 
     @pytest.mark.asyncio
-    async def test_switch_home_head_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_switch_home_head_success(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         """Happy Path: Ownership transfer."""
         home, admin = auth_setup
         new_admin_id = uuid.uuid4()
         home.add_member(new_admin_id)
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         await mgmt_service.switch_home_head(admin.id, home._id, new_admin_id)
 
@@ -170,12 +169,12 @@ class TestManagementService:
         mock_home_repo.update.assert_called()
 
     @pytest.mark.asyncio
-    async def test_leave_home_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_leave_home_success(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         """Happy Path: Member leaves home."""
         home, admin = auth_setup
         member_id = uuid.uuid4()
         home.add_member(member_id)
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         await mgmt_service.leave_home(member_id, home._id)
 
@@ -183,10 +182,10 @@ class TestManagementService:
         mock_home_repo.update.assert_called()
 
     @pytest.mark.asyncio
-    async def test_leave_home_admin_fails(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_leave_home_admin_fails(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         """Sad Path: Admin cannot leave without transfer."""
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         with pytest.raises(PermissionError, match="Admin cannot leave"):
             await mgmt_service.leave_home(admin.id, home._id)
@@ -196,9 +195,9 @@ class TestManagementService:
     # ==========================================
 
     @pytest.mark.asyncio
-    async def test_get_home_details_success(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup):
+    async def test_get_home_details_success(self, mgmt_service, mock_home_repo, mock_user_repo, auth_setup, mock_security_check):
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
         mock_user_repo.get_names_by_ids.return_value = {admin.id: "AdminName"}
 
         details = await mgmt_service.get_home_details(admin.id, home._id)
@@ -207,9 +206,9 @@ class TestManagementService:
         assert "join code" in details
 
     @pytest.mark.asyncio
-    async def test_update_expiration_range_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_update_expiration_range_success(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         await mgmt_service.update_expiration_range(admin.id, home._id, 14)
 
@@ -217,9 +216,9 @@ class TestManagementService:
         mock_home_repo.update.assert_called()
 
     @pytest.mark.asyncio
-    async def test_update_expiration_range_invalid(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_update_expiration_range_invalid(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         with pytest.raises(ValueError, match="positive integer"):
             await mgmt_service.update_expiration_range(admin.id, home._id, -5)
@@ -229,19 +228,19 @@ class TestManagementService:
     # ==========================================
 
     @pytest.mark.asyncio
-    async def test_delete_home_success(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_delete_home_success(self, mgmt_service, mock_home_repo, auth_setup, mock_security_check):
         home, admin = auth_setup
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.return_value = home
 
         await mgmt_service.delete_home(admin.id, home._id)
 
         mock_home_repo.delete.assert_called_with(home._id)
 
     @pytest.mark.asyncio
-    async def test_delete_home_unauthorized(self, mgmt_service, mock_home_repo, auth_setup):
+    async def test_delete_home_unauthorized(self, mgmt_service, auth_setup, mock_security_check):
         home, _ = auth_setup
         stranger_id = uuid.uuid4()
-        mock_home_repo.get_by_id.return_value = home
+        mock_security_check.side_effect = ValueError("User is not a member")
 
         with pytest.raises(ValueError, match="User is not a member"):
             await mgmt_service.delete_home(stranger_id, home._id)
