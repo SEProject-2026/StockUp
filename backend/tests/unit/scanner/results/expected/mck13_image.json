@@ -1,0 +1,20 @@
+{
+    "chain": "mck",
+    "items": [
+        {
+            "barcode": "7290110325619",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "56760",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8883",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

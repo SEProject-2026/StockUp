@@ -1,0 +1,110 @@
+{
+    "chain": "carrefour",
+    "items": [
+        {
+            "barcode": "7290118521020",
+            "quantity": 6.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1043",
+            "quantity": 1.25,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290000136585",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "9018004",
+            "quantity": 11.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000001579",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290019056263",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000136523",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290019056508",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290108357707",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110115227",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290019056645",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290004131074",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1503",
+            "quantity": 1.35,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7664",
+            "quantity": 1.89,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290012823602",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110117795",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110117856",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000136561",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290012884986",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290001201589",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000334325",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

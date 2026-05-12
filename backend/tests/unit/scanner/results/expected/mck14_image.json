@@ -1,0 +1,175 @@
+{
+    "chain": "mck",
+    "items": [
+        {
+            "barcode": "605",
+            "quantity": 1.42,
+            "unit": "KG"
+        },
+        {
+            "barcode": "1201589",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290107932080",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000001593",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1616",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "700",
+            "quantity": 3.465,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290018443705",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "530",
+            "quantity": 0.915,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290115201680",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8753364",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "178707",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290107947480",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8004800002556",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "667",
+            "quantity": 1.585,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7622010001858",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "629",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290016401189",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "661",
+            "quantity": 1.445,
+            "unit": "KG"
+        },
+        {
+            "barcode": "211442",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290113865419",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290016334050",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110557119",
+            "quantity": 3.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290013525710",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290113861282",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290000000374",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290115678376",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290113867673",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290113862142",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290014088917",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290014935952",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290115678383",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290012313899",
+            "quantity": 4.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290113860667",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8881",
+            "quantity": 7.0,
+            "unit": "UNIT"
+        }
+    ]
+}
