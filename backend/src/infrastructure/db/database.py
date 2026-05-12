@@ -1,35 +1,53 @@
 import os
-from sqlalchemy import create_engine
-from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import NullPool
+from dotenv import load_dotenv
 
-
-load_dotenv()  
+load_dotenv()
 load_dotenv("backend/.env")
 
-# 1. Fallback mechanism: check both common names
-# This ensures that if CI uses one name and local dev uses another, it still works.
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TEST_DATABASE_URL")
+# 1. Database URL configuration
+# Ensure the URL starts with postgresql+asyncpg:// for async support
+# and points to port 6543 for Supabase Transaction Pooler.
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TEST_DATABASE_URL")
 
-# 2. Safety Check: If both are None (common during CI collection phase),
-# we provide a dummy string to prevent SQLAlchemy from raising an ArgumentError.
-if SQLALCHEMY_DATABASE_URL is None:
-    # This URL won't actually be used by tests because the Container overrides it,
-    # but it allows the 'engine' object to be created without crashing the import.
-    SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost:5432/placeholder_db"
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql+asyncpg://postgres:pass@localhost:5433/stockup_test"
 
-if not SQLALCHEMY_DATABASE_URL:
-    SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost:5433/stockup_test"
+# 2. Optimized Engine for Supabase Transaction Mode
+# Cites: ARD 4.1.1 (Performance) and Supabase Infrastructure constraints.
+engine = create_async_engine(
+    DATABASE_URL,
+    # NullPool is ideal when using an external pooler like Supavisor.
+    # It prevents Render from holding idle connections.
+    poolclass=NullPool,
+    connect_args={
+        # Mandatory for Transaction mode to prevent errors with prepared statements.
+        "prepared_statement_cache_size": 0,
+        "statement_cache_size": 0,
+        # Fail fast if the pooler is saturated (Queue exceeds limits).
+        "command_timeout": 10 
+    }
+)
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# 3. Async Session Factory
+AsyncSessionLocal = sessionmaker(
+    bind=engine, 
+    class_=AsyncSession, 
+    expire_on_commit=False
+)
 
 Base = declarative_base()
 
-# (Dependency Injection)
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# 4. Dependency Injection (Asynchronous)
+async def get_db():
+    """
+    Yields a database session and ensures it's closed immediately
+    after use to free up the Transaction Pooler slot.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
