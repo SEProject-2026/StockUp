@@ -42,7 +42,7 @@ except Exception as e:
     app_logger.warning(f"Warning: Could not initialize Google Vision API client. {e}")
 
 # Initialize HuggingFace Client
-hf_client = Client("orioha/PDFExtractor")
+            hf_client = Client("orioha/PDFExtractor")
 
 def _save_pdf_debug_text(pdf_path: str, content: str) -> None:
     if not ENABLE_DEBUG:
