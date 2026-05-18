@@ -1,35 +1,47 @@
 import os
-from sqlalchemy import create_engine
-from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import NullPool
+from dotenv import load_dotenv
 
+load_dotenv()
 
-load_dotenv()  
-load_dotenv("backend/.env")
+# Ensure the prefix is asyncpg for async driver support
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# 1. Fallback mechanism: check both common names
-# This ensures that if CI uses one name and local dev uses another, it still works.
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TEST_DATABASE_URL")
+# Default fallback for local testing
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5433/stockup_test"
 
-# 2. Safety Check: If both are None (common during CI collection phase),
-# we provide a dummy string to prevent SQLAlchemy from raising an ArgumentError.
-if SQLALCHEMY_DATABASE_URL is None:
-    # This URL won't actually be used by tests because the Container overrides it,
-    # but it allows the 'engine' object to be created without crashing the import.
-    SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost:5432/placeholder_db"
-
-if not SQLALCHEMY_DATABASE_URL:
-    SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost:5433/stockup_test"
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
+# --- CRITICAL: Define Base here so models can import it ---
 Base = declarative_base()
 
-# (Dependency Injection)
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# The async engine implementation optimized for Supabase Transaction Mode
+engine = create_async_engine(
+    DATABASE_URL,
+    poolclass=NullPool,  # Mandatory for Supabase Supavisor
+    connect_args={
+        "prepared_statement_cache_size": 0,  # Required for Transaction mode
+        "statement_cache_size": 0
+    }
+)
+
+AsyncSessionLocal = sessionmaker(
+    bind=engine, 
+    class_=AsyncSession, 
+    expire_on_commit=False
+)
+
+# Dependency for FastAPI routes
+async def get_db():
+    """
+    Yields an async session and ensures it is closed after the request.
+    Cites: ARD 4.1.2 (Reliability and Stability)
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
