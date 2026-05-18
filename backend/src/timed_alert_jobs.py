@@ -2,18 +2,17 @@ from contextlib import asynccontextmanager
 import subprocess
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.infrastructure.app_container import AppContainer
-from src.infrastructure.db.database import SessionLocal
+from src.infrastructure.db.database import AsyncSessionLocal, engine
+from src.infrastructure.db import models
 from fastapi import FastAPI
 
 scheduler = AsyncIOScheduler()
 
 async def daily_expiration_job():
-    db = SessionLocal()
-    try:
+    async with AsyncSessionLocal() as db:
         stock_service = AppContainer.get_stock_service(db)
         await stock_service.check_expirations_and_notify()
-    finally:
-        db.close()
+
 
 async def weekly_catalog_update_job():
     print("Starting Weekly Catalog Update...")
@@ -28,6 +27,10 @@ async def weekly_catalog_update_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create tables asynchronously
+    async with engine.begin() as conn:
+        await conn.run_sync(models.Base.metadata.create_all)
+
     scheduler.add_job(daily_expiration_job, 'cron', hour=8, minute=0)
     scheduler.add_job(weekly_catalog_update_job, 'cron', day_of_week='sun', hour=12, minute=0)
 
