@@ -1,0 +1,20 @@
+{
+    "chain": "victory",
+    "items": [
+        {
+            "barcode": "7290117383070",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290013358530",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290003578177",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        }
+    ]
+}

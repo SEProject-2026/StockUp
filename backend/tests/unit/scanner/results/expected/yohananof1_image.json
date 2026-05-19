@@ -1,0 +1,35 @@
+{
+    "chain": "yohananof",
+    "items": [
+        {
+            "barcode": "96421",
+            "quantity": 0.384,
+            "unit": "KG"
+        },
+        {
+            "barcode": "400228",
+            "quantity": 1.08,
+            "unit": "KG"
+        },
+        {
+            "barcode": "405728",
+            "quantity": 1.12,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290001900031",
+            "quantity": 1.125,
+            "unit": "KG"
+        },
+        {
+            "barcode": "897",
+            "quantity": 0.635,
+            "unit": "KG"
+        },
+        {
+            "barcode": "34560",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

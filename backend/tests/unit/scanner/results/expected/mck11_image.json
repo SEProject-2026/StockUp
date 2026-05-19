@@ -1,0 +1,15 @@
+{
+    "chain": "mck",
+    "items": [
+        {
+            "barcode": "42209",
+            "quantity": 2.196,
+            "unit": "KG"
+        },
+        {
+            "barcode": "5555",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

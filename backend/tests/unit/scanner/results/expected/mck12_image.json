@@ -1,0 +1,50 @@
+{
+    "chain": "mck",
+    "items": [
+        {
+            "barcode": "7290110577254",
+            "quantity": 5.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7613035635845",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "5996405",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290112495150",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290014940901",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "583",
+            "quantity": 0.465,
+            "unit": "KG"
+        },
+        {
+            "barcode": "612",
+            "quantity": 1.335,
+            "unit": "KG"
+        },
+        {
+            "barcode": "8883",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "5555",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

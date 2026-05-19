@@ -1,0 +1,55 @@
+{
+    "chain": "Unknown Chain",
+    "items": [
+        {
+            "barcode": "66332",
+            "quantity": 5.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290004537289",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4537265",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "70384",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290110558420",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "48192",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "100700587",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "8700216811491",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "100703007",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "16400151",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}
