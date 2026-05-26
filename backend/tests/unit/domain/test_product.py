@@ -29,6 +29,9 @@ class TestProductDomain:
         past_date = today - timedelta(days=1)
         assert ProductItem(expiration_date=past_date).get_status(3) == ExpirationType.EXPIRED
 
+        # Case: Expires exactly TODAY -> GOING_TO_EXPIRE
+        assert ProductItem(expiration_date=today).get_status(3) == ExpirationType.GOING_TO_EXPIRE
+
     # ==========================================
     # 2. Product Initialization & Basic Guards
     # ==========================================
@@ -95,6 +98,26 @@ class TestProductDomain:
         with pytest.raises(ValueError, match="cannot be negative"):
             any_product.update_item_quantity(item_id, -1)
 
+    def test_add_item_merge_logic(self, any_product):
+        """Happy Path: Adding an item with the exact same location and date should merge quantities."""
+        expiry = date.today()
+        any_product.add_item(quantity=5, location=LocationType.FRIDGE, expiration_date=expiry)
+        any_product.add_item(quantity=3, location=LocationType.FRIDGE, expiration_date=expiry)
+        
+        assert len(any_product.items) == 1  # Should still be one line item
+        assert any_product.total_quantity == 8
+        assert any_product.items[0].quantity == 8
+
+    def test_update_item_quantity_not_found(self, any_product):
+        """Sad Path: Error when updating quantity for an ID that doesn't exist."""
+        with pytest.raises(ValueError, match="not found"):
+            any_product.update_item_quantity(uuid.uuid4(), 10)
+
+    def test_update_item_location_not_found(self, any_product):
+        """Sad Path: Error when updating location for an ID that doesn't exist."""
+        with pytest.raises(ValueError, match="not found"):
+            any_product.update_item_location(uuid.uuid4(), LocationType.PANTRY)
+
     # ==========================================
     # 4. Location & Date Merge Logic (Complex)
     # ==========================================
@@ -152,3 +175,24 @@ class TestProductDomain:
         any_product.update_item_date(item_id, expiry)
         assert any_product.items[0].expiration_date == expiry
         assert len(any_product.items) == 1
+
+    #=========================================
+    # 5. settings
+    #=========================================
+
+    def test_set_nickname(self, any_product):
+        """Happy Path: Verify nickname updates correctly."""
+        any_product.set_nickname("tnuva milk")
+        assert any_product.nickname == "tnuva milk"
+
+    def test_update_date_no_merge(self, any_product):
+        """Happy Path: Updating date to a totally new date simply updates the item."""
+        expiry_old = date(2025, 1, 1)
+        expiry_new = date(2025, 2, 1)
+        any_product.add_item(quantity=5, location=LocationType.FRIDGE, expiration_date=expiry_old)
+        item_id = any_product.items[0].id
+        
+        any_product.update_item_date(item_id, expiry_new)
+        
+        assert len(any_product.items) == 1
+        assert any_product.items[0].expiration_date == expiry_new

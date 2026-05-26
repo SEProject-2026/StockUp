@@ -95,3 +95,34 @@ class TestShoppingListDomain:
         with freeze_time("2026-03-25 12:10:00"):
             any_shopping_list.check_item_as_bought("Coffee")
             assert any_shopping_list.updated_at > current_time
+
+    # ==========================================
+    # Sad Paths & Edge Cases
+    # ==========================================
+
+    def test_remove_non_existent_item_fails(self, any_shopping_list):
+        """Sad Path: Removing an item that doesn't exist should raise an error."""
+        with pytest.raises(ValueError, match="Item not found"):
+            any_shopping_list.remove_item("Ghost Item")
+
+    def test_update_quantity_not_found_fails(self, any_shopping_list):
+        """Sad Path: Updating quantity for non-existent item should raise an error."""
+        with pytest.raises(ValueError, match="Item not found"):
+            any_shopping_list.update_quantity("Ghost Item", 5)
+
+    def test_check_item_as_bought_not_found_fails(self, any_shopping_list):
+        """Sad Path: Checking an item that doesn't exist should raise an error."""
+        with pytest.raises(ValueError, match="Item not found"):
+            any_shopping_list.check_item_as_bought("Ghost Item")
+
+    @freeze_time("2026-03-25 12:00:00")
+    def test_timestamp_refreshes_on_quantity_merge(self, any_shopping_list):
+        """Internal Logic: Verify updated_at refreshes even when just merging quantities."""
+        any_shopping_list.add_item("Milk", 1)
+        any_shopping_list.updated_at = datetime.now()
+        initial_time = any_shopping_list.updated_at
+        
+        with freeze_time("2026-03-25 12:05:00"):
+            any_shopping_list.add_item("Milk", 2) # This triggers the merge block
+            
+        assert any_shopping_list.updated_at > initial_time

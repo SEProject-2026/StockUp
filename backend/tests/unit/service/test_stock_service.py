@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from src.domain.receipt.receipt import ReceiptDTO, ReceiptItemDTO
 from src.domain.product.product import Product
 from src.repositories.catalog_provider import CatalogItem
-from src.domain.enums import ExpirationType, LocationType
+from src.domain.enums import ExpirationType, LocationType, UnitType
 
 # ==========================================
 # 1. Tests for add_product
@@ -53,6 +53,14 @@ async def test_add_product_success(stock_service, mock_home_repo, mock_product_r
     mock_product_repo.save.assert_called_once()
     saved_product = mock_product_repo.save.call_args[0][0]
     assert saved_product.id == product.id
+
+@pytest.mark.asyncio
+async def test_add_product_unknown_returns_none(stock_service, mock_home_repo, auth_setup):
+    home, admin = auth_setup
+    mock_home_repo.get_by_id.return_value = home
+    
+    result = await stock_service.add_product("Unknown Product", admin.id, home._id, 1)
+    assert result is None
 
 
 @pytest.mark.asyncio
@@ -809,6 +817,66 @@ async def test_get_home_products_success(stock_service, mock_home_repo, mock_pro
     # Verify the specific repository method was called
     mock_product_repo.list_all_by_home.assert_called_once_with(home._id)
 
+from unittest.mock import patch
+
+# ==========================================
+# 8. Tests for scan_receipt (ML & Catalog)
+# ==========================================
+
+@pytest.mark.asyncio
+async def test_scan_receipt_success(stock_service, mock_home_repo, mock_catalog_provider, auth_setup):
+    """
+    Scenario: Happy path for scanning a receipt with both known and unknown products, including KG conversion.
+    """
+    home, admin = auth_setup
+    mock_home_repo.get_by_id.return_value = home
+    
+    # Mock the scanner output
+    mock_scanner_result = {
+        "123": (2.0, "UNIT"),  # Known product
+        "456": (1.5, "KG"),    # Known product by weight
+        "999": (1.0, "UNIT")   # Unknown product
+    }
+    stock_service._receipt_scanner.parse_receipt.return_value = ("Supermarket", mock_scanner_result)
+    
+    # Mock catalog items
+    known_item1 = MagicMock(weight=1, location=LocationType.FRIDGE)
+    known_item1.name = "Milk"
+    known_item2 = MagicMock(weight=0.5, location=LocationType.FRIDGE)
+    known_item2.name = "Tomatoes"
+
+    async def mock_get_item(barcode, chain):
+        if barcode == "123": return known_item1
+        if barcode == "456": return known_item2
+        return None # Return None for unknown barcode 999
+        
+    mock_catalog_provider.get_item_by_barcode.side_effect = mock_get_item
+
+    # Patch os.path.exists so the validation passes without needing real files
+    with patch('os.path.exists', return_value=True):
+        receipt_dto = await stock_service.scan_receipt(admin.id, home._id, ["/fake/path.jpg"])
+        
+    assert receipt_dto.chain == "Supermarket"
+    assert len(receipt_dto.items) == 3
+    
+    # Check regular known item
+    item_unit = next(i for i in receipt_dto.items if i.barcode == "123")
+    assert item_unit.quantity == 2.0
+    
+    # Check unknown item fallback
+    item_unknown = next(i for i in receipt_dto.items if i.barcode == "999")
+    assert item_unknown.name == "Unknown Product"
+
+@pytest.mark.asyncio
+async def test_scan_receipt_invalid_files_fails(stock_service, mock_home_repo, auth_setup):
+    """Sad Path: Scanner rejects missing or invalid file paths."""
+    home, admin = auth_setup
+    mock_home_repo.get_by_id.return_value = home
+    
+    with patch('os.path.exists', return_value=False):
+        with pytest.raises(ValueError, match="No valid files found"):
+            await stock_service.scan_receipt(admin.id, home._id, ["/fake/path.jpg"])
+
 # ==========================================
 # 9. Tests for add_receipt (Commit logic)
 # ==========================================
@@ -839,6 +907,25 @@ async def test_add_receipt_success(stock_service, mock_home_repo, mock_product_r
     assert added_count == 2
     
     mock_product_repo.save_all.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_add_receipt_saves_history_and_updates_catalog(stock_service, mock_home_repo, mock_product_repo, auth_setup):
+    home, admin = auth_setup
+    mock_home_repo.get_by_id.return_value = home
+    mock_product_repo.get_by_original_name.return_value = None
+
+    # Use a KG item to trigger the catalog update logic
+    items = [ReceiptItemDTO(name="Tomatoes", quantity=1.0, barcode="456", unit=UnitType.KG, weight=0.5)]
+    receipt_dto = ReceiptDTO(id=uuid.uuid4(), home_id=home._id, user_id=admin.id, chain="Supersal", items=items)
+
+    await stock_service.add_receipt(receipt_dto)
+
+    # Assert receipt history was saved
+    stock_service._receipt_repository.save.assert_called_once()
+    
+    # Assert catalog weights were updated and persisted
+    stock_service._catalog_provider.update_weighted_mem_only.assert_called_once()
+    stock_service._catalog_provider.persist.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -909,3 +996,46 @@ async def test_add_receipt_fails_unauthorized(stock_service, mock_home_repo, aut
     # Act & Assert
     with pytest.raises(ValueError, match="User is not a member"):
         await stock_service.add_receipt(receipt_dto)
+
+    # ==========================================
+# 10. Tests for Expiration Cron Job
+# ==========================================
+
+@patch("src.services.stock_service.send_push_notification") # Adjust path to your notification function
+@pytest.mark.asyncio
+async def test_check_expirations_and_notify_success(mock_send_push, stock_service, mock_home_repo, mock_product_repo, mock_user_repo):
+    """
+    Scenario: The cron job finds expired items and sends a push notification to members.
+    """
+    # Setup mock home
+    mock_home = MagicMock()
+    mock_home.get_id.return_value = uuid.uuid4()
+    mock_home.get_name.return_value = "Test Home"
+    mock_home.get_expiration_range.return_value = 3
+    mock_home.get_members.return_value = [uuid.uuid4()]
+    
+    # Mock get_homes_batch to return 1 home on first call, empty list on second call (to break the loop)
+    mock_home_repo.get_homes_batch.side_effect = [[mock_home], []]
+    
+    # Setup mock product that is EXPIRED
+    expired_product = MagicMock()
+    expired_product.nickname = "Milk"
+    expired_product.original_name = "Milk"
+    expired_item = MagicMock()
+    expired_item.get_status.return_value = ExpirationType.EXPIRED
+    expired_product.items = [expired_item]
+    
+    mock_product_repo.list_all_by_home.return_value = [expired_product]
+    
+    # Setup mock user to receive push
+    mock_user = MagicMock(push_token="token123")
+    mock_user_repo.get_by_id.return_value = mock_user
+    
+    # Act
+    await stock_service.check_expirations_and_notify()
+    
+    # Assert
+    mock_send_push.assert_called_once()
+    call_kwargs = mock_send_push.call_args[1]
+    assert call_kwargs["token"] == "token123"
+    assert "פג תוקף: Milk" in call_kwargs["message"]

@@ -22,8 +22,6 @@ from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 
-# --- Dependency Injection ---
-
 def get_shopping_list_service(db: Session = Depends(get_db)) -> ShoppingListService:
     return AppContainer.get_shopping_list_service(db)
 
@@ -43,15 +41,14 @@ async def create_list(
 ):
     app_logger.info(f"User {user_id} creating list '{request.name}' for home {request.home_id}")
     try:
-        # Check if user belongs to home before creating
-        # We assume the service or a dedicated validator handles this check
+
         new_list = await service.create_shopping_list(request.home_id, request.name)
         return GeneralResponse(
             status="success", 
             message="List created", 
             data=ShoppingListDTO.model_validate(new_list)
         )
-    except PermissionError as e:
+    except (ValueError, PermissionError) as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except Exception as e:
@@ -66,7 +63,6 @@ async def get_home_lists(
     user_id: UUID = Depends(get_current_user_id)
 ):
     app_logger.info(f"User {user_id} accessing lists for home {home_id}")
-    # Authorization check should happen here or inside the service
     lists = await service.get_all_shopping_lists_by_home(home_id)
     return GeneralResponse(status="success", data=[ShoppingListDTO.model_validate(l) for l in lists])
 
@@ -79,7 +75,6 @@ async def get_list(
 ):
     try:
         shopping_list = await service.get_shopping_list(list_id)
-        # Verify user has access to the home associated with this list
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(shopping_list))
     except ValueError as e:
         translated_message = translate_error(str(e))
@@ -225,5 +220,9 @@ async def delete_list(
     user_id: UUID = Depends(get_current_user_id)
 ):
     app_logger.info(f"User {user_id} deleting list {list_id}")
-    # Ensure authorization before deletion
-    await service.delete_shopping_list(list_id)
+    try:
+        await service.delete_shopping_list(list_id)
+        return GeneralResponse(status="success", message="List deleted")
+    except ValueError as e:
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)

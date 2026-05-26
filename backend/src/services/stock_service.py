@@ -539,7 +539,7 @@ class StockService:
                 offset += batch_size
                 
                 # Adding a short sleep to prevent overwhelming the database in case of large number of homes. 
-                asyncio.sleep(0.1) 
+                await asyncio.sleep(0.1) 
 
             except Exception as e:
                 app_logger.error(f"Fatal error fetching batch at offset {offset}: {e}")
