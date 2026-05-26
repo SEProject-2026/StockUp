@@ -22,8 +22,6 @@ from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 
-# --- Dependency Injection ---
-
 def get_shopping_list_service(db: Session = Depends(get_db)) -> ShoppingListService:
     return AppContainer.get_shopping_list_service(db)
 
@@ -50,7 +48,7 @@ async def create_list(
             message="List created", 
             data=ShoppingListDTO.model_validate(new_list)
         )
-    except PermissionError as e:
+    except (ValueError, PermissionError) as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except Exception as e:
@@ -222,5 +220,9 @@ async def delete_list(
     user_id: UUID = Depends(get_current_user_id)
 ):
     app_logger.info(f"User {user_id} deleting list {list_id}")
-    # Ensure authorization before deletion
-    await service.delete_shopping_list(user_id, list_id)
+    try:
+        await service.delete_shopping_list(user_id, list_id)
+        return GeneralResponse(status="success", message="List deleted")
+    except ValueError as e:
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)

@@ -52,6 +52,7 @@ class Home:
     def _validate_name(self, name: str) -> None:
         if not name or not name.strip():
             raise ValueError("Home name cannot be empty.")
+        
     def assign_admin(self, head_user_id: UUID, user_id: UUID) -> None:
         if not self.is_admin(head_user_id):
                 raise PermissionError("Only current admin can transfer admin rights")

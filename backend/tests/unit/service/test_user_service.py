@@ -45,6 +45,17 @@ class TestUserService:
         
         mock_user_repo.save.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_register_fail_invalid_domain_data(self, user_service, mock_user_repo):
+        """Sad Path: Verify that domain validation errors (e.g. empty name) bubble up."""
+        mock_user_repo.get_by_id.return_value = None
+        mock_user_repo.get_by_email.return_value = None
+        
+        with pytest.raises(ValueError, match="cannot be empty"):
+            await user_service.register(email="valid@test.com", user_id=uuid.uuid4(), name="")
+            
+        mock_user_repo.save.assert_not_called()
+
     # ==========================================
     # 2. Profile Management (update_name)
     # ==========================================
@@ -90,3 +101,29 @@ class TestUserService:
         
         with pytest.raises(ValueError, match="User not found"):
             await user_service.update_push_token(uuid.uuid4(), "token_123")
+
+    # ==========================================
+    # 4. Logout Logic
+    # ==========================================
+
+    @pytest.mark.asyncio
+    async def test_logout_success_clears_token(self, user_service, mock_user_repo, any_user):
+        """Happy Path: Logout should find the user and clear the push token."""
+        mock_user_repo.get_by_id.return_value = any_user
+        any_user.push_token = "active_token_123"
+        
+        result = await user_service.logout(any_user.id)
+        
+        assert result is True
+        assert any_user.push_token is None
+        mock_user_repo.update_push_token.assert_called_once_with(any_user.id, None)
+
+    @pytest.mark.asyncio
+    async def test_logout_user_not_found(self, user_service, mock_user_repo):
+        """Sad Path: Logging out a non-existent user should not crash, just return True gracefully."""
+        mock_user_repo.get_by_id.return_value = None
+        
+        result = await user_service.logout(uuid.uuid4())
+        
+        assert result is True
+        mock_user_repo.update_push_token.assert_not_called()

@@ -50,6 +50,17 @@ class TestShoppingListService:
         await shopping_list_service.delete_shopping_list(user_id, list_id)
         mock_shopping_repo.delete.assert_called_once_with(list_id)
 
+    @pytest.mark.asyncio
+    async def test_get_shopping_list_success(self, shopping_list_service, mock_shopping_repo, any_shopping_list):
+        """Happy Path: Successfully retrieve an existing shopping list."""
+        mock_shopping_repo.get_by_id.return_value = any_shopping_list
+
+        result = await shopping_list_service.get_shopping_list(any_shopping_list.id)
+
+        assert result.id == any_shopping_list.id
+        assert result.name == any_shopping_list.name
+        mock_shopping_repo.get_by_id.assert_called_once_with(any_shopping_list.id)
+
     # ==========================================
     # 2. Item Management (Add, Remove, Update)
     # ==========================================
@@ -168,3 +179,25 @@ class TestShoppingListService:
         assert len(results) == 2
         assert results == mock_lists
         mock_shopping_repo.get_all_by_home.assert_called_once_with(home_id)
+
+    # ==========================================
+    # 5. Sad Paths (Service Level Validations)
+    # ==========================================
+
+    @pytest.mark.asyncio
+    async def test_add_item_to_non_existent_list_fails(self, shopping_list_service, mock_shopping_repo):
+        """Sad Path: Trying to add an item to a list that doesn't exist."""
+        fake_id = uuid.uuid4()
+        mock_shopping_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValueError, match=f"Shopping list not found: {fake_id}"):
+            await shopping_list_service.add_item_to_list(fake_id, "Milk", 2)
+
+    @pytest.mark.asyncio
+    async def test_enter_shopping_mode_non_existent_list_fails(self, shopping_list_service, mock_shopping_repo):
+        """Sad Path: Trying to enter shopping mode for a list that doesn't exist."""
+        fake_id = uuid.uuid4()
+        mock_shopping_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValueError, match=f"Shopping list not found: {fake_id}"):
+            await shopping_list_service.enter_shopping_mode(fake_id)
