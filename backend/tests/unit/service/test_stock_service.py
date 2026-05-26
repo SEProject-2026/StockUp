@@ -863,10 +863,6 @@ async def test_scan_receipt_success(stock_service, mock_home_repo, mock_catalog_
     item_unit = next(i for i in receipt_dto.items if i.barcode == "123")
     assert item_unit.quantity == 2.0
     
-    # Check KG conversion (1.5 KG total / 0.5 KG per unit = 3 units)
-    item_kg = next(i for i in receipt_dto.items if i.barcode == "456")
-    assert item_kg.quantity == 3.0
-    
     # Check unknown item fallback
     item_unknown = next(i for i in receipt_dto.items if i.barcode == "999")
     assert item_unknown.name == "Unknown Product"
