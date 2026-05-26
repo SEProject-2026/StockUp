@@ -92,9 +92,14 @@ class StockService:
         print(f"Chain name: {chain_name}")
         receipt_items_dto: list[ReceiptItemDTO] = []
 
+        # Bulk fetch all catalog items in one single query to minimize database roundtrip latency
+        barcodes = list(scanned_items.keys())
+        catalog_items = await self._catalog_provider.get_items_by_barcodes(barcodes, chain_name)
+        catalog_map = {ci.barcode: ci for ci in catalog_items}
+
         for barcode, (qty, unit_str) in scanned_items.items():
             unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
-            ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+            ci = catalog_map.get(barcode)
 
             if ci:
                 avg_unit_weight = 1

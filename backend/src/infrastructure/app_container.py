@@ -68,23 +68,22 @@ class AppContainer:
         - If 'db' is provided: Returns DbCatalogProvider.
         - If 'db' is None: Returns CsvCatalogProvider.
         """
+        if db:
+            return DbCatalogProvider(db)
+
         if AppContainer._catalog_provider_instance is not None:
             return AppContainer._catalog_provider_instance
-        # 1. Production (Database)
-        #if db:
-         #   _catalog_provider_instance= DbCatalogProvider(db)
 
         # 2. Testing/Fallback (CSV)
-        if AppContainer._catalog_provider_instance is None:
-            project_root = Path(__file__).resolve().parents[2]
-            csv_path = project_root / "src" / "data" / "master_db.csv"
+        project_root = Path(__file__).resolve().parents[2]
+        csv_path = project_root / "src" / "data" / "master_db.csv"
 
-            if not csv_path.exists():
-                alt = project_root / "data" / "master_db.csv"
-                if alt.exists():
-                    csv_path = alt
+        if not csv_path.exists():
+            alt = project_root / "data" / "master_db.csv"
+            if alt.exists():
+                csv_path = alt
 
-            AppContainer._catalog_provider_instance = CsvCatalogProvider(str(csv_path))
+        AppContainer._catalog_provider_instance = CsvCatalogProvider(str(csv_path))
 
         return AppContainer._catalog_provider_instance
 
