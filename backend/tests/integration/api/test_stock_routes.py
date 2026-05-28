@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from datetime import date
 from unittest.mock import AsyncMock, patch
@@ -69,6 +71,35 @@ def test_remove_item_fully_deletes_product(client, home_headers):
     
     assert response.status_code == 200
     assert response.json()["data"] is None
+
+def test_update_item_location_success(client, home_headers):
+    """Scenario: Move an item to a different location."""
+    add_res = client.post("/stock/add", json={"name": "Fish", "quantity": 1, "location": "FRIDGE"}, headers=home_headers)
+    p_id = add_res.json()["data"]["id"]
+    i_id = add_res.json()["data"]["items"][0]["id"]
+    
+    response = client.patch(
+        f"/stock/{p_id}/items/{i_id}/location", 
+        json={"location": "FREEZER"}, 
+        headers=home_headers
+    )
+    
+    assert response.status_code == 200
+    assert response.json()["data"]["items"][0]["location"] == "FREEZER"
+
+def test_update_nickname_success(client, home_headers):
+    """Scenario: Update the nickname of a product."""
+    add_res = client.post("/stock/add", json={"name": "Water", "quantity": 6}, headers=home_headers)
+    p_id = add_res.json()["data"]["id"]
+    
+    response = client.patch(
+        f"/stock/{p_id}/nickname", 
+        json={"nickname": "Mineral Water"}, 
+        headers=home_headers
+    )
+    
+    assert response.status_code == 200
+    assert response.json()["data"]["nickname"] == "Mineral Water"
 
 # ==========================================
 # 2. Filtering & Search
@@ -214,6 +245,43 @@ def test_scan_receipt_success(client, home_headers):
         assert data["chain"] == "mock_chain"
         assert len(data["items"]) == 2
 
+def test_search_global_catalog_by_name(client, home_headers):
+    """Scenario: Search catalog by name string."""
+    with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
+        mock_svc = AsyncMock()
+        mock_item = CatalogItem(barcode="111", name="Test Milk", manufacturer="Tnuva")
+        mock_svc.search_product_by_name_external_db.return_value = [mock_item]
+        mock_factory.return_value = mock_svc
+        
+        response = client.get("/stock/catalog/search?query=Milk", headers=home_headers)
+        
+        assert response.status_code == 200
+        assert len(response.json()["data"]) == 1
+        assert response.json()["data"][0]["name"] == "Test Milk"
+
+def test_scan_receipt_file_upload(client, home_headers):
+    """Scenario: Uploading a file to the scan endpoint."""
+    with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
+        mock_svc = AsyncMock()
+        # Mocking the service return to bypass actual ML execution during API test
+        from src.domain.receipt.receipt import ReceiptDTO
+        mock_svc.scan_receipt.return_value = ReceiptDTO(
+            id=uuid4(), home_id=uuid4(), user_id=uuid4(), chain="Test Chain", items=[]
+        )
+        mock_factory.return_value = mock_svc
+
+        # Prepare fake file payload for TestClient
+        files = [("files", ("receipt.jpg", b"fake_image_content", "image/jpeg"))]
+        
+        # We extract just the X-Home-ID. 
+        # WARNING: We must NOT send "Content-Type: application/json" because uploading files uses "multipart/form-data"
+        headers = {"X-Home-ID": home_headers["X-Home-ID"]}
+        
+        response = client.post("/stock/scan", files=files, headers=headers)
+        
+        assert response.status_code == 200
+        assert response.json()["data"]["chain"] == "Test Chain"
+
 # ==========================================
 # 4. Error Handling
 # ==========================================
@@ -233,6 +301,118 @@ def test_add_product_missing_home_header(client, active_home):
     # but the Header requirement failed.
     assert response.status_code == 422
 
+def test_stock_item_not_found_returns_400(client, home_headers):
+    """Sad Path: Trying to update a completely fake product/item ID."""
+    fake_p_id = str(uuid4())
+    fake_i_id = str(uuid4())
+    
+    response = client.patch(
+        f"/stock/{fake_p_id}/items/{fake_i_id}/quantity", 
+        json={"new_quantity": 5}, 
+        headers=home_headers
+    )
+    
+    # The service will throw a ValueError ("Product not found"), which the router turns into a 400
+    assert response.status_code == 400
+    assert "detail" in response.json()
+
+def test_stock_routes_unauthenticated_fails(client):
+    """Security: Verify unauthenticated users are blocked from stock management."""
+    headers = {"X-Home-ID": str(uuid4())}
+    
+    response = client.get("/stock/all", headers=headers)
+    
+    assert response.status_code == 401
+
+# ==========================================
+# 5. Full Router Exception Coverage (Boost to 100%)
+# ==========================================
+
+@pytest.mark.parametrize("method, endpoint, payload", [
+    ("POST", "/stock/add", {"name": "Valid Name", "quantity": 1, "barcode": "123"}),    ("PATCH", f"/stock/{uuid4()}/items/{uuid4()}/expiration", {"new_date": "2026-01-01"}),
+    ("PATCH", f"/stock/{uuid4()}/items/{uuid4()}/location", {"location": "FREEZER"}),
+    ("PATCH", f"/stock/{uuid4()}/nickname", {"nickname": "New Name"}),
+    ("DELETE", f"/stock/{uuid4()}/items/{uuid4()}", None),
+    ("GET", "/stock/filter?query=Milk", None),
+    ("GET", "/stock/all", None),
+    ("GET", "/stock/catalog/search?query=Milk", None),
+    ("GET", f"/stock/catalog/barcode/12345", None),
+    ("POST", "/stock/add-receipt", {"chain": "test", "items": []})
+])
+def test_all_stock_routes_value_error_returns_400(client, home_headers, method, endpoint, payload):
+    """Coverage: Ensure EVERY route properly catches ValueError from the Domain/Service and returns 400."""
+    with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
+        mock_svc = AsyncMock()
+        # Make ALL methods of the mock throw ValueError to simulate Domain validation failures
+        mock_svc.add_product.side_effect = ValueError("Domain error")
+        mock_svc.update_item_date.side_effect = ValueError("Domain error")
+        mock_svc.update_item_location.side_effect = ValueError("Domain error")
+        mock_svc.update_nickname.side_effect = ValueError("Domain error")
+        mock_svc.remove_item.side_effect = ValueError("Domain error")
+        mock_svc.filter_products.side_effect = ValueError("Domain error")
+        mock_svc.get_home_products.side_effect = ValueError("Domain error")
+        mock_svc.search_product_by_name_external_db.side_effect = ValueError("Domain error")
+        mock_svc.search_product_by_barcode_external_db.side_effect = ValueError("Domain error")
+        mock_svc.add_receipt.side_effect = ValueError("Domain error")
+        
+        mock_factory.return_value = mock_svc
+
+        # Execute the correct HTTP method dynamically
+        if method == "POST":
+            res = client.post(endpoint, json=payload, headers=home_headers)
+        elif method == "PATCH":
+            res = client.patch(endpoint, json=payload, headers=home_headers)
+        elif method == "DELETE":
+            res = client.delete(endpoint, headers=home_headers)
+        else:
+            res = client.get(endpoint, headers=home_headers)
+
+        assert res.status_code == 400
+        assert "detail" in res.json()
+
+
+def test_stock_scan_receipt_internal_error_500(client, home_headers):
+    """Coverage: Ensure scan_receipt catches general Exceptions and returns 500."""
+    with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
+        mock_svc = AsyncMock()
+        mock_svc.scan_receipt.side_effect = Exception("ML Model Crashed")
+        mock_factory.return_value = mock_svc
+
+        files = [("files", ("receipt.jpg", b"fake_image_content", "image/jpeg"))]
+        headers = {"X-Home-ID": home_headers["X-Home-ID"]}
+        res = client.post("/stock/scan", files=files, headers=headers)
+
+        assert res.status_code == 500
+        assert "ML Model Crashed" in res.json()["detail"]
+
+
+def test_stock_add_receipt_internal_error_500(client, home_headers):
+    """Coverage: Ensure add_receipt catches general Exceptions and returns 500."""
+    with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
+        mock_svc = AsyncMock()
+        mock_svc.add_receipt.side_effect = Exception("DB Connection Lost")
+        mock_factory.return_value = mock_svc
+
+        payload = {"chain": "test", "items": []}
+        res = client.post("/stock/add-receipt", json=payload, headers=home_headers)
+
+        assert res.status_code == 500
+        assert "DB Connection Lost" in res.json()["detail"]
+
+
+def test_get_global_product_by_barcode_not_found_returns_200_with_none(client, home_headers):
+    """Coverage: Test the 'if not item:' branch in barcode lookup."""
+    with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
+        mock_svc = AsyncMock()
+        # Service successfully searched but found nothing (returns None)
+        mock_svc.search_product_by_barcode_external_db.return_value = None
+        mock_factory.return_value = mock_svc
+
+        res = client.get("/stock/catalog/barcode/999999", headers=home_headers)
+
+        assert res.status_code == 200
+        assert res.json()["data"] is None
+        assert "not found" in res.json()["message"]
 def test_add_receipt_unauthorized_home(client, active_home):
     """Scenario: User authenticated but trying to post to a random UUID home."""
     import uuid

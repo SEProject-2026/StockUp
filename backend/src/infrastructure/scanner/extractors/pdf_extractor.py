@@ -24,6 +24,25 @@ PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 PROCESSOR_ID = os.environ.get("DOCUMENT_AI_PROCESSOR_ID")
 LOCATION = os.environ.get("GCP_LOCATION", "eu")
 
+# --- Lazy Loading Setup for HuggingFace ---
+_hf_client_cache = None
+
+def get_hf_client():
+    """
+    Lazy initialization for HuggingFace Client.
+    This prevents timeouts during GitHub Actions test collection by ensuring
+    the connection only happens when a PDF extraction is actually requested.
+    """
+    global _hf_client_cache
+    if _hf_client_cache is None:
+        try:
+            app_logger.info("Initializing HuggingFace PDFExtractor Client...")
+            _hf_client_cache = Client("orioha/PDFExtractor")
+        except Exception as e:
+            app_logger.error(f"Failed to initialize HF Client: {e}")
+            raise e
+    return _hf_client_cache
+
 # Initialize Google Vision Client
 try:
     if vision:
@@ -39,9 +58,6 @@ try:
 except Exception as e:
     vision_client = None
     app_logger.warning(f"Warning: Could not initialize Google Vision API client. {e}")
-
-# Initialize HuggingFace Client
-hf_client = Client("orioha/PDFExtractor")
 
 def _save_pdf_debug_text(pdf_path: str, content: str) -> None:
     if not ENABLE_DEBUG:
@@ -80,7 +96,8 @@ def _extract_digital_pdf(file_path: str) -> str:
     Extract text natively from a digital PDF file using HuggingFace space.
     """
     try:
-        text = hf_client.predict(
+        client = get_hf_client()
+        text = client.predict(
             file=handle_file(file_path),
             api_name="/api_handler"
         )

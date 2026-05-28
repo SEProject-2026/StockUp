@@ -94,13 +94,10 @@ class CatalogItemModel(Base):
     chain = Column("Chain", String, primary_key=True, default="GLOBAL")
     name = Column("ItemName", String, nullable=False)
     manufacturer = Column("ManufacturerName", String)
-    unit_of_measure = Column("UnitOfMeasure", String)
-    qty_in_package = Column("QtyInPackage", String)
     last_update = Column("LastUpdate", DateTime)
     location = Column("SuggestedStorageCategory", String, default="OTHER")
     avg_weight = Column("AverageWeight", Float, default=0.0)
     sample_size = Column("SampleSize", Integer, default=0)
-
 
 class ShoppingListModel(Base):
     __tablename__ = "shopping_lists"

@@ -11,20 +11,8 @@ from src.domain.enums import LocationType
 
 # --- Domain & Persistence Factories ---
 
-import uuid
-from typing import Optional
-from sqlalchemy.orm import Session
-# IMPORT YOUR ACTUAL SQLALCHEMY MODELS HERE
-from src.infrastructure.db.models import UserModel 
-from src.infrastructure.db.models import HomeModel
-# ... import others as needed
-
-import uuid
-from typing import Optional
-from sqlalchemy.orm import Session
 from src.infrastructure.db.models import UserModel, HomeModel
-from src.domain.user.user import User
-from src.domain.home.home import Home
+
 
 def create_user_entity(db: Optional[Session] = None, **kwargs) -> User:
     user_id = kwargs.get("user_id", uuid.uuid4())
