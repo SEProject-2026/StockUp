@@ -19,6 +19,7 @@ from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
 from src.repositories.user_repository import IUserRepository
 from src.services.notification_service import send_push_notification
+from src.services.house_auth import require_house_access
 
 class StockService:
  
@@ -35,6 +36,7 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
+    @require_house_access
     async def add_product(
         self, 
         name: str, 
@@ -48,7 +50,7 @@ class StockService:
     ) -> Optional[Product]:
         """Standard operation for single item additions."""
         app_logger.debug(f"Starting add_product process for '{name}' (home_id: {home_id})")
-        await self._check_access(user_id, home_id)
+        
         
         if name == "Unknown Product":
             app_logger.warning(f"Add product rejected: Attempted to add 'Unknown Product' in home {home_id}")
@@ -69,6 +71,7 @@ class StockService:
         return product
         
     
+    @require_house_access
     async def scan_receipt(
         self,
         user_id: UUID,
@@ -76,7 +79,7 @@ class StockService:
         files_paths: List[str],  
     ) -> ReceiptDTO:
         app_logger.debug(f"Starting receipt scan for home {home_id} with {len(files_paths)} files")
-        await self._check_access(user_id, home_id)
+        
 
         # 1. Validation Guards
         self._validate_file_paths(files_paths)
@@ -92,9 +95,14 @@ class StockService:
         print(f"Chain name: {chain_name}")
         receipt_items_dto: list[ReceiptItemDTO] = []
 
+        # Bulk fetch all catalog items in one single query to minimize database roundtrip latency
+        barcodes = list(scanned_items.keys())
+        catalog_items = await self._catalog_provider.get_items_by_barcodes(barcodes, chain_name)
+        catalog_map = {ci.barcode: ci for ci in catalog_items}
+
         for barcode, (qty, unit_str) in scanned_items.items():
             unit = UnitType(unit_str) if unit_str in UnitType.__members__ else UnitType.UNIT
-            ci = await self._catalog_provider.get_item_by_barcode(barcode, chain_name)
+            ci = catalog_map.get(barcode)
 
             if ci:
                 avg_unit_weight = 1
@@ -173,17 +181,51 @@ class StockService:
         if not all(isinstance(fp, (str, os.PathLike)) for fp in paths):
             raise TypeError("files_paths must contain only path strings")
 
-    async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
-        """High-performance operation for full receipts."""
-        app_logger.debug(f"Processing receipt addition for home {receipt_dto.home_id} with {len(receipt_dto.items)} items")
-        await self._check_access(receipt_dto.user_id, receipt_dto.home_id)
+    @require_house_access
+    async def validate_receipt(self, receipt_dto: ReceiptDTO) -> int:
+        """
+        Fast validation-only path — called during the HTTP request.
+        Returns the count of valid (non-unknown) items.
+        """
+        app_logger.debug(f"Validating receipt for home {receipt_dto.home_id} with {len(receipt_dto.items)} items")
+        
+        count = sum(1 for item in receipt_dto.items if item.name != "Unknown Product")
+        app_logger.info(f"Receipt validated: {count} known items for home {receipt_dto.home_id}")
+        return count
+
+    async def commit_receipt(self, receipt_dto: ReceiptDTO, count: int) -> None:
+        """
+        Heavy persistence path — called as a BackgroundTask after the response is sent.
+        FastAPI keeps request-scoped dependencies alive through background tasks,
+        so the service's injected repositories and DB session are still valid.
+        """
+        try:
+            await self._commit_receipt_internal(receipt_dto, count)
+        except Exception as e:
+            app_logger.error(f"Background receipt commit failed for home {receipt_dto.home_id}: {e}")
+
+    async def _commit_receipt_internal(self, receipt_dto: ReceiptDTO, count: int) -> None:
+        """
+        Internal commit logic — executes within a dedicated DB session.
+        Tracks new vs existing products and new vs merged items to enable
+        the optimized save_all_receipt bulk path.
+        """
+        app_logger.debug(f"Committing receipt for home {receipt_dto.home_id} ({count} items)")
         
         existing_products = await self._product_repository.list_all_by_home(receipt_dto.home_id)
         products_map = {p.original_name: p for p in existing_products}
         
-        products_to_save = {}
+        # Track which products existed before this receipt
+        existing_product_ids = {p.id for p in existing_products}
+        
+        # Collect IDs of items that existed BEFORE we start adding receipt items.
+        # Any item ID NOT in this set after processing was created by add_item().
+        pre_existing_item_ids = set()
+        for p in existing_products:
+            for item in p.items:
+                pre_existing_item_ids.add(item.id)
+        
         catalog_updated = False
-        count = 0
         
         for item in receipt_dto.items:
             if item.name == "Unknown Product":
@@ -215,13 +257,34 @@ class StockService:
             # Inventory uses Integer quantity. We ensure at least 1 unit if it's a known product.
             inventory_qty = max(1, int(item.quantity))
             product.add_item(inventory_qty, item.location, item.expiration_date)
-            
-            products_to_save[product.id] = product
-            count += 1
 
-        if products_to_save:
-            await self._product_repository.save_all(list(products_to_save.values()))
-            app_logger.info(f"Bulk saved {len(products_to_save)} products to DB for home {receipt_dto.home_id}")
+        # Separate new vs existing products for the optimized save path
+        new_products = []
+        updated_products = []
+        for product in products_map.values():
+            if product.id in existing_product_ids:
+                # Only include if it was actually modified (it was in the receipt)
+                if any(item.name == product.original_name for item in receipt_dto.items if item.name != "Unknown Product"):
+                    updated_products.append(product)
+            else:
+                new_products.append(product)
+
+        # Determine which item IDs are newly created (not pre-existing)
+        new_item_ids = set()
+        for product in new_products + updated_products:
+            for item in product.items:
+                if item.id not in pre_existing_item_ids:
+                    new_item_ids.add(item.id)
+
+        if new_products or updated_products:
+            await self._product_repository.save_all_receipt(
+                new_products=new_products,
+                updated_products=updated_products,
+                new_item_ids=new_item_ids,
+            )
+            app_logger.info(
+                f"Receipt saved: {len(new_products)} new + {len(updated_products)} updated products for home {receipt_dto.home_id}"
+            )
             
         # Save the receipt to the receipt repository to track what was bought together
         # We only save KNOWN products to avoid polluting recommendation data with "Unknown Product" placeholders
@@ -244,6 +307,7 @@ class StockService:
             self._catalog_provider.persist()
             app_logger.debug("Catalog weights persisted successfully")
 
+        # Send push notifications concurrently
         try:
             home = await self._home_repository.get_by_id(receipt_dto.home_id)
             scanner_user = await self._user_repository.get_by_id(receipt_dto.user_id)
@@ -269,16 +333,15 @@ class StockService:
                 
         except Exception as e:
             app_logger.error(f"Failed to send receipt notifications: {e}")
-
-        return count
         
+    @require_house_access
     async def remove_item(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID) -> Optional[Product]:
         """
         Removes a specific item batch (line) from the product.
         If the product becomes empty, it deletes the product entity entirely.
         """
         app_logger.debug(f"Attempting to remove item {item_id} from product {product_id}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         
@@ -317,9 +380,10 @@ class StockService:
             
             return None
 
+    @require_house_access
     async def update_item_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_quantity: int) -> Optional[Product]:
         app_logger.debug(f"Attempting to update quantity of item {item_id} to {new_quantity}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -358,9 +422,10 @@ class StockService:
             
             return None
 
+    @require_house_access
     async def update_item_date(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_date: Optional[date]) -> Product:
         app_logger.debug(f"Attempting to update expiration date of item {item_id} to {new_date}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -373,9 +438,10 @@ class StockService:
         app_logger.info(f"Expiration date for item {item_id} updated successfully")
         return product
     
+    @require_house_access
     async def update_item_location(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_location: LocationType) -> Product:
         app_logger.debug(f"Attempting to move item {item_id} to {new_location}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -388,9 +454,10 @@ class StockService:
         app_logger.info(f"Location for item {item_id} updated to {new_location}")
         return product
         
+    @require_house_access
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:
         app_logger.debug(f"Attempting to update nickname for product {product_id}")
-        await self._check_access(user_id, home_id)
+        
 
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -409,10 +476,11 @@ class StockService:
     # Read / Filter / Search Operations
     # ==========================================
 
-    async def filter_products(self, user_id: UUID, home_id: UUID, query: Optional[str]=None, location: Optional[LocationType]=None, expiration_type: Optional[ExpirationType]=None) -> List[Product]:
+    @require_house_access
+    async def filter_products(self, user_id: UUID, home_id: UUID, query: Optional[str]=None, location: Optional[LocationType]=None, expiration_type: Optional[ExpirationType]=None, home=None) -> List[Product]:
 
         app_logger.debug(f"Starting filter_manager with location={location} and expiration_type={expiration_type} for home {home_id}")
-        warning_days = await self._check_access(user_id, home_id)
+        warning_days = home.get_expiration_range()
 
         products = await self._product_repository.filter_products(home_id, query_text=query, location=location, expiration_type=expiration_type, warning_days=warning_days)
         return products        
@@ -448,22 +516,25 @@ class StockService:
             items=filtered_items_dtos
         )
 
+    @require_house_access
     async def search_product_by_name_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[CatalogItem]:
         app_logger.debug(f"Searching external catalog for '{query}'")
-        await self._check_access(user_id, home_id)
+        
         search_results = await self._catalog_provider.search_items_by_name(query)
         return search_results
     
+    @require_house_access
     async def search_product_by_barcode_external_db(self, user_id: UUID, home_id: UUID, barcode: str) -> Optional[CatalogItem]:
         app_logger.debug(f"Searching external catalog by barcode: {barcode}")
-        await self._check_access(user_id, home_id)
+        
         item = await self._catalog_provider.get_item_by_barcode(barcode)
         return item
     
+    @require_house_access
     async def get_home_products(self, user_id: UUID, home_id: UUID) -> List[Product]:
         """Retrieves all products in the home's inventory."""
         app_logger.debug(f"Retrieving all products for home {home_id}")
-        await self._check_access(user_id, home_id)
+        
         products = await self._product_repository.list_all_by_home(home_id)
         return products
 
@@ -534,7 +605,7 @@ class StockService:
                 offset += batch_size
                 
                 # Adding a short sleep to prevent overwhelming the database in case of large number of homes. 
-                asyncio.sleep(0.1) 
+                await asyncio.sleep(0.1) 
 
             except Exception as e:
                 app_logger.error(f"Fatal error fetching batch at offset {offset}: {e}")
@@ -542,14 +613,4 @@ class StockService:
 
         app_logger.info(f"Finished daily expiration check. Processed {total_processed} homes total.")
     
-    async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
-        """Helper to verify user exists, logged in, and member of the home"""
-        home = await self._home_repository.get_by_id(home_id)
-        if not home:
-            app_logger.warning(f"Access check failed: Home {home_id} does not exist")
-            raise ValueError("Home retrieval failed")
-        if not home.is_member(user_id):
-            app_logger.warning(f"Access check failed: User {user_id} is not a member of home {home_id}")
-            raise ValueError("User is not a member of the home")
-        return home.get_expiration_range()
     

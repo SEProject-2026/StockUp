@@ -154,3 +154,20 @@ async def update_push_token(
     except ValueError as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=400, detail=translated_message)
+
+@router.post("/logout", response_model=GeneralResponse)
+async def logout(
+    user_service: UserServiceDep, 
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Logout the user and clear their push token.
+    Protected Route.
+    """
+    app_logger.info(f"Logout request received from user {user_id}")
+    await user_service.logout(user_id)
+    
+    return GeneralResponse(
+        status="success", 
+        message="Logged out successfully"
+    )

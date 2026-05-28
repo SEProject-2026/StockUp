@@ -368,11 +368,13 @@ async def scan_receipt(
 async def add_receipt(
     request: AddReceiptRequest,
     service: StockServiceDep,
+    background_tasks: BackgroundTasks,
     home_id: UUID = Header(..., alias="X-Home-ID"),
     user_id: UUID = Depends(get_current_user_id),
 ):
     """
     Accepts confirmed receipt items from the client and adds them to inventory.
+    Validates synchronously, then commits to DB in a background task.
     """
     app_logger.info(f"Add receipt request received from user {user_id} with {len(request.items)} items")
     try:
@@ -395,7 +397,11 @@ async def add_receipt(
             ]
         )
         
-        processed_count = await service.add_receipt(receipt_dto)
+        # Fast path: validate access + count items (runs during request)
+        processed_count = await service.validate_receipt(receipt_dto)
+        
+        # Heavy path: DB persistence + notifications (runs after response is sent)
+        background_tasks.add_task(service.commit_receipt, receipt_dto, processed_count)
         
         return GeneralResponse(
             status="success",

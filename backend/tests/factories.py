@@ -9,7 +9,11 @@ from src.domain.home.home import Home
 from src.domain.product.product import Product, ProductItem
 from src.domain.shopping_list.shopping_list import ShoppingList, ShoppingListItem
 from src.domain.enums import LocationType
+
+# --- Domain & Persistence Factories ---
+
 from src.infrastructure.db.models import UserModel, HomeModel
+
 
 # ==========================================
 # 1. Domain & Persistence Factories (Async)

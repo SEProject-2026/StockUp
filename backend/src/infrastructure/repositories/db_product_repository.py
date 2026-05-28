@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Set
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
@@ -24,7 +24,65 @@ class DbProductRepository(IProductRepository):
             await self._perform_upsert_logic(product)
         await self.db.commit()
 
-    async def _perform_upsert_logic(self, product: Product) -> None:
+    async def save_all_receipt(
+        self,
+        new_products: List[Product],
+        updated_products: List[Product],
+        new_item_ids: Set[UUID],
+    ) -> None:
+        """
+        Receipt-optimized bulk save. Zero re-queries, single commit.
+        """
+        # 1. New products: direct INSERT (no query needed)
+        for product in new_products:
+            db_product = ProductModel(
+                id=str(product.id),
+                home_id=str(product.home_id),
+                original_name=product.original_name,
+                nickname=product.nickname,
+                barcode=product.barcode,
+            )
+            self.db.add(db_product)
+            for item in product.items:
+                self.db.add(ProductItemModel(
+                    id=str(item.id),
+                    product_id=str(product.id),
+                    quantity=item.quantity,
+                    expiration_date=item.expiration_date,
+                    location=item.location.value if item.location else LocationType.OTHER.value,
+                ))
+
+        # 2. Existing products: only handle items that changed during receipt processing
+        for product in updated_products:
+            # Update product-level fields (nickname may have changed)
+            self.db.query(ProductModel).filter(
+                ProductModel.id == str(product.id)
+            ).update({
+                ProductModel.nickname: product.nickname,
+                ProductModel.barcode: product.barcode,
+            })
+
+            for item in product.items:
+                if item.id in new_item_ids:
+                    # This is a brand new item created by add_item → INSERT
+                    self.db.add(ProductItemModel(
+                        id=str(item.id),
+                        product_id=str(product.id),
+                        quantity=item.quantity,
+                        expiration_date=item.expiration_date,
+                        location=item.location.value if item.location else LocationType.OTHER.value,
+                    ))
+                else:
+                    # This is an existing item that add_item merged into → atomic UPDATE
+                    self.db.query(ProductItemModel).filter(
+                        ProductItemModel.id == str(item.id)
+                    ).update({
+                        ProductItemModel.quantity: item.quantity,
+                    })
+
+        self.db.commit()
+
+    def _perform_upsert_logic(self, product: Product) -> None:
         """Internal helper to handle the mapping logic without commit."""
         result = await self.db.execute(
             select(ProductModel)

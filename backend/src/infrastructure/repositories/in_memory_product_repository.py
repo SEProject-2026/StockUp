@@ -1,7 +1,7 @@
 import copy
 import datetime
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from src.domain.enums import ExpirationType, LocationType
 from src.repositories.i_product_repository import IProductRepository
 from src.domain.product.product import Product
@@ -17,6 +17,18 @@ class InMemoryProductRepository(IProductRepository):
 
     async def save_all(self, products: List[Product]) -> None:
         for product in products:
+            self._products_db[product.id] = product
+
+    async def save_all_receipt(
+        self,
+        new_products: List[Product],
+        updated_products: List[Product],
+        new_item_ids: Set[uuid.UUID],
+    ) -> None:
+        """In-memory: just store all products."""
+        for product in new_products:
+            self._products_db[product.id] = product
+        for product in updated_products:
             self._products_db[product.id] = product
     
     async def get_by_id(self, product_id: uuid.UUID) -> Optional[Product]: 

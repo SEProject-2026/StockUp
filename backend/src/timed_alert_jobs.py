@@ -18,11 +18,11 @@ async def daily_expiration_job():
 async def weekly_catalog_update_job():
     print("Starting Weekly Catalog Update...")
     try:
-        subprocess.run(["python", "scraper.py"], check=True)
+        subprocess.run(["python", "db_updater.py"], check=True)
         subprocess.run(["python", "update_table.py"], check=True)
-        print("✅ Weekly Catalog Update finished successfully!")
+        print("Weekly Catalog Update finished successfully!")
     except Exception as e:
-        print(f"❌ Error during weekly update: {e}")
+        print(f"Error during weekly update: {e}")
 
 # Here you can add more scheduled jobs if needed, following the same pattern as above.
 

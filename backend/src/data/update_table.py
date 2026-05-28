@@ -4,8 +4,11 @@ import pandas as pd
 import re
 from datetime import datetime
 from supabase import create_client, Client
+from dotenv import load_dotenv
 
 # --- Configuration ---
+load_dotenv()
+
 # Replace with your actual Supabase project credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -20,7 +23,7 @@ CHAIN_MAP = {"mck_online": "mck"}
 # =========================================
 # Category Logic
 # =========================================
-FRIDGE, FREEZER, PANTRY, CLEANING, OTHER = "fridge", "freezer", "pantry", "cleaning", "Other"
+FRIDGE, FREEZER, PANTRY, CLEANING, OTHER = "FRIDGE", "FREEZER", "PANTRY", "CLEANING", "OTHER"
 
 EXACT_WORDS = {
     FREEZER: ["גידרון"],
@@ -89,9 +92,32 @@ def process_and_upload():
         df = pd.read_csv(file_path, dtype={'ItemCode': str}).drop_duplicates(subset=['ItemCode'], keep='first')
         df.rename(columns={'ItemCode': 'Barcode'}, inplace=True)
         
-        existing_data = supabase.table(TABLE_NAME).select("*").eq("Chain", chain_name).execute()
-        db_products = {row['Barcode']: row for row in existing_data.data}
-        db_names = {row['ItemName']: row['Barcode'] for row in existing_data.data}
+        # Fetch all existing items for this specific chain with pagination (Supabase default limit is 1000 rows)
+        offset = 0
+        limit = 1000
+        chain_rows = []
+        while True:
+            response = supabase.table(TABLE_NAME).select("*").eq("Chain", chain_name).range(offset, offset + limit - 1).execute()
+            if not response.data:
+                break
+            chain_rows.extend(response.data)
+            if len(response.data) < limit:
+                break
+            offset += limit
+
+        # Fetch GLOBAL items specifically for the barcodes in our CSV (avoiding loading the entire global catalog)
+        csv_barcodes = df['Barcode'].dropna().unique().tolist()
+        global_rows = []
+        for i in range(0, len(csv_barcodes), 1000):
+            batch = csv_barcodes[i:i+1000]
+            response = supabase.table(TABLE_NAME).select("*").eq("Chain", "GLOBAL").in_("Barcode", batch).execute()
+            if response.data:
+                global_rows.extend(response.data)
+
+        # Build lookups. We key db_products by (Barcode, Chain) because primary key is composite.
+        existing_rows = chain_rows + global_rows
+        db_products = {(row['Barcode'], row['Chain']): row for row in existing_rows}
+        db_names = {row['ItemName']: row['Barcode'] for row in chain_rows}
 
         final_batch = []
         barcodes_to_delete = []
@@ -111,8 +137,9 @@ def process_and_upload():
             new_manufacturer = str(row.get('ManufacturerName', '')) if pd.notna(row.get('ManufacturerName')) else ""
             target_chain = "GLOBAL" if (is_global and chain_name in TRUSTED_GLOBAL_SOURCES) else chain_name
 
-            if clean_code in db_products:
-                db_row = db_products[clean_code]
+            product_key = (clean_code, target_chain)
+            if product_key in db_products:
+                db_row = db_products[product_key]
                 final_name = db_row.get('ItemName')
                 category = db_row.get('SuggestedStorageCategory')
                 avg_weight = db_row.get('AverageWeight', 0)
