@@ -354,6 +354,7 @@ def test_all_stock_routes_value_error_returns_400(client, home_headers, method, 
         mock_svc.search_product_by_name_external_db.side_effect = ValueError("Domain error")
         mock_svc.search_product_by_barcode_external_db.side_effect = ValueError("Domain error")
         mock_svc.add_receipt.side_effect = ValueError("Domain error")
+        mock_svc.validate_receipt.side_effect = ValueError("Domain error")
         
         mock_factory.return_value = mock_svc
 
@@ -390,7 +391,7 @@ def test_stock_add_receipt_internal_error_500(client, home_headers):
     """Coverage: Ensure add_receipt catches general Exceptions and returns 500."""
     with patch("src.infrastructure.app_container.AppContainer.get_stock_service") as mock_factory:
         mock_svc = AsyncMock()
-        mock_svc.add_receipt.side_effect = Exception("DB Connection Lost")
+        mock_svc.validate_receipt.side_effect = Exception("DB Connection Lost")
         mock_factory.return_value = mock_svc
 
         payload = {"chain": "test", "items": []}
@@ -421,5 +422,4 @@ def test_add_receipt_unauthorized_home(client, active_home):
     
     response = client.post("/stock/add-receipt", json=payload, headers=bad_headers)
     
-    # Should fail with 400 (as per StockService._check_access raising ValueError)
     assert response.status_code == 400

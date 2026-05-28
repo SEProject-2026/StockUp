@@ -181,13 +181,13 @@ class StockService:
         if not all(isinstance(fp, (str, os.PathLike)) for fp in paths):
             raise TypeError("files_paths must contain only path strings")
 
+    @require_house_access
     async def validate_receipt(self, receipt_dto: ReceiptDTO) -> int:
         """
         Fast validation-only path — called during the HTTP request.
         Returns the count of valid (non-unknown) items.
         """
         app_logger.debug(f"Validating receipt for home {receipt_dto.home_id} with {len(receipt_dto.items)} items")
-        await self._check_access(receipt_dto.user_id, receipt_dto.home_id)
         
         count = sum(1 for item in receipt_dto.items if item.name != "Unknown Product")
         app_logger.info(f"Receipt validated: {count} known items for home {receipt_dto.home_id}")

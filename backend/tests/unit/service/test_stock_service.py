@@ -879,14 +879,13 @@ async def test_scan_receipt_invalid_files_fails(stock_service, mock_home_repo, a
 # ==========================================
 
 @pytest.mark.asyncio
-async def test_validate_receipt_returns_known_item_count(stock_service, mock_home_repo, auth_setup):
+async def test_validate_receipt_returns_known_item_count(stock_service, mock_home_repo, active_service_context):
     """
     Scenario: Validating a receipt with mixed known and unknown items.
     Verify: Returns count of known items only, performs access check.
     """
     # Arrange
-    home, admin = auth_setup
-    mock_home_repo.get_by_id.return_value = home
+    home, admin = active_service_context
 
     items = [
         ReceiptItemDTO(name="Milk", quantity=2.0, barcode="111"),
@@ -903,7 +902,7 @@ async def test_validate_receipt_returns_known_item_count(stock_service, mock_hom
 
 
 @pytest.mark.asyncio
-async def test_commit_receipt_success(stock_service, mock_home_repo, mock_product_repo, auth_setup):
+async def test_commit_receipt_success(stock_service, mock_home_repo, mock_product_repo, active_service_context):
     """
     Scenario: Committing a receipt with multiple items.
     Verify: The service uses the repository's receipt-optimized bulk save.
@@ -942,7 +941,8 @@ async def test_add_receipt_saves_history_and_updates_catalog(stock_service, mock
     items = [ReceiptItemDTO(name="Tomatoes", quantity=1.0, barcode="456", unit=UnitType.KG, weight=0.5)]
     receipt_dto = ReceiptDTO(id=uuid.uuid4(), home_id=home._id, user_id=admin.id, chain="Supersal", items=items)
 
-    await stock_service.add_receipt(receipt_dto)
+    count = await stock_service.validate_receipt(receipt_dto)
+    await stock_service.commit_receipt(receipt_dto, count)
 
     # Assert receipt history was saved
     stock_service._receipt_repository.save.assert_called_once()
@@ -953,7 +953,7 @@ async def test_add_receipt_saves_history_and_updates_catalog(stock_service, mock
 
 
 @pytest.mark.asyncio
-async def test_commit_receipt_merges_with_existing_inventory(stock_service, mock_home_repo, mock_product_repo, auth_setup, any_product):
+async def test_commit_receipt_merges_with_existing_inventory(stock_service, mock_home_repo, mock_product_repo, active_service_context, any_product):
     """
     Scenario: Receipt contains an item that already exists in the inventory.
     Verify: The service finds the existing entity and merges quantities.
@@ -998,7 +998,7 @@ async def test_commit_receipt_merges_with_existing_inventory(stock_service, mock
     mock_product_repo.save_all_receipt.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_validate_receipt_fails_unauthorized(stock_service, mock_home_repo, auth_setup):
+async def test_validate_receipt_fails_unauthorized(stock_service, mock_home_repo, active_service_context):
     """
     Scenario: Commit a receipt to a home where the user is not a member.
     Verify: ValueError is raised and no items are processed.
