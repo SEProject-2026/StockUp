@@ -44,7 +44,7 @@ def require_house_access(func):
         user_id = bound_args.arguments.get('head_user_id') or \
                   bound_args.arguments.get('user_id') or \
                   bound_args.arguments.get('current_head_id')
-        home_id = bound_args.arguments.get('home_id')
+        home_id = bound_args.arguments.get('home_id') or bound_args.arguments.get('target_home_id')
         list_id = bound_args.arguments.get('id') # ShoppingListService uses 'id' for list_id
         
         # 1. Extract from DTO if needed
@@ -58,8 +58,9 @@ def require_house_access(func):
         # 2. Resolve home_id from list_id if home_id is missing (for ShoppingListService)
         if not home_id and list_id and hasattr(self, 'shopping_repo'):
             shopping_list = await self.shopping_repo.get_by_id(list_id)
-            if shopping_list:
-                home_id = shopping_list.home_id
+            if not shopping_list:
+                raise ValueError(f"Shopping list not found: {list_id}")
+            home_id = shopping_list.home_id
 
         # 3. Perform the check
         home = await validate_home_membership(self._home_repository, user_id, home_id)

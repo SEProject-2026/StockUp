@@ -2,7 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 from src.domain.shopping_list.shopping_list import ShoppingList
 from src.infrastructure.logger import app_logger
-from src.services.security import require_house_access
+from src.services.house_auth import require_house_access
 
 class ShoppingListService:
     def __init__(self, shopping_repo, home_repository):

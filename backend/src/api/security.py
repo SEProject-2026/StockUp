@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, Security
 
 from src.infrastructure.app_container import AppContainer
 
-# 1. הגדרת הסכימה החדשה
+# 1. define the security scheme
 security_scheme = HTTPBearer()
 
 async def get_current_user_id(
@@ -14,7 +14,7 @@ async def get_current_user_id(
     """
     Dependency שמאמת טוקן מול Supabase.
     """
-    # 2. חילוץ הטוקן הנקי (ה-Bearer כבר יורד אוטומטית)
+    # 2.extract the token from the credentials
     token = auth.credentials
     
     auth_provider = AppContainer.get_auth_provider()

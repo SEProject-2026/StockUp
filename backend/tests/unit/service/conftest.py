@@ -9,20 +9,6 @@ from src.services.shopping_list_service import ShoppingListService
 # --- Infrastructure Mocks (Global for all services) ---
 
 @pytest.fixture(autouse=True)
-def mock_security_check():
-    """
-    Globally bypasses real authorization logic in unit tests.
-    Every service method decorated with @require_house_access will 
-    succeed by default and receive a mocked Home object.
-    """
-    with patch("src.services.security.validate_home_membership", new_callable=AsyncMock) as mock:
-        # By default, return a MagicMock that acts like a Home domain object
-        mock_home = MagicMock()
-        mock_home.get_expiration_range.return_value = 7
-        mock.return_value = mock_home
-        yield mock
-
-@pytest.fixture(autouse=True)
 def mock_notifications():
     """
     Prevents real push notifications. 
@@ -81,14 +67,21 @@ def mock_receipt_repo():
     return AsyncMock()
 
 @pytest.fixture
-def security_context():
+def active_service_context(mock_home_repo, auth_setup):
     """
-    Provides a consistent user/home context for testing.
+    Sets up a realistic context for service unit tests where the real 
+    @require_house_access decorator is invoked.
+    Configures mock_home_repo to return the home entity when requested.
     """
-    return {
-        "user_id": uuid.UUID("11111111-1111-1111-1111-111111111111"),
-        "home_id": uuid.UUID("22222222-2222-2222-2222-222222222222")
-    }
+    home, user = auth_setup
+    
+    async def get_by_id_side_effect(home_id):
+        if home_id == home._id:
+            return home
+        return None
+    mock_home_repo.get_by_id.side_effect = get_by_id_side_effect
+    
+    return home, user
 
 # --- Service Fixtures (Manual Dependency Injection) ---
 

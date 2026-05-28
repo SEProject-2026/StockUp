@@ -19,7 +19,7 @@ from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
 from src.repositories.user_repository import IUserRepository
 from src.services.notification_service import send_push_notification
-from src.services.security import require_house_access
+from src.services.house_auth import require_house_access
 
 class StockService:
  

@@ -1,17 +1,8 @@
 import pytest
 from uuid import UUID, uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.services.security import validate_home_membership, require_house_access
+from src.services.house_auth import validate_home_membership, require_house_access
 
-@pytest.fixture(autouse=True)
-def unmock_security():
-    """
-    Ensure we are testing the REAL decorator and validation logic,
-    not the global mock from conftest.py.
-    """
-    # We patch it with its own original implementation
-    with patch("src.services.security.validate_home_membership", side_effect=validate_home_membership):
-        yield
 
 @pytest.mark.asyncio
 async def test_validate_home_membership_success():

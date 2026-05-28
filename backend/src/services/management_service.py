@@ -5,7 +5,7 @@ from src.repositories.i_home_repository import IHomeRepository
 from src.services.notification_service import send_push_notification
 from src.domain.home.home import Home
 from src.infrastructure.logger import app_logger
-from src.services.security import require_house_access
+from src.services.house_auth import require_house_access
 
 class ManagementService:
 
