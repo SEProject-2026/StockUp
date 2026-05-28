@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Set
 from src.domain.enums import ExpirationType, LocationType
 from src.domain.product.product import Product
 from uuid import UUID
@@ -17,6 +17,24 @@ class IProductRepository(ABC):
     @abstractmethod
     async def save_all(self, products: List[Product]) -> None:
         """Creates multiple inventory items in a batch operation."""
+        pass
+
+    @abstractmethod
+    async def save_all_receipt(
+        self,
+        new_products: List[Product],
+        updated_products: List[Product],
+        new_item_ids: Set[UUID],
+    ) -> None:
+        """
+        Receipt-optimized bulk save. Skips redundant re-queries by leveraging
+        the caller's knowledge of which products/items are new vs existing.
+        - new_products: Products that don't exist in DB yet (direct INSERT).
+        - updated_products: Products already loaded from DB (only new items are inserted).
+        - new_item_ids: IDs of ProductItems created during this receipt processing.
+          Items whose IDs are NOT in this set were merged into existing items
+          and need an atomic quantity UPDATE instead of INSERT.
+        """
         pass
 
     @abstractmethod

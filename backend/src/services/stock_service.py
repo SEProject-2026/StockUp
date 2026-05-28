@@ -182,17 +182,50 @@ class StockService:
             raise TypeError("files_paths must contain only path strings")
 
     @require_house_access
-    async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
-        """High-performance operation for full receipts."""
-        app_logger.debug(f"Processing receipt addition for home {receipt_dto.home_id} with {len(receipt_dto.items)} items")
+    async def validate_receipt(self, receipt_dto: ReceiptDTO) -> int:
+        """
+        Fast validation-only path — called during the HTTP request.
+        Returns the count of valid (non-unknown) items.
+        """
+        app_logger.debug(f"Validating receipt for home {receipt_dto.home_id} with {len(receipt_dto.items)} items")
         
+        count = sum(1 for item in receipt_dto.items if item.name != "Unknown Product")
+        app_logger.info(f"Receipt validated: {count} known items for home {receipt_dto.home_id}")
+        return count
+
+    async def commit_receipt(self, receipt_dto: ReceiptDTO, count: int) -> None:
+        """
+        Heavy persistence path — called as a BackgroundTask after the response is sent.
+        FastAPI keeps request-scoped dependencies alive through background tasks,
+        so the service's injected repositories and DB session are still valid.
+        """
+        try:
+            await self._commit_receipt_internal(receipt_dto, count)
+        except Exception as e:
+            app_logger.error(f"Background receipt commit failed for home {receipt_dto.home_id}: {e}")
+
+    async def _commit_receipt_internal(self, receipt_dto: ReceiptDTO, count: int) -> None:
+        """
+        Internal commit logic — executes within a dedicated DB session.
+        Tracks new vs existing products and new vs merged items to enable
+        the optimized save_all_receipt bulk path.
+        """
+        app_logger.debug(f"Committing receipt for home {receipt_dto.home_id} ({count} items)")
         
         existing_products = await self._product_repository.list_all_by_home(receipt_dto.home_id)
         products_map = {p.original_name: p for p in existing_products}
         
-        products_to_save = {}
+        # Track which products existed before this receipt
+        existing_product_ids = {p.id for p in existing_products}
+        
+        # Collect IDs of items that existed BEFORE we start adding receipt items.
+        # Any item ID NOT in this set after processing was created by add_item().
+        pre_existing_item_ids = set()
+        for p in existing_products:
+            for item in p.items:
+                pre_existing_item_ids.add(item.id)
+        
         catalog_updated = False
-        count = 0
         
         for item in receipt_dto.items:
             if item.name == "Unknown Product":
@@ -224,13 +257,34 @@ class StockService:
             # Inventory uses Integer quantity. We ensure at least 1 unit if it's a known product.
             inventory_qty = max(1, int(item.quantity))
             product.add_item(inventory_qty, item.location, item.expiration_date)
-            
-            products_to_save[product.id] = product
-            count += 1
 
-        if products_to_save:
-            await self._product_repository.save_all(list(products_to_save.values()))
-            app_logger.info(f"Bulk saved {len(products_to_save)} products to DB for home {receipt_dto.home_id}")
+        # Separate new vs existing products for the optimized save path
+        new_products = []
+        updated_products = []
+        for product in products_map.values():
+            if product.id in existing_product_ids:
+                # Only include if it was actually modified (it was in the receipt)
+                if any(item.name == product.original_name for item in receipt_dto.items if item.name != "Unknown Product"):
+                    updated_products.append(product)
+            else:
+                new_products.append(product)
+
+        # Determine which item IDs are newly created (not pre-existing)
+        new_item_ids = set()
+        for product in new_products + updated_products:
+            for item in product.items:
+                if item.id not in pre_existing_item_ids:
+                    new_item_ids.add(item.id)
+
+        if new_products or updated_products:
+            await self._product_repository.save_all_receipt(
+                new_products=new_products,
+                updated_products=updated_products,
+                new_item_ids=new_item_ids,
+            )
+            app_logger.info(
+                f"Receipt saved: {len(new_products)} new + {len(updated_products)} updated products for home {receipt_dto.home_id}"
+            )
             
         # Save the receipt to the receipt repository to track what was bought together
         # We only save KNOWN products to avoid polluting recommendation data with "Unknown Product" placeholders
@@ -253,6 +307,7 @@ class StockService:
             self._catalog_provider.persist()
             app_logger.debug("Catalog weights persisted successfully")
 
+        # Send push notifications concurrently
         try:
             home = await self._home_repository.get_by_id(receipt_dto.home_id)
             scanner_user = await self._user_repository.get_by_id(receipt_dto.user_id)
@@ -278,8 +333,6 @@ class StockService:
                 
         except Exception as e:
             app_logger.error(f"Failed to send receipt notifications: {e}")
-
-        return count
         
     @require_house_access
     async def remove_item(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID) -> Optional[Product]:
