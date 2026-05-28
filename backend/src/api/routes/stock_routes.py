@@ -2,7 +2,7 @@ from typing import List, Optional, Annotated
 from uuid import UUID, uuid4
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query, File
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.receipt.receipt import ReceiptDTO, ReceiptItemDTO
 from src.infrastructure.db.database import get_db
@@ -26,7 +26,7 @@ from src.api.routes.translate_notifications import translate_error
 router = APIRouter(prefix="/stock", tags=["Stock Management"])
 
 # --- Dependency Injection ---
-def get_stock_service(db: Session = Depends(get_db)) -> StockService:
+def get_stock_service(db: AsyncSession = Depends(get_db)) -> StockService:
     return AppContainer.get_stock_service(db)
 
 StockServiceDep = Annotated[StockService, Depends(get_stock_service)]

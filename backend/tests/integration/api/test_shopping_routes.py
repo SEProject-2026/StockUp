@@ -6,25 +6,25 @@ from unittest.mock import AsyncMock, patch
 # 1. Lifecycle & Item Management
 # ==========================================
 
-def test_create_shopping_list_api(client, active_home):
+async def test_create_shopping_list_api(client, active_home):
     """Scenario: Create a new list using the active_home context."""
     payload = {"home_id": str(active_home.id), "name": "Weekend BBQ"}
-    response = client.post("/shopping-lists/", json=payload)
+    response = await client.post("/shopping-lists/", json=payload)
 
     assert response.status_code == 201
     assert response.json()["data"]["name"] == "Weekend BBQ"
 
-def test_add_item_and_update_quantity(client, active_home):
+async def test_add_item_and_update_quantity(client, active_home):
     """Scenario: Add an item and then change its quantity."""
     # 1. Create List
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Groceries"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Groceries"})
     list_id = list_res.json()["data"]["id"]
 
     # 2. Add Item
-    client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Steak", "quantity": 2})
+    await client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Steak", "quantity": 2})
 
     # 3. Update Quantity
-    patch_res = client.patch(f"/shopping-lists/{list_id}/items/Steak/quantity", json={"new_quantity": 5})
+    patch_res = await client.patch(f"/shopping-lists/{list_id}/items/Steak/quantity", json={"new_quantity": 5})
     
     assert patch_res.status_code == 200
     items = patch_res.json()["data"]["items"]
@@ -34,22 +34,22 @@ def test_add_item_and_update_quantity(client, active_home):
 # 2. Shopping Mode Logic
 # ==========================================
 
-def test_full_shopping_mode_flow(client, active_home):
+async def test_full_shopping_mode_flow(client, active_home):
     """Scenario: Enter mode -> Check item -> Exit mode with clear=True."""
     # Setup list with 2 items
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Store"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Store"})
     list_id = list_res.json()["data"]["id"]
-    client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Milk", "quantity": 1})
-    client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Bread", "quantity": 1})
+    await client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Milk", "quantity": 1})
+    await client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Bread", "quantity": 1})
 
     # 1. Enter Mode
-    client.post(f"/shopping-lists/{list_id}/enter-mode")
+    await client.post(f"/shopping-lists/{list_id}/enter-mode")
     
     # 2. Check Milk
-    client.patch(f"/shopping-lists/{list_id}/items/Milk/check")
+    await client.patch(f"/shopping-lists/{list_id}/items/Milk/check")
     
     # 3. Exit with Clear
-    response = client.post(f"/shopping-lists/{list_id}/exit-mode", json={"clear": True})
+    response = await client.post(f"/shopping-lists/{list_id}/exit-mode", json={"clear": True})
     
     assert response.status_code == 200
     final_items = response.json()["data"]["items"]
@@ -57,15 +57,15 @@ def test_full_shopping_mode_flow(client, active_home):
     assert final_items[0]["item_name"] == "Bread"
     assert response.json()["data"]["is_active_shopping_mode"] is False
 
-def test_exit_mode_without_clear(client, active_home):
+async def test_exit_mode_without_clear(client, active_home):
     """Scenario: Exit mode but keep bought items in the list."""
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Keep Items"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Keep Items"})
     list_id = list_res.json()["data"]["id"]
-    client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Milk", "quantity": 1})
-    client.patch(f"/shopping-lists/{list_id}/items/Milk/check")
+    await client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Milk", "quantity": 1})
+    await client.patch(f"/shopping-lists/{list_id}/items/Milk/check")
 
     # Exit with clear=False
-    response = client.post(f"/shopping-lists/{list_id}/exit-mode", json={"clear": False})
+    response = await client.post(f"/shopping-lists/{list_id}/exit-mode", json={"clear": False})
     
     assert response.status_code == 200
     assert len(response.json()["data"]["items"]) == 1
@@ -75,9 +75,9 @@ def test_exit_mode_without_clear(client, active_home):
 # 3. Recommendations (Mocked)
 # ==========================================
 
-def test_get_recommendations_api(client, active_home):
+async def test_get_recommendations_api(client, active_home):
     """Scenario: Verify recommendations route is working with a mock service."""
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Recs"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Recs"})
     list_id = list_res.json()["data"]["id"]
 
     mock_data = ["Apples", "Bananas"]
@@ -86,7 +86,7 @@ def test_get_recommendations_api(client, active_home):
         mock_service.get_recommendations.return_value = mock_data
         mock_factory.return_value = mock_service
 
-        response = client.get(f"/shopping-lists/{list_id}/recommendations")
+        response = await client.get(f"/shopping-lists/{list_id}/recommendations")
         assert response.status_code == 200
         assert response.json()["data"] == mock_data
 

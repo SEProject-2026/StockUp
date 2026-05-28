@@ -1,7 +1,7 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.db.database import get_db
 from src.services.management_service import ManagementService
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/homes", tags=["Home Management"])
 
 # --- Dependency Injection Setup ---
 
-def get_management_service(db: Session = Depends(get_db)) -> ManagementService:
+def get_management_service(db: AsyncSession = Depends(get_db)) -> ManagementService:
     return AppContainer.get_management_service(db)
 
 ManagementServiceDep = Annotated[ManagementService, Depends(get_management_service)]
