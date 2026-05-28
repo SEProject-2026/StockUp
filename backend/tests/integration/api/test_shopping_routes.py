@@ -126,21 +126,21 @@ def test_get_recommendations_api(client, active_home):
 # 4. Security & Edge Cases
 # ==========================================
 
-# def test_create_list_in_wrong_home_fails(client, db_session, auth_user):
-#     """Scenario: User tries to create a list in a home they don't belong to."""
-#     from tests.factories import create_user_entity, create_home_entity
+def test_create_list_in_wrong_home_fails(client, db_session, auth_user):
+    """Scenario: User tries to create a list in a home they don't belong to."""
+    from tests.factories import create_user_entity, create_home_entity
     
-#     # Setup: auth_user exists but we create a home for someone else
-#     create_user_entity(db=db_session, user_id=auth_user)
-#     other_owner = create_user_entity(db=db_session, email="other@test.com")
-#     other_home = create_home_entity(db=db_session, admin_user_id=other_owner.id)
-#     db_session.commit()
+    # Setup: auth_user exists but we create a home for someone else
+    create_user_entity(db=db_session, user_id=auth_user)
+    other_owner = create_user_entity(db=db_session, email="other@test.com")
+    other_home = create_home_entity(db=db_session, admin_user_id=other_owner.id)
+    db_session.commit()
 
-#     payload = {"home_id": str(other_home.id), "name": "Hacker List"}
-#     response = client.post("/shopping-lists/", json=payload)
+    payload = {"home_id": str(other_home.id), "name": "Hacker List"}
+    response = client.post("/shopping-lists/", json=payload)
 
-#     # Assert: Should be Forbidden or Bad Request based on your service logic
-#     assert response.status_code in [403, 400]
+    # Assert: Should be Forbidden or Bad Request based on your service logic
+    assert response.status_code in [403, 400]
 
 def test_shopping_routes_unauthenticated_fails(client):
     """Security: Verify unauthenticated users are blocked."""

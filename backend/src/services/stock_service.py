@@ -19,6 +19,7 @@ from src.domain.receipt.receipt import ReceiptItemDTO, ReceiptDTO
 from src.infrastructure.logger import app_logger
 from src.repositories.user_repository import IUserRepository
 from src.services.notification_service import send_push_notification
+from src.services.house_auth import require_house_access
 
 class StockService:
  
@@ -35,6 +36,7 @@ class StockService:
     # 2. Stock Management (Inventory)
     # ==========================================
 
+    @require_house_access
     async def add_product(
         self, 
         name: str, 
@@ -48,7 +50,7 @@ class StockService:
     ) -> Optional[Product]:
         """Standard operation for single item additions."""
         app_logger.debug(f"Starting add_product process for '{name}' (home_id: {home_id})")
-        await self._check_access(user_id, home_id)
+        
         
         if name == "Unknown Product":
             app_logger.warning(f"Add product rejected: Attempted to add 'Unknown Product' in home {home_id}")
@@ -69,6 +71,7 @@ class StockService:
         return product
         
     
+    @require_house_access
     async def scan_receipt(
         self,
         user_id: UUID,
@@ -76,7 +79,7 @@ class StockService:
         files_paths: List[str],  
     ) -> ReceiptDTO:
         app_logger.debug(f"Starting receipt scan for home {home_id} with {len(files_paths)} files")
-        await self._check_access(user_id, home_id)
+        
 
         # 1. Validation Guards
         self._validate_file_paths(files_paths)
@@ -178,10 +181,11 @@ class StockService:
         if not all(isinstance(fp, (str, os.PathLike)) for fp in paths):
             raise TypeError("files_paths must contain only path strings")
 
+    @require_house_access
     async def add_receipt(self, receipt_dto: ReceiptDTO) -> int:
         """High-performance operation for full receipts."""
         app_logger.debug(f"Processing receipt addition for home {receipt_dto.home_id} with {len(receipt_dto.items)} items")
-        await self._check_access(receipt_dto.user_id, receipt_dto.home_id)
+        
         
         existing_products = await self._product_repository.list_all_by_home(receipt_dto.home_id)
         products_map = {p.original_name: p for p in existing_products}
@@ -277,13 +281,14 @@ class StockService:
 
         return count
         
+    @require_house_access
     async def remove_item(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID) -> Optional[Product]:
         """
         Removes a specific item batch (line) from the product.
         If the product becomes empty, it deletes the product entity entirely.
         """
         app_logger.debug(f"Attempting to remove item {item_id} from product {product_id}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         
@@ -322,9 +327,10 @@ class StockService:
             
             return None
 
+    @require_house_access
     async def update_item_quantity(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_quantity: int) -> Optional[Product]:
         app_logger.debug(f"Attempting to update quantity of item {item_id} to {new_quantity}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -363,9 +369,10 @@ class StockService:
             
             return None
 
+    @require_house_access
     async def update_item_date(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_date: Optional[date]) -> Product:
         app_logger.debug(f"Attempting to update expiration date of item {item_id} to {new_date}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -378,9 +385,10 @@ class StockService:
         app_logger.info(f"Expiration date for item {item_id} updated successfully")
         return product
     
+    @require_house_access
     async def update_item_location(self, user_id: UUID, home_id: UUID, product_id: UUID, item_id: UUID, new_location: LocationType) -> Product:
         app_logger.debug(f"Attempting to move item {item_id} to {new_location}")
-        await self._check_access(user_id, home_id)
+        
         
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -393,9 +401,10 @@ class StockService:
         app_logger.info(f"Location for item {item_id} updated to {new_location}")
         return product
         
+    @require_house_access
     async def update_nickname(self, user_id: UUID, home_id: UUID, product_id: UUID, new_nickname: str) -> Product:
         app_logger.debug(f"Attempting to update nickname for product {product_id}")
-        await self._check_access(user_id, home_id)
+        
 
         product = await self._product_repository.get_by_id(product_id)
         if not product or product.home_id != home_id:
@@ -414,10 +423,11 @@ class StockService:
     # Read / Filter / Search Operations
     # ==========================================
 
-    async def filter_products(self, user_id: UUID, home_id: UUID, query: Optional[str]=None, location: Optional[LocationType]=None, expiration_type: Optional[ExpirationType]=None) -> List[Product]:
+    @require_house_access
+    async def filter_products(self, user_id: UUID, home_id: UUID, query: Optional[str]=None, location: Optional[LocationType]=None, expiration_type: Optional[ExpirationType]=None, home=None) -> List[Product]:
 
         app_logger.debug(f"Starting filter_manager with location={location} and expiration_type={expiration_type} for home {home_id}")
-        warning_days = await self._check_access(user_id, home_id)
+        warning_days = home.get_expiration_range()
 
         products = await self._product_repository.filter_products(home_id, query_text=query, location=location, expiration_type=expiration_type, warning_days=warning_days)
         return products        
@@ -453,22 +463,25 @@ class StockService:
             items=filtered_items_dtos
         )
 
+    @require_house_access
     async def search_product_by_name_external_db(self, user_id: UUID, home_id: UUID, query: str) -> List[CatalogItem]:
         app_logger.debug(f"Searching external catalog for '{query}'")
-        await self._check_access(user_id, home_id)
+        
         search_results = await self._catalog_provider.search_items_by_name(query)
         return search_results
     
+    @require_house_access
     async def search_product_by_barcode_external_db(self, user_id: UUID, home_id: UUID, barcode: str) -> Optional[CatalogItem]:
         app_logger.debug(f"Searching external catalog by barcode: {barcode}")
-        await self._check_access(user_id, home_id)
+        
         item = await self._catalog_provider.get_item_by_barcode(barcode)
         return item
     
+    @require_house_access
     async def get_home_products(self, user_id: UUID, home_id: UUID) -> List[Product]:
         """Retrieves all products in the home's inventory."""
         app_logger.debug(f"Retrieving all products for home {home_id}")
-        await self._check_access(user_id, home_id)
+        
         products = await self._product_repository.list_all_by_home(home_id)
         return products
 
@@ -547,14 +560,4 @@ class StockService:
 
         app_logger.info(f"Finished daily expiration check. Processed {total_processed} homes total.")
     
-    async def _check_access(self, user_id: UUID, home_id: UUID) -> int:
-        """Helper to verify user exists, logged in, and member of the home"""
-        home = await self._home_repository.get_by_id(home_id)
-        if not home:
-            app_logger.warning(f"Access check failed: Home {home_id} does not exist")
-            raise ValueError("Home retrieval failed")
-        if not home.is_member(user_id):
-            app_logger.warning(f"Access check failed: User {user_id} is not a member of home {home_id}")
-            raise ValueError("User is not a member of the home")
-        return home.get_expiration_range()
     

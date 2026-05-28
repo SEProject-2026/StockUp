@@ -155,12 +155,16 @@ class AppContainer:
     def get_shopping_list_service(db: Optional[Session] = None):
         # Production (DB)
         if db:
-            return ShoppingListService(shopping_repo=DbShoppingListRepository(db))
+            return ShoppingListService(
+                shopping_repo=DbShoppingListRepository(db),
+                home_repository=DbHomeRepository(db)
+            )
         
         # Testing (In-Memory)
         if AppContainer._shopping_list_service_instance is None:
             AppContainer._shopping_list_service_instance = ShoppingListService(
-                shopping_repo=InMemoryShoppingListRepository()
+                shopping_repo=InMemoryShoppingListRepository(),
+                home_repository=InMemoryHomeRepository()
             )
             
         return AppContainer._shopping_list_service_instance
