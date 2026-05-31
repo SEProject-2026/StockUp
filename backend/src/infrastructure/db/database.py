@@ -1,5 +1,4 @@
 import os
-import asyncpg
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -27,28 +26,18 @@ def _make_async_url(url: str) -> str:
 
 ASYNC_DATABASE_URL = _make_async_url(SQLALCHEMY_DATABASE_URL)
 
-async def async_connect_custom():
-    """
-    NUCLEAR OPTION FOR TRANSACTION POOLERS:
-    Directly bypasses SQLAlchemy's initialization logic by generating a raw 
-    asyncpg connection with hard-coded statement cache disabling.
-    """
-    # Convert postgresql+asyncpg:// back to postgresql:// for raw asyncpg usage
-    raw_url = ASYNC_DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
-    
-    return await asyncpg.connect(
-        raw_url,
-        statement_cache_size=0,
-        max_cached_statement_lifetime=0
-    )
-
 async_engine = create_async_engine(
-    "postgresql+asyncpg://",  # We pass an empty dialect prefix since async_creator handles the URL
-    async_creator=async_connect_custom,
+    ASYNC_DATABASE_URL,
     pool_size=5,
     max_overflow=10,       # 5 + 10 = 15 total (matches Supabase Nano limit)
     pool_recycle=300,      # Recycle connections every 5 min to avoid stale pooler slots
     pool_pre_ping=True,
+    # Disable prepared statement caching at the asyncpg driver level.
+    # Required for pgbouncer in transaction/statement pool mode.
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 AsyncSessionLocal = async_sessionmaker(
