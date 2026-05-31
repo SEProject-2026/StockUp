@@ -2,18 +2,18 @@ from contextlib import asynccontextmanager
 import subprocess
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.infrastructure.app_container import AppContainer
-from src.infrastructure.db.database import SessionLocal
+from src.infrastructure.db.database import AsyncSessionLocal
 from fastapi import FastAPI
 
 scheduler = AsyncIOScheduler()
 
 async def daily_expiration_job():
-    db = SessionLocal()
-    try:
-        stock_service = AppContainer.get_stock_service(db)
-        await stock_service.check_expirations_and_notify()
-    finally:
-        db.close()
+    async with AsyncSessionLocal() as db:
+        try:
+            stock_service = AppContainer.get_stock_service(db)
+            await stock_service.check_expirations_and_notify()
+        finally:
+            await db.close()
 
 async def weekly_catalog_update_job():
     print("Starting Weekly Catalog Update...")

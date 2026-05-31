@@ -1,7 +1,7 @@
 from typing import Annotated 
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from sqlalchemy.orm import Session 
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.user.user import User
 from src.infrastructure import app_container
@@ -27,7 +27,7 @@ from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-def get_user_service(db: Session = Depends(get_db)) -> UserService:
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
     return AppContainer.get_user_service(db)
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]

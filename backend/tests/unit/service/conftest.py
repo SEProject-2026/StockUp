@@ -53,8 +53,6 @@ def mock_shopping_repo():
 @pytest.fixture
 def mock_catalog_provider():
     provider = AsyncMock()
-    provider.update_weighted_mem_only = MagicMock()
-    provider.persist = MagicMock()
     return provider
 
 @pytest.fixture

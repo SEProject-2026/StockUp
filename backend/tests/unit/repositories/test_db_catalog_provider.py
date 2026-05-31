@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -23,20 +23,26 @@ class MockCatalogItemModel(Base):
     avg_weight = Column(Float)
     sample_size = Column(Integer)
 
-@pytest.fixture(scope="function")
-def db_session():
-    """Creates a fresh in-memory SQLite database for every test."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-    
-    yield session
-    
-    session.close()
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+import pytest_asyncio
 
-@pytest.fixture(scope="function")
-def seeded_db(db_session):
+@pytest_asyncio.fixture(scope="function")
+async def db_session():
+    # Initialize the async engine
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        
+    SessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    
+    async with SessionLocal() as session:
+        yield session
+        
+    # Dispose the engine to close all background connections and free the event loop
+    await engine.dispose()
+
+@pytest_asyncio.fixture(scope="function")
+async def seeded_db(db_session):
     """Seeds the in-memory database with test data."""
     # Note: Using valid Enums for location based on our previous findings!
     items = [
@@ -45,11 +51,11 @@ def seeded_db(db_session):
         MockCatalogItemModel(barcode="7290000000456", name="Banana", manufacturer="Import", chain="GLOBAL", location="OTHER", avg_weight=150.0, sample_size=5),
     ]
     db_session.add_all(items)
-    db_session.commit()
+    await db_session.commit()
     return db_session
 
-@pytest.fixture
-def provider(seeded_db):
+@pytest_asyncio.fixture
+async def provider(seeded_db):
     """Returns the provider connected to the seeded in-memory DB."""
     # We patch the provider's reference to CatalogItemModel to use our Mock model
     with patch('src.infrastructure.repositories.db_catalog_provider.CatalogItemModel', MockCatalogItemModel):
@@ -57,7 +63,8 @@ def provider(seeded_db):
 
 # --- 2. Tests ---
 
-def test_map_to_domain(provider):
+@pytest.mark.asyncio
+async def test_map_to_domain(provider):
     """Tests proper mapping from SQLAlchemy model to Pydantic Domain model."""
     db_model = MockCatalogItemModel(
         barcode="999", name="Test", manufacturer="TestMfg", 
@@ -69,7 +76,8 @@ def test_map_to_domain(provider):
     assert domain_model.name == "Test"
     assert domain_model.weight == 50.0 # Checking the avg_weight -> weight map
 
-def test_get_padded_barcode(provider):
+@pytest.mark.asyncio
+async def test_get_padded_barcode(provider):
     """Tests the Israeli barcode padding helper."""
     assert provider._get_padded_barcode("123") == "7290000000123"
     assert provider._get_padded_barcode("7290000000456") == "7290000000456"
@@ -122,41 +130,47 @@ async def test_search_items_by_name(provider):
     assert results[0].chain_source == "GLOBAL"
     assert results[1].chain_source == "CHAIN_A"
 
-def test_update_weighted_mem_only(provider, seeded_db):
+@pytest.mark.asyncio
+async def test_update_weighted_mem_only(provider, seeded_db):
     """Tests the moving average math and DB flush logic."""
     barcode = "123"
+    from sqlalchemy import select
     
     # Update the GLOBAL apple (Initial: weight=100, size=2, total=200)
-    provider.update_weighted_mem_only(barcode, "GLOBAL", 160.0)
+    await provider.update_weighted_mem_only(barcode, "GLOBAL", 160.0)
     
     # Because flush() writes to the session buffer, we can query it directly
-    updated_model = seeded_db.query(MockCatalogItemModel).filter_by(name="Global Apple").first()
+    result = await seeded_db.execute(select(MockCatalogItemModel).filter_by(name="Global Apple"))
+    updated_model = result.scalars().first()
     
     # New size = 3, New Total = 360, New Avg = 120
     assert updated_model.sample_size == 3
     assert updated_model.avg_weight == 120.0
 
-def test_update_weighted_mem_only_missing(provider):
+@pytest.mark.asyncio
+async def test_update_weighted_mem_only_missing(provider):
     """Ensures updating a missing item doesn't crash."""
     # Should safely return without executing math
-    provider.update_weighted_mem_only("999", "GLOBAL", 50.0)
+    await provider.update_weighted_mem_only("999", "GLOBAL", 50.0)
 
-def test_persist_success(provider, seeded_db):
+@pytest.mark.asyncio
+async def test_persist_success(provider, seeded_db):
     """Tests successful commit."""
     # Change some data
-    provider.update_weighted_mem_only("123", "GLOBAL", 160.0)
+    await provider.update_weighted_mem_only("123", "GLOBAL", 160.0)
     
     # Patch commit to verify it's called
-    with patch.object(seeded_db, 'commit') as mock_commit:
-        provider.persist()
+    with patch.object(seeded_db, 'commit', new_callable=AsyncMock) as mock_commit:
+        await provider.persist()
         mock_commit.assert_called_once()
 
-def test_persist_exception(provider, seeded_db):
+@pytest.mark.asyncio
+async def test_persist_exception(provider, seeded_db):
     """Tests rollback triggers on exception."""
     # Force the commit to throw an error
     with patch.object(seeded_db, 'commit', side_effect=Exception("DB Failure")):
-        with patch.object(seeded_db, 'rollback') as mock_rollback:
+        with patch.object(seeded_db, 'rollback', new_callable=AsyncMock) as mock_rollback:
             with pytest.raises(Exception, match="DB Failure"):
-                provider.persist()
+                await provider.persist()
             
             mock_rollback.assert_called_once()

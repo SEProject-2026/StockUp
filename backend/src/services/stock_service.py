@@ -233,7 +233,7 @@ class StockService:
             
             if item.unit == UnitType.KG and item.quantity > 0 and item.barcode:
                 current_measured_avg = item.weight / item.quantity
-                self._catalog_provider.update_weighted_mem_only(
+                await self._catalog_provider.update_weighted_mem_only(
                     barcode=item.barcode,
                     chain_name=receipt_dto.chain,
                     measured_weight=current_measured_avg
@@ -304,7 +304,7 @@ class StockService:
             app_logger.info(f"Successfully saved receipt record for home {receipt_dto.home_id}")
         
         if catalog_updated:
-            self._catalog_provider.persist()
+            await self._catalog_provider.persist()
             app_logger.debug("Catalog weights persisted successfully")
 
         # Send push notifications concurrently

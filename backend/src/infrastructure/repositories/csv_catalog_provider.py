@@ -106,7 +106,7 @@ class CsvCatalogProvider(ICatalogProvider):
             if len(results) >= 20: break
         return results
 
-    def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
+    async def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
         """Updates internal memory object with moving average logic."""
         item = self._get_item_sync(barcode, chain_name)
         if not item:
@@ -116,7 +116,7 @@ class CsvCatalogProvider(ICatalogProvider):
         item.sample_size += 1
         item.weight = (old_total + measured_weight) / item.sample_size
 
-    def persist(self):
+    async def persist(self):
         """Finalizes changes by rewriting the CSV file."""
         fields = [
             "Barcode", "ItemName", "ManufacturerName", 

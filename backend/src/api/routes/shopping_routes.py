@@ -1,7 +1,7 @@
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.db.database import get_db
 from src.services.shopping_list_service import ShoppingListService
@@ -22,10 +22,12 @@ from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 
-def get_shopping_list_service(db: Session = Depends(get_db)) -> ShoppingListService:
+# --- Dependency Injection ---
+
+def get_shopping_list_service(db: AsyncSession = Depends(get_db)) -> ShoppingListService:
     return AppContainer.get_shopping_list_service(db)
 
-def get_recommendation_service(db: Session = Depends(get_db)) -> RecommendationService:
+def get_recommendation_service(db: AsyncSession = Depends(get_db)) -> RecommendationService:
     return AppContainer.get_recommendation_service(db)
 
 ShoppingServiceDep = Annotated[ShoppingListService, Depends(get_shopping_list_service)]
@@ -52,6 +54,7 @@ async def create_list(
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except Exception as e:
+        app_logger.error(f"Error creating list: {e}", exc_info=True)
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 

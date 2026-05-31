@@ -4,6 +4,7 @@ from uuid import uuid4, UUID
 from unittest.mock import patch
 from sqlalchemy import create_engine, Column, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+import pytest_asyncio
 
 from src.domain.receipt.receipt import ReceiptDTO, ReceiptItemDTO
 from src.domain.enums import UnitType, LocationType
@@ -33,18 +34,25 @@ class MockReceiptRecordItemModel(Base):
     
     receipt = relationship("MockReceiptRecordModel", back_populates="items")
 
-@pytest.fixture(scope="function")
-def db_session():
-    """Creates a fresh in-memory SQLite database."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-    yield session
-    session.close()
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-@pytest.fixture
-def repo(db_session):
+@pytest_asyncio.fixture(scope="function")
+async def db_session():
+    # Initialize the async engine
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        
+    SessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    
+    async with SessionLocal() as session:
+        yield session
+        
+    # Dispose the engine to close all background connections and free the event loop
+    await engine.dispose()
+
+@pytest_asyncio.fixture
+async def repo(db_session):
     """Returns the repository connected to the mocked in-memory models."""
     # We patch the models inside your repository file so it uses our mock SQLite ones
     # Adjust 'db_receipt_repository' below to match your actual file name
@@ -75,7 +83,14 @@ async def test_save_receipt(repo, db_session):
     await repo.save(dto)
     
     # Verify via direct DB query
-    saved_receipt = db_session.query(MockReceiptRecordModel).filter_by(id=str(receipt_id)).first()
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    result = await db_session.execute(
+        select(MockReceiptRecordModel)
+        .options(selectinload(MockReceiptRecordModel.items))
+        .filter_by(id=str(receipt_id))
+    )
+    saved_receipt = result.scalars().first()
     assert saved_receipt is not None
     assert saved_receipt.home_id == str(home_id)
     assert len(saved_receipt.items) == 2
@@ -102,7 +117,7 @@ async def test_get_by_home_logic_and_mapping(repo, db_session):
     rec2 = MockReceiptRecordModel(id=str(uuid4()), home_id=str(other_home), user_id=str(uuid4()), chain="CHAIN_B")
     
     db_session.add_all([rec1, rec2])
-    db_session.commit()
+    await db_session.commit()
     
     # Fetch
     results = await repo.get_by_home(target_home)
@@ -134,7 +149,7 @@ async def test_get_by_home_with_since(repo, db_session):
     new_rec = MockReceiptRecordModel(id=str(uuid4()), home_id=str(home_id), user_id=str(uuid4()), chain="NEW", created_at=now)
     
     db_session.add_all([old_rec, new_rec])
-    db_session.commit()
+    await db_session.commit()
     
     # Query for last 5 days
     since_date = now - timedelta(days=5)
@@ -156,7 +171,7 @@ async def test_get_by_home_limit_and_ordering(repo, db_session):
             chain=f"CHAIN_{i}", created_at=now - timedelta(days=i)
         )
         db_session.add(rec)
-    db_session.commit()
+    await db_session.commit()
     
     # Limit to 2
     results = await repo.get_by_home(home_id, limit=2)

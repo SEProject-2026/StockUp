@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # --- Services ---
 from src.infrastructure.scanner.receipt_scanner import ReceiptScanner
@@ -62,7 +62,7 @@ class AppContainer:
         return AppContainer._receipt_scanner_instance
 
     @staticmethod
-    def get_catalog_provider(db: Optional[Session] = None):
+    def get_catalog_provider(db: Optional[AsyncSession] = None):
         """
         Returns a Catalog Provider.
         - If 'db' is provided: Returns DbCatalogProvider.
@@ -88,7 +88,7 @@ class AppContainer:
         return AppContainer._catalog_provider_instance
 
     @staticmethod
-    def get_user_service(db: Optional[Session] = None) -> UserService:
+    def get_user_service(db: Optional[AsyncSession] = None) -> UserService:
         """
         Returns a UserService.
         - If 'db' is provided: Returns a new instance connected to the DB (Production).
@@ -108,7 +108,7 @@ class AppContainer:
         return AppContainer._user_service_instance
 
     @staticmethod
-    def get_stock_service(db: Optional[Session] = None) -> StockService:
+    def get_stock_service(db: Optional[AsyncSession] = None) -> StockService:
         catalog = AppContainer.get_catalog_provider(db)
         scanner = AppContainer.get_receipt_scanner()
 
@@ -137,7 +137,7 @@ class AppContainer:
         return AppContainer._stock_service_instance
 
     @staticmethod
-    def get_management_service(db: Optional[Session] = None) -> ManagementService:
+    def get_management_service(db: Optional[AsyncSession] = None) -> ManagementService:
         # Production (DB)
         if db:
             return ManagementService(home_repository=DbHomeRepository(db), user_repository=DbUserRepository(db))
@@ -152,7 +152,7 @@ class AppContainer:
         return AppContainer._management_service_instance
     
     @staticmethod
-    def get_shopping_list_service(db: Optional[Session] = None):
+    def get_shopping_list_service(db: Optional[AsyncSession] = None):
         # Production (DB)
         if db:
             return ShoppingListService(
@@ -170,7 +170,7 @@ class AppContainer:
         return AppContainer._shopping_list_service_instance
 
     @staticmethod
-    def get_recommendation_engine(db: Optional[Session] = None):
+    def get_recommendation_engine(db: Optional[AsyncSession] = None):
         if db:
             return RecommendationEngine(
                 product_repository=DbProductRepository(db),
@@ -182,7 +182,7 @@ class AppContainer:
         )
 
     @staticmethod
-    def get_recommendation_service(db: Optional[Session] = None):
+    def get_recommendation_service(db: Optional[AsyncSession] = None):
         engine = AppContainer.get_recommendation_engine(db)
         # Production (DB)
         if db:
