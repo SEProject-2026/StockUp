@@ -32,11 +32,13 @@ async_engine = create_async_engine(
     max_overflow=10,       # 5 + 10 = 15 total (matches Supabase Nano limit)
     pool_recycle=300,      # Recycle connections every 5 min to avoid stale pooler slots
     pool_pre_ping=True,
+    # Disable SQLAlchemy asyncpg dialect's own prepared statement cache.
+    # This is a dialect-level param, NOT an asyncpg connect arg.
+    prepared_statement_cache_size=0,
     # Disable prepared statement caching at the asyncpg driver level.
     # Required for pgbouncer in transaction/statement pool mode.
     connect_args={
         "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
     },
 )
 
