@@ -85,15 +85,15 @@ class TestAuthIntegration:
         response = await client.put("/auth/update_name", json={"name": "New Name"})
         assert response.status_code == 400
 
-    def test_update_name_unauthenticated_fails(self, client):
+    async def test_update_name_unauthenticated_fails(self, client):
         """Security: Verify protected route rejects unauthenticated requests."""
         # Note: We are NOT using the 'auth_user' fixture here
-        response = client.put("/auth/update_name", json={"name": "Hacker Name"})
+        response = await client.put("/auth/update_name", json={"name": "Hacker Name"})
         assert response.status_code == 401
 
-    def test_update_push_token_unauthenticated_fails(self, client):
+    async def test_update_push_token_unauthenticated_fails(self, client):
         """Security: Verify protected route rejects unauthenticated requests."""
-        response = client.patch("/auth/me/push-token", json={"push_token": "hacker_token"})
+        response = await client.patch("/auth/me/push-token", json={"push_token": "hacker_token"})
         assert response.status_code == 401
 
     # ==========================================
@@ -110,27 +110,27 @@ class TestAuthIntegration:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
     
-    def test_update_push_token_user_not_found(self, client, auth_user, db_session):
+    async def test_update_push_token_user_not_found(self, client, auth_user, db_session):
         """Sad Path: Auth ID exists but user not in DB."""
         # No user created in db_session
-        response = client.patch("/auth/me/push-token", json={"push_token": "expo_123"})
+        response = await client.patch("/auth/me/push-token", json={"push_token": "expo_123"})
         assert response.status_code == 400
 
     # ==========================================
     # 4. Logout (POST /auth/logout)
     # ==========================================
 
-    def test_logout_success(self, client, auth_user, db_session):
+    async def test_logout_success(self, client, auth_user, db_session):
         """Happy Path: Authenticated user logs out."""
         create_user_entity(db=db_session, user_id=auth_user)
-        db_session.commit()
+        await db_session.commit()
 
-        response = client.post("/auth/logout")
+        response = await client.post("/auth/logout")
 
         assert response.status_code == 200
         assert response.json()["status"] == "success"
 
-    def test_logout_unauthenticated_fails(self, client):
+    async def test_logout_unauthenticated_fails(self, client):
         """Security: Unauthenticated user cannot hit logout route."""
-        response = client.post("/auth/logout")
+        response = await client.post("/auth/logout")
         assert response.status_code == 401

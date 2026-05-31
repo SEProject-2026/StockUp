@@ -62,7 +62,7 @@ class ICatalogProvider(ABC):
         pass
 
     @abstractmethod
-    def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
+    async def update_weighted_mem_only(self, barcode: str, chain_name: str, measured_weight: float):
         """
         Updates the in-memory weighted average for a product's weight.
         This does not persist changes to the underlying data source.
@@ -74,6 +74,6 @@ class ICatalogProvider(ABC):
         """
         pass
     @abstractmethod
-    def persist(self):
+    async def persist(self):
         """Persists all changes made in memory/session to the underlying storage."""
         pass

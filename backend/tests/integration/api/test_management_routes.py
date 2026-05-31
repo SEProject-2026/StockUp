@@ -34,12 +34,12 @@ class TestManagementAPIIntegration:
         assert response.status_code == 200
         assert len(response.json()["data"]) == 2
 
-    def test_create_home_empty_name_fails(self, client, auth_user, db_session):
+    async def test_create_home_empty_name_fails(self, client, auth_user, db_session):
         """Validation: Catch empty home name strings (422)."""
         create_user_entity(db=db_session, user_id=auth_user)
-        db_session.flush()
+        await db_session.flush()
 
-        response = client.post("/homes/create", json={"name": ""})
+        response = await client.post("/homes/create", json={"name": ""})
         # Pydantic should block it before it hits the service
         assert response.status_code == 422
 
@@ -119,13 +119,13 @@ class TestManagementAPIIntegration:
         response = await client.post(f"/homes/{home.id}/answer_request", json={"user_id": str(applicant.id), "approved": True})
         assert response.status_code == 400
 
-    def test_join_home_invalid_code_fails(self, client, auth_user, db_session):
+    async def test_join_home_invalid_code_fails(self, client, auth_user, db_session):
         """Sad Path: Trying to join with a non-existent code."""
         create_user_entity(db=db_session, user_id=auth_user)
-        db_session.flush()
+        await db_session.flush()
 
         # "WRONG-CODE" is definitely not a valid 8-char code
-        response = client.post("/homes/join", json={"home_code": "WRONG-CO"}) 
+        response = await client.post("/homes/join", json={"home_code": "WRONG-CO"}) 
         
         assert response.status_code == 400
         assert "detail" in response.json()
@@ -284,38 +284,38 @@ class TestManagementAPIIntegration:
 
     async def test_interact_with_non_existent_home(self, client, auth_user, db_session):
         create_user_entity(db=db_session, user_id=auth_user)
-        db_session.flush()
-        response = client.get(f"/homes/{uuid4()}/join_code")
+        await db_session.flush()
+        response = await client.get(f"/homes/{uuid4()}/join_code")
         assert response.status_code in [400, 403, 404]
 
-    def test_get_home_details_success(self, client, auth_user, db_session):
+    async def test_get_home_details_success(self, client, auth_user, db_session):
         """Happy Path: Authenticated member retrieves home details."""
-        create_user_entity(db=db_session, user_id=auth_user)
-        home = create_home_entity(db=db_session, admin_user_id=auth_user, name="My Details Home")
-        db_session.flush()
+        user = create_user_entity(db=db_session, user_id=auth_user)
+        home = create_home_entity(db=db_session, admin_user=user, name="My Details Home")
+        await db_session.commit()
 
-        response = client.get(f"/homes/{home.id}/details")
+        response = await client.get(f"/homes/{home.id}/details")
         
         assert response.status_code == 200
         data = response.json()["data"]
         assert data["name"] == "My Details Home"
         assert "join code" in data
-        assert str(auth_user) in data["member_names"]
+        assert user.name in list(data["member_names"].values())
 
     # ==========================================
     # 6. Security (401 Unauthorized Checks)
     # ==========================================
 
-    def test_get_my_homes_unauthenticated_fails(self, client):
+    async def test_get_my_homes_unauthenticated_fails(self, client):
         """Security: Verify unauthenticated requests are blocked globally in this router."""
         # Using the client WITHOUT the auth_user fixture/token
-        response = client.get("/homes/my_homes")
+        response = await client.get("/homes/my_homes")
         assert response.status_code == 401
 
-    def test_create_home_unauthenticated_fails(self, client):
+    async def test_create_home_unauthenticated_fails(self, client):
         """Security: Cannot create a home without being logged in."""
         payload = {"name": "Hacker Home"}
-        response = client.post("/homes/create", json=payload)
+        response = await client.post("/homes/create", json=payload)
         assert response.status_code == 401
 
     # ==========================================
@@ -336,10 +336,10 @@ class TestManagementAPIIntegration:
         ("PATCH", f"/homes/{uuid4()}/expiration_range", {"new_range": 14}),
         ("GET", f"/homes/{uuid4()}/join_requests", None),
     ])
-    def test_all_management_routes_exceptions_returns_400_or_403(self, client, auth_user, db_session, method, endpoint, payload):
+    async def test_all_management_routes_exceptions_returns_400_or_403(self, client, auth_user, db_session, method, endpoint, payload):
         """Coverage: Ensure EVERY route properly catches errors and returns 400 or 403."""
         create_user_entity(db=db_session, user_id=auth_user)
-        db_session.flush()
+        await db_session.flush()
 
         with patch("src.infrastructure.app_container.AppContainer.get_management_service") as mock_factory:
             mock_svc = AsyncMock()
@@ -360,14 +360,14 @@ class TestManagementAPIIntegration:
             mock_factory.return_value = mock_svc
 
             if method == "POST":
-                res = client.post(endpoint, json=payload)
+                res = await client.post(endpoint, json=payload)
             elif method == "PUT":
-                res = client.put(endpoint, json=payload)
+                res = await client.put(endpoint, json=payload)
             elif method == "PATCH":
-                res = client.patch(endpoint, json=payload)
+                res = await client.patch(endpoint, json=payload)
             elif method == "DELETE":
-                res = client.delete(endpoint)
+                res = await client.delete(endpoint)
             else:
-                res = client.get(endpoint)
+                res = await client.get(endpoint)
 
             assert res.status_code in [400, 403, 404]

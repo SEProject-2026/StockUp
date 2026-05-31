@@ -30,34 +30,34 @@ async def test_add_item_and_update_quantity(client, active_home):
     items = patch_res.json()["data"]["items"]
     assert next(i for i in items if i["item_name"] == "Steak")["quantity"] == 5
 
-def test_get_home_lists_success(client, active_home):
+async def test_get_home_lists_success(client, active_home):
     """Scenario: Retrieve all shopping lists for a home."""
     # Create two lists
-    client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "List 1"})
-    client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "List 2"})
+    await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "List 1"})
+    await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "List 2"})
 
-    response = client.get(f"/shopping-lists/home/{active_home.id}")
+    response = await client.get(f"/shopping-lists/home/{active_home.id}")
     
     assert response.status_code == 200
     assert len(response.json()["data"]) == 2
 
-def test_get_single_list_success(client, active_home):
+async def test_get_single_list_success(client, active_home):
     """Scenario: Retrieve a specific list by ID."""
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "My List"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "My List"})
     list_id = list_res.json()["data"]["id"]
 
-    response = client.get(f"/shopping-lists/{list_id}")
+    response = await client.get(f"/shopping-lists/{list_id}")
     
     assert response.status_code == 200
     assert response.json()["data"]["name"] == "My List"
 
-def test_remove_item_from_list(client, active_home):
+async def test_remove_item_from_list(client, active_home):
     """Scenario: Remove a specific item from the list."""
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Remove Test"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Remove Test"})
     list_id = list_res.json()["data"]["id"]
-    client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Apple", "quantity": 1})
+    await client.post(f"/shopping-lists/{list_id}/items", json={"item_name": "Apple", "quantity": 1})
 
-    response = client.delete(f"/shopping-lists/{list_id}/items/Apple")
+    response = await client.delete(f"/shopping-lists/{list_id}/items/Apple")
     
     assert response.status_code == 200
     assert len(response.json()["data"]["items"]) == 0
@@ -126,46 +126,46 @@ async def test_get_recommendations_api(client, active_home):
 # 4. Security & Edge Cases
 # ==========================================
 
-def test_create_list_in_wrong_home_fails(client, db_session, auth_user):
+async def test_create_list_in_wrong_home_fails(client, db_session, auth_user):
     """Scenario: User tries to create a list in a home they don't belong to."""
     from tests.factories import create_user_entity, create_home_entity
     
     # Setup: auth_user exists but we create a home for someone else
     create_user_entity(db=db_session, user_id=auth_user)
     other_owner = create_user_entity(db=db_session, email="other@test.com")
-    other_home = create_home_entity(db=db_session, admin_user_id=other_owner.id)
-    db_session.commit()
+    other_home = create_home_entity(db=db_session, admin_user=other_owner)
+    await db_session.commit()
 
     payload = {"home_id": str(other_home.id), "name": "Hacker List"}
-    response = client.post("/shopping-lists/", json=payload)
+    response = await client.post("/shopping-lists/", json=payload)
 
     # Assert: Should be Forbidden or Bad Request based on your service logic
     assert response.status_code in [403, 400]
 
-def test_shopping_routes_unauthenticated_fails(client):
+async def test_shopping_routes_unauthenticated_fails(client):
     """Security: Verify unauthenticated users are blocked."""
     # Using client WITHOUT auth setup
-    response = client.post("/shopping-lists/", json={"home_id": str(uuid4()), "name": "Hacker List"})
+    response = await client.post("/shopping-lists/", json={"home_id": str(uuid4()), "name": "Hacker List"})
     assert response.status_code == 401
 
-def test_interact_with_non_existent_list_fails_404(client, auth_user):
+async def test_interact_with_non_existent_list_fails_404(client, auth_user):
     """Sad Path: Trying to get or modify a list that doesn't exist."""
     fake_id = str(uuid4())
     
     # Check GET
-    res_get = client.get(f"/shopping-lists/{fake_id}")
+    res_get = await client.get(f"/shopping-lists/{fake_id}")
     assert res_get.status_code == 404
 
     # Check Add Item
-    res_add = client.post(f"/shopping-lists/{fake_id}/items", json={"item_name": "Milk", "quantity": 1})
+    res_add = await client.post(f"/shopping-lists/{fake_id}/items", json={"item_name": "Milk", "quantity": 1})
     assert res_add.status_code == 404
 
-def test_delete_shopping_list_success(client, active_home):
+async def test_delete_shopping_list_success(client, active_home):
     """Scenario: Delete a list successfully (expects 204 No Content)."""
-    list_res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "To Be Deleted"})
+    list_res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "To Be Deleted"})
     list_id = list_res.json()["data"]["id"]
 
-    response = client.delete(f"/shopping-lists/{list_id}")
+    response = await client.delete(f"/shopping-lists/{list_id}")
     
     assert response.status_code == 204
     # No json() assertion here because 204 means no body!
@@ -184,7 +184,7 @@ def test_delete_shopping_list_success(client, active_home):
     ("PATCH", f"/shopping-lists/{uuid4()}/items/Milk/check", None),
     ("POST", f"/shopping-lists/{uuid4()}/exit-mode", {"clear": True}),
 ])
-def test_all_shopping_routes_value_error_returns_404(client, active_home, method, endpoint, payload):
+async def test_all_shopping_routes_value_error_returns_404(client, active_home, method, endpoint, payload):
     """Coverage: Ensure EVERY shopping route properly catches ValueError and returns 404."""
     with patch("src.infrastructure.app_container.AppContainer.get_shopping_list_service") as mock_factory:
         mock_svc = AsyncMock()
@@ -207,19 +207,19 @@ def test_all_shopping_routes_value_error_returns_404(client, active_home, method
 
             # Execute the request dynamically
             if method == "POST":
-                res = client.post(endpoint, json=payload)
+                res = await client.post(endpoint, json=payload)
             elif method == "PATCH":
-                res = client.patch(endpoint, json=payload)
+                res = await client.patch(endpoint, json=payload)
             elif method == "DELETE":
-                res = client.delete(endpoint)
+                res = await client.delete(endpoint)
             else:
-                res = client.get(endpoint)
+                res = await client.get(endpoint)
 
             assert res.status_code == 404
             assert "detail" in res.json()
 
 
-def test_create_list_general_exception_returns_400(client, active_home):
+async def test_create_list_general_exception_returns_400(client, active_home):
     """Coverage: Ensure create_list catches general Exceptions and returns 400."""
     with patch("src.infrastructure.app_container.AppContainer.get_management_service") as mock_mgt:
         # Bypass management check
@@ -231,6 +231,6 @@ def test_create_list_general_exception_returns_400(client, active_home):
             mock_shop_svc.create_shopping_list.side_effect = Exception("DB Timeout")
             mock_shop.return_value = mock_shop_svc
             
-            res = client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Test"})
+            res = await client.post("/shopping-lists/", json={"home_id": str(active_home.id), "name": "Test"})
             
             assert res.status_code == 400

@@ -123,8 +123,14 @@ async def active_home(db_session, auth_user):
     return home
 
 @pytest.fixture
-def home_headers(active_home):
+async def home_headers(active_home):
     """
     Injects the active home ID into request headers.
     """
     return {"X-Home-ID": str(active_home.id)}
+
+@pytest.fixture(autouse=True)
+def clean_dependency_overrides():
+    """Clears FastAPI dependency overrides after each test to prevent leaks."""
+    yield
+    app.dependency_overrides.clear()

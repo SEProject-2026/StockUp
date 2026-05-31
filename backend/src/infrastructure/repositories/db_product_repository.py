@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from typing import List, Optional, Set
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, update
 from sqlalchemy.orm import selectinload, contains_eager
 from src.repositories.i_product_repository import IProductRepository
 from src.domain.product.product import Product, ProductItem
@@ -55,12 +55,11 @@ class DbProductRepository(IProductRepository):
         # 2. Existing products: only handle items that changed during receipt processing
         for product in updated_products:
             # Update product-level fields (nickname may have changed)
-            self.db.query(ProductModel).filter(
-                ProductModel.id == str(product.id)
-            ).update({
-                ProductModel.nickname: product.nickname,
-                ProductModel.barcode: product.barcode,
-            })
+            await self.db.execute(
+                update(ProductModel)
+                .where(ProductModel.id == str(product.id))
+                .values(nickname=product.nickname, barcode=product.barcode)
+            )
 
             for item in product.items:
                 if item.id in new_item_ids:
@@ -74,15 +73,15 @@ class DbProductRepository(IProductRepository):
                     ))
                 else:
                     # This is an existing item that add_item merged into → atomic UPDATE
-                    self.db.query(ProductItemModel).filter(
-                        ProductItemModel.id == str(item.id)
-                    ).update({
-                        ProductItemModel.quantity: item.quantity,
-                    })
+                    await self.db.execute(
+                        update(ProductItemModel)
+                        .where(ProductItemModel.id == str(item.id))
+                        .values(quantity=item.quantity)
+                    )
 
-        self.db.commit()
+        await self.db.commit()
 
-    def _perform_upsert_logic(self, product: Product) -> None:
+    async def _perform_upsert_logic(self, product: Product) -> None:
         """Internal helper to handle the mapping logic without commit."""
         result = await self.db.execute(
             select(ProductModel)

@@ -1,7 +1,7 @@
 from typing import List, Optional, Annotated
 from uuid import UUID, uuid4
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, status, Header, Query, File
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Path, UploadFile, status, Header, Query, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.receipt.receipt import ReceiptDTO, ReceiptItemDTO

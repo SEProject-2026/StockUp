@@ -106,27 +106,30 @@ async def test_search_items_by_name_limit(provider):
     results = await provider.search_items_by_name("testitem")
     assert len(results) == 20 # Should break at 20
 
-def test_update_weighted_mem_only(provider):
+@pytest.mark.asyncio
+async def test_update_weighted_mem_only(provider):
     """Tests the moving average mathematical logic."""
     barcode = "123"
     
     # Global Apple initial: Weight=100, Size=2 -> Total = 200
-    provider.update_weighted_mem_only(barcode, "GLOBAL", 160.0)
+    await provider.update_weighted_mem_only(barcode, "GLOBAL", 160.0)
     
     item = provider._get_item_sync(barcode, "GLOBAL")
     # New Size should be 3. New Total = 360. New Average = 120.
     assert item.sample_size == 3
     assert item.weight == 120.0
 
-def test_update_weighted_mem_only_missing(provider):
+@pytest.mark.asyncio
+async def test_update_weighted_mem_only_missing(provider):
     """Tests updating a non-existent item (should silently return)."""
-    provider.update_weighted_mem_only("999", "GLOBAL", 100.0) # Shouldn't crash
+    await provider.update_weighted_mem_only("999", "GLOBAL", 100.0) # Shouldn't crash
 
-def test_persist(provider, tmp_path):
+@pytest.mark.asyncio
+async def test_persist(provider, tmp_path):
     """Tests the atomic write to CSV."""
-    provider.update_weighted_mem_only("123", "GLOBAL", 160.0) # Change data
+    await provider.update_weighted_mem_only("123", "GLOBAL", 160.0) # Change data
     
-    provider.persist()
+    await provider.persist()
     
     # Reload from the written file to verify
     new_provider = CsvCatalogProvider(provider.csv_path)
@@ -135,11 +138,12 @@ def test_persist(provider, tmp_path):
     assert updated_item.sample_size == 3
     assert updated_item.weight == 120.0
 
-def test_persist_exception(provider):
+@pytest.mark.asyncio
+async def test_persist_exception(provider):
     """Tests temp file cleanup if an exception occurs during persistence."""
     # Force shutil.move to throw an error to trigger the except block
     with patch('shutil.move', side_effect=Exception("Simulated move error")):
         # We need to spy on os.remove to ensure the temp file is cleaned up
         with patch('os.remove') as mock_remove:
-            provider.persist()
+            await provider.persist()
             mock_remove.assert_called_once()

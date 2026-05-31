@@ -124,9 +124,9 @@ class DbCatalogProvider(ICatalogProvider):
             )
             db_item = result.scalars().first()
         if db_item:
-            old_total = db_item.weight * db_item.sample_size
+            old_total = db_item.avg_weight * db_item.sample_size
             db_item.sample_size += 1
-            db_item.weight = (old_total + measured_weight) / db_item.sample_size
+            db_item.avg_weight = (old_total + measured_weight) / db_item.sample_size
             self.db.add(db_item)
             await self.db.flush()
 
