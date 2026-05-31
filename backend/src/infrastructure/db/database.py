@@ -1,18 +1,14 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Load environment variables from the specific backend .env file
 load_dotenv("backend/.env")
 
-# 1. Fallback mechanism: check both common names
-# This ensures that if CI uses one name and local dev uses another, it still works.
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TEST_DATABASE_URL")
 
-# 2. Safety Check: If both are None (common during CI collection phase)
-# or empty, provide a valid local fallback to prevent SQLAlchemy from crashing.
 if not SQLALCHEMY_DATABASE_URL:
     SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost:5433/stockup_test"
 
@@ -37,19 +33,24 @@ async_engine = create_async_engine(
     pool_recycle=300,      # Recycle connections every 5 min to avoid stale pooler slots
     pool_pre_ping=True,
     
-    # 1. This tells asyncpg to completely ignore prepared statements cache
+    # 1. Standard config for asyncpg backend connection
     connect_args={
         "statement_cache_size": 0,
         "max_cached_statement_lifetime": 0,
-    },
-    
-    # 2. CRITICAL FOR SQLALCHEMY INTERNAL QUERIES:
-    # This forces SQLAlchemy to execute ALL queries (including schema checks like 'select current_schema()')
-    # using inline execution without attempting to create server-side prepared statements.
-    execution_options={
-        "compiled_cache": None
     }
 )
+
+# 2. CRITICAL CORE FIX: 
+# This event listener intercepts EVERY raw connection creation (including SQLAlchemy startup hooks).
+# It enforces statement_cache_size=0 directly on the underlying asyncpg connection object
+# before SQLAlchemy can even attempt to run internal queries like 'select pg_catalog.version()'.
+@event.listens_for(async_engine.sync_engine, "connect")
+def connect(dbapi_connection, connection_record):
+    connection_record.info["_skip_prepared_statements"] = True
+    # Disable cache on the raw asyncpg connection object wrapped by SQLAlchemy
+    if hasattr(dbapi_connection, "_connection"):
+        dbapi_connection._connection._connection.statement_cache_size = 0
+
 
 AsyncSessionLocal = async_sessionmaker(
     bind=async_engine,
