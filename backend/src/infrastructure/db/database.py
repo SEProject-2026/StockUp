@@ -37,12 +37,17 @@ async_engine = create_async_engine(
     pool_recycle=300,      # Recycle connections every 5 min to avoid stale pooler slots
     pool_pre_ping=True,
     
-    # CRITICAL FOR TRANSACTION POOLER (Supavisor):
-    # Pass driver-specific arguments directly to asyncpg via connect_args.
-    # This bypasses SQLAlchemy's strict validation and disables caching correctly.
+    # 1. This tells asyncpg to completely ignore prepared statements cache
     connect_args={
-        "statement_cache_size": 0,          # Disables asyncpg prepared statement cache
-        "max_cached_statement_lifetime": 0, # Ensures statements aren't cached by lifetime
+        "statement_cache_size": 0,
+        "max_cached_statement_lifetime": 0,
+    },
+    
+    # 2. CRITICAL FOR SQLALCHEMY INTERNAL QUERIES:
+    # This forces SQLAlchemy to execute ALL queries (including schema checks like 'select current_schema()')
+    # using inline execution without attempting to create server-side prepared statements.
+    execution_options={
+        "compiled_cache": None
     }
 )
 
