@@ -47,6 +47,15 @@ class UserService:
 
     async def logout(self, user_id: UUID) -> bool:
         app_logger.info(f"User {user_id} logged out")
+
+        user = await self.user_repo.get_by_id(user_id)
+        if user:
+            user.update_push_token(None)
+            await self.user_repo.update_push_token(user_id, None)
+            app_logger.info(f"User {user_id} logged out and push token cleared")
+        else:
+            app_logger.warning(f"Logout called for non-existent user {user_id}")
+
         return True
     
     async def update_name(self, user_id: UUID, new_name: str) -> User:

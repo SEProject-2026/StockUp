@@ -1,7 +1,6 @@
 import os
 import io
 import json
-import pdfplumber
 import pypdfium2 as pdfium
 from gradio_client import Client, handle_file
 from src.infrastructure.logger import app_logger

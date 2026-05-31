@@ -25,6 +25,7 @@ class ShoppingList(BaseModel):
         for item in self.items:
             if item.item_name == item_name:
                 item.quantity += quantity
+                self._refresh_timestamp()
                 return
         self.items.append(ShoppingListItem(item_name=item_name, quantity=quantity, location=location))
         self._refresh_timestamp()
@@ -44,7 +45,8 @@ class ShoppingList(BaseModel):
                 item.quantity = new_quantity
                 self._refresh_timestamp()
                 return
-    
+        raise ValueError(f"Item not found: {item_name}")
+
     def enter_shopping_mode(self) -> None:
         self.is_active_shopping_mode = True
 
@@ -54,6 +56,7 @@ class ShoppingList(BaseModel):
                 item.is_bought = not item.is_bought  # Toggle bought status
                 self._refresh_timestamp()
                 return
+        raise ValueError(f"Item not found: {item_name}")
 
     def exit_shopping_mode(self, clear: bool = False) -> None:
         """

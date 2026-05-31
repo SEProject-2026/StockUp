@@ -1,7 +1,7 @@
 from typing import Annotated 
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from sqlalchemy.orm import Session 
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.user.user import User
 from src.infrastructure import app_container
@@ -27,7 +27,7 @@ from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-def get_user_service(db: Session = Depends(get_db)) -> UserService:
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
     return AppContainer.get_user_service(db)
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
@@ -101,3 +101,20 @@ async def update_push_token(
     except ValueError as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=400, detail=translated_message)
+
+@router.post("/logout", response_model=GeneralResponse)
+async def logout(
+    user_service: UserServiceDep, 
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Logout the user and clear their push token.
+    Protected Route.
+    """
+    app_logger.info(f"Logout request received from user {user_id}")
+    await user_service.logout(user_id)
+    
+    return GeneralResponse(
+        status="success", 
+        message="Logged out successfully"
+    )

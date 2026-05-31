@@ -1,31 +1,94 @@
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Set
 from uuid import UUID
-from sqlalchemy.orm import Session, joinedload, contains_eager
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_, and_, update
+from sqlalchemy.orm import selectinload, contains_eager
 from src.repositories.i_product_repository import IProductRepository
 from src.domain.product.product import Product, ProductItem
-from src.domain.enums import ExpirationType, ExpirationType, LocationType
+from src.domain.enums import ExpirationType, LocationType
 from src.infrastructure.db.models import ProductModel, ProductItemModel
-from sqlalchemy import or_, and_
 
 class DbProductRepository(IProductRepository):
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def save(self, product: Product) -> None:
         """Standard save for single product additions - Always commits."""
-        self._perform_upsert_logic(product)
-        self.db.commit()
+        await self._perform_upsert_logic(product)
+        await self.db.commit()
 
     async def save_all(self, products: List[Product]) -> None:
         """Bulk save for receipts - Commits once at the end."""
         for product in products:
-            self._perform_upsert_logic(product)
-        self.db.commit()
+            await self._perform_upsert_logic(product)
+        await self.db.commit()
 
-    def _perform_upsert_logic(self, product: Product) -> None:
+    async def save_all_receipt(
+        self,
+        new_products: List[Product],
+        updated_products: List[Product],
+        new_item_ids: Set[UUID],
+    ) -> None:
+        """
+        Receipt-optimized bulk save. Zero re-queries, single commit.
+        """
+        # 1. New products: direct INSERT (no query needed)
+        for product in new_products:
+            db_product = ProductModel(
+                id=str(product.id),
+                home_id=str(product.home_id),
+                original_name=product.original_name,
+                nickname=product.nickname,
+                barcode=product.barcode,
+            )
+            self.db.add(db_product)
+            for item in product.items:
+                self.db.add(ProductItemModel(
+                    id=str(item.id),
+                    product_id=str(product.id),
+                    quantity=item.quantity,
+                    expiration_date=item.expiration_date,
+                    location=item.location.value if item.location else LocationType.OTHER.value,
+                ))
+
+        # 2. Existing products: only handle items that changed during receipt processing
+        for product in updated_products:
+            # Update product-level fields (nickname may have changed)
+            await self.db.execute(
+                update(ProductModel)
+                .where(ProductModel.id == str(product.id))
+                .values(nickname=product.nickname, barcode=product.barcode)
+            )
+
+            for item in product.items:
+                if item.id in new_item_ids:
+                    # This is a brand new item created by add_item → INSERT
+                    self.db.add(ProductItemModel(
+                        id=str(item.id),
+                        product_id=str(product.id),
+                        quantity=item.quantity,
+                        expiration_date=item.expiration_date,
+                        location=item.location.value if item.location else LocationType.OTHER.value,
+                    ))
+                else:
+                    # This is an existing item that add_item merged into → atomic UPDATE
+                    await self.db.execute(
+                        update(ProductItemModel)
+                        .where(ProductItemModel.id == str(item.id))
+                        .values(quantity=item.quantity)
+                    )
+
+        await self.db.commit()
+
+    async def _perform_upsert_logic(self, product: Product) -> None:
         """Internal helper to handle the mapping logic without commit."""
-        db_product = self.db.query(ProductModel).filter(ProductModel.id == str(product.id)).first()
+        result = await self.db.execute(
+            select(ProductModel)
+            .options(selectinload(ProductModel.items))
+            .where(ProductModel.id == str(product.id))
+        )
+        db_product = result.scalars().first()
 
         if not db_product:
             db_product = ProductModel(
@@ -70,17 +133,17 @@ class DbProductRepository(IProductRepository):
                 self.db.add(new_db_item)
 
         for leftover_item in existing_items.values():
-            self.db.delete(leftover_item)
+            await self.db.delete(leftover_item)
 
-        self.db.flush()
+        await self.db.flush()
 
     async def get_by_id(self, product_id: UUID) -> Optional[Product]:
-        db_product = (
-            self.db.query(ProductModel)
-            .options(joinedload(ProductModel.items))
-            .filter(ProductModel.id == str(product_id))
-            .first()
+        result = await self.db.execute(
+            select(ProductModel)
+            .options(selectinload(ProductModel.items))
+            .where(ProductModel.id == str(product_id))
         )
+        db_product = result.scalars().first()
         
         if not db_product:
             return None
@@ -88,26 +151,26 @@ class DbProductRepository(IProductRepository):
         return self._to_domain(db_product)
 
     async def list_all_by_home(self, home_id: UUID) -> List[Product]:
-        db_products = (
-            self.db.query(ProductModel)
-            .options(joinedload(ProductModel.items))
-            .filter(ProductModel.home_id == str(home_id))
-            .all()
+        result = await self.db.execute(
+            select(ProductModel)
+            .options(selectinload(ProductModel.items))
+            .where(ProductModel.home_id == str(home_id))
         )
+        db_products = result.scalars().unique().all()
         return [self._to_domain(p) for p in db_products]
 
     async def search_by_name(self, home_id: UUID, query: str) -> List[Product]:
         search_pattern = f"%{query}%"
-        db_products = (
-            self.db.query(ProductModel)
-            .options(joinedload(ProductModel.items))
-            .filter(ProductModel.home_id == str(home_id))
-            .filter(
+        result = await self.db.execute(
+            select(ProductModel)
+            .options(selectinload(ProductModel.items))
+            .where(ProductModel.home_id == str(home_id))
+            .where(
                 (ProductModel.original_name.ilike(search_pattern)) | 
                 (ProductModel.nickname.ilike(search_pattern))
             )
-            .all()
         )
+        db_products = result.scalars().unique().all()
         return [self._to_domain(p) for p in db_products]
 
     async def update(self, product: Product) -> None:
@@ -115,19 +178,22 @@ class DbProductRepository(IProductRepository):
         await self.save(product)
 
     async def delete(self, product_id: UUID) -> None:
-        db_product = self.db.query(ProductModel).filter(ProductModel.id == str(product_id)).first()
+        result = await self.db.execute(
+            select(ProductModel).where(ProductModel.id == str(product_id))
+        )
+        db_product = result.scalars().first()
         if db_product:
-            self.db.delete(db_product)
-            self.db.commit()
+            await self.db.delete(db_product)
+            await self.db.commit()
 
     async def get_by_original_name(self, home_id: UUID, name: str) -> Optional[Product]:
-        db_product = (
-            self.db.query(ProductModel)
-            .options(joinedload(ProductModel.items))
-            .filter(ProductModel.home_id == str(home_id))
-            .filter(ProductModel.original_name == name)
-            .first()
+        result = await self.db.execute(
+            select(ProductModel)
+            .options(selectinload(ProductModel.items))
+            .where(ProductModel.home_id == str(home_id))
+            .where(ProductModel.original_name == name)
         )
+        db_product = result.scalars().first()
         if not db_product:
             return None
         return self._to_domain(db_product)
@@ -136,15 +202,14 @@ class DbProductRepository(IProductRepository):
         """
         Complex Query: Find products that have AT LEAST one item in the given location.
         """
-        db_products = (
-            self.db.query(ProductModel)
+        result = await self.db.execute(
+            select(ProductModel)
             .join(ProductItemModel) # Join to filter by item location
-            .filter(ProductModel.home_id == str(home_id))
-            .filter(ProductItemModel.location == location)
-            .options(joinedload(ProductModel.items)) # Eager load all items (even not matching ones)
-            .distinct()
-            .all()
+            .where(ProductModel.home_id == str(home_id))
+            .where(ProductItemModel.location == location)
+            .options(selectinload(ProductModel.items)) # Eager load all items (even not matching ones)
         )
+        db_products = result.scalars().unique().all()
         return [self._to_domain(p) for p in db_products]
 
     # --- Mapper ---
@@ -187,12 +252,14 @@ class DbProductRepository(IProductRepository):
         warning_days: int = 0
     ) -> List[Product]:
         
-        query = self.db.query(ProductModel).join(ProductModel.items)
-        
-        query = query.filter(ProductModel.home_id == str(home_id))
+        stmt = (
+            select(ProductModel)
+            .join(ProductModel.items)
+            .where(ProductModel.home_id == str(home_id))
+        )
 
         if query_text and len(query_text) >= 2:
-            query = query.filter(
+            stmt = stmt.where(
                 or_(
                     ProductModel.original_name.ilike(f"%{query_text}%"),
                     ProductModel.nickname.ilike(f"%{query_text}%")
@@ -200,25 +267,26 @@ class DbProductRepository(IProductRepository):
             )
 
         if location:
-            query = query.filter(ProductItemModel.location == location)
+            stmt = stmt.where(ProductItemModel.location == location)
 
         if expiration_type:
             today = date.today()
             
             if expiration_type == ExpirationType.EXPIRED:
-                query = query.filter(ProductItemModel.expiration_date < today)
+                stmt = stmt.where(ProductItemModel.expiration_date < today)
                 
             elif expiration_type == ExpirationType.GOING_TO_EXPIRE:
                 warning_date = today + timedelta(days=warning_days)
-                query = query.filter(
+                stmt = stmt.where(
                     and_(
                         ProductItemModel.expiration_date >= today,
                         ProductItemModel.expiration_date <= warning_date
                     )
                 )
 
-        query = query.options(contains_eager(ProductModel.items))
+        stmt = stmt.options(contains_eager(ProductModel.items))
 
-        db_products = query.distinct().all()
+        result = await self.db.execute(stmt)
+        db_products = result.scalars().unique().all()
         
         return [self._to_domain(p) for p in db_products]

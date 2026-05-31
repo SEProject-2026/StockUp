@@ -12,10 +12,15 @@ class User:
         
         # We keep the uuid4() default only as a fallback.
         self.id = id if id else uuid4()
+        self._validate_email(email)
         self.email = email
         self._validate_name(name)
         self.name = name
         self.push_token = push_token
+
+    def _validate_email(self, email: str):
+        if not email or "@" not in email:
+            raise ValueError("Invalid email address")
 
     def update_name(self, new_name: str):
         self._validate_name(new_name)
