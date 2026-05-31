@@ -38,12 +38,11 @@ async_engine = create_async_engine(
     pool_pre_ping=True,
     
     # CRITICAL FOR TRANSACTION POOLER (Supavisor):
-    # Disables SQLAlchemy-level prepared statement caching to prevent routing errors
-    prepared_statement_cache_size=0,
-    
-    # Disables asyncpg-level prepared statement caching directly in the driver
+    # Pass driver-specific arguments directly to asyncpg via connect_args.
+    # This bypasses SQLAlchemy's strict validation and disables caching correctly.
     connect_args={
-        "statement_cache_size": 0
+        "statement_cache_size": 0,          # Disables asyncpg prepared statement cache
+        "max_cached_statement_lifetime": 0, # Ensures statements aren't cached by lifetime
     }
 )
 
