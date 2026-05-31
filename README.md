@@ -24,7 +24,6 @@
 * **User Management:** **Supabase Auth** (External Authentication Service).
 * **Database:** PostgreSQL (Cloud-based via Supabase).
 * **Computer Vision:** Google Cloud Vision API and OpenCV.
-* **Infrastructure:** Redis for task orchestration and real-time synchronization.
 
 ## 📂 Repository Structure
 
