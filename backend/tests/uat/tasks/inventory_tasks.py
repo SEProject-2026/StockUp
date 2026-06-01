@@ -3,7 +3,7 @@ import random
 from datetime import date, timedelta
 from locust import task
 
-@task(3)
+@task
 def fetch_inventory(user):
     """
     Simulate user opening the app and retrieving the full inventory of their home.
@@ -41,7 +41,7 @@ def fetch_inventory(user):
             response.failure(f"Fetch inventory failed: {response.status_code} - {response.text}")
 
 
-@task(1)
+@task
 def add_product(user):
     """
     Simulate a user adding a new product to their inventory.
@@ -101,7 +101,7 @@ def add_product(user):
             response.failure(f"Add product failed: {response.status_code} - {response.text}")
 
 
-@task(1)
+@task
 def update_item_quantity(user):
     """
     Simulate a user adjusting the quantity of an existing item batch.
@@ -141,7 +141,7 @@ def update_item_quantity(user):
             response.failure(f"Update quantity failed: {response.status_code} - {response.text}")
 
 
-@task(1)
+@task
 def scan_receipt(user):
     """
     Simulate uploading a PDF receipt for scanning and OCR parsing.
