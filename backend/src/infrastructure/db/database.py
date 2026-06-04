@@ -17,11 +17,11 @@ if not SQLALCHEMY_DATABASE_URL:
 
 def _make_async_url(url: str) -> str:
     """
-    Convert a standard postgresql:// URL to postgresql+psycopg:// 
+    Convert a standard postgresql:// or postgresql+asyncpg:// URL to postgresql+psycopg:// 
     This triggers SQLAlchemy 2.0 to use the fully async Psycopg 3 driver.
     """
     if url.startswith("postgresql+asyncpg://"):
-        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
         
     if url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+psycopg://", 1)

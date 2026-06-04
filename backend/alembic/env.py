@@ -41,9 +41,11 @@ db_url = os.getenv("DATABASE_URL")
 if not db_url:
     raise ValueError("❌ DATABASE_URL is missing! Please check your .env file.")
 
-# Alembic is synchronous, so we need to use a sync driver (psycopg2) instead of asyncpg
-if db_url and "postgresql+asyncpg" in db_url:
-    db_url = db_url.replace("postgresql+asyncpg", "postgresql")
+# Alembic is synchronous, so we need to use a sync driver (psycopg2) instead of asyncpg or psycopg async
+if db_url:
+    for driver in ["postgresql+asyncpg", "postgresql+psycopg"]:
+        if driver in db_url:
+            db_url = db_url.replace(driver, "postgresql")
 
 config.set_main_option("sqlalchemy.url", db_url)
 

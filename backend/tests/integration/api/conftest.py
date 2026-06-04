@@ -1,6 +1,7 @@
 import os
 import pytest
 import uuid
+import asyncio
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -10,7 +11,13 @@ from httpx import AsyncClient, ASGITransport
 from tests.factories import create_home_entity, create_user_entity
 from src.main import app
 from src.api.security import get_current_user_id
-from src.infrastructure.db.database import Base, get_db
+from src.infrastructure.db.database import Base, get_db, _make_async_url
+
+@pytest.fixture(scope="session")
+def event_loop_policy():
+    """psycopg3 requires a selector-based event loop for async operations."""
+    policy = getattr(asyncio, "WindowsSelectorEventLoopPolicy", asyncio.DefaultEventLoopPolicy)
+    return policy()
 
 @pytest.fixture(autouse=True)
 def mock_scheduler(mocker):
@@ -26,7 +33,6 @@ def mock_scheduler(mocker):
 # ==========================================
 
 TEST_DATABASE_URL = "postgresql://user:password@localhost:5433/stockup_test"
-ASYNC_TEST_DATABASE_URL = "postgresql+asyncpg://user:password@localhost:5433/stockup_test"
 
 # Sync engine — used only for schema setup and cleanup (DDL operations)
 sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
@@ -49,7 +55,11 @@ def async_db_resources():
     Using NullPool to avoid event loop mismatch issues across tests.
     """
     print("\n[DEBUG] async_db_resources started", flush=True)
-    engine = create_async_engine(ASYNC_TEST_DATABASE_URL, poolclass=NullPool)
+    engine = create_async_engine(
+        _make_async_url(TEST_DATABASE_URL),
+        poolclass=NullPool,
+        connect_args={"prepare_threshold": None}
+    )
     session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     print("[DEBUG] async_db_resources finished", flush=True)
     return engine, session_factory
