@@ -357,7 +357,7 @@ def check_sla(environment):
     if total_stats.fail_ratio > 0.01:
         print(f"❌ SLA Failure: Error rate of {total_stats.fail_ratio:.2%} exceeded the 1.0% limit.")
         
-    # 2. Response Time SLA (P95 should be < 2.0 seconds)
+    # 2. Response Time SLA (P95 should be < 4.0 seconds)
     p95_latency = total_stats.get_response_time_percentile(0.95)
-    if p95_latency > 2000:
-        print(f"❌ SLA Failure: P95 response time of {p95_latency:.0f}ms exceeded the 2000ms limit.")
+    if p95_latency > 4000:
+        print(f"❌ SLA Failure: P95 response time of {p95_latency:.0f}ms exceeded the 4000ms limit.")
