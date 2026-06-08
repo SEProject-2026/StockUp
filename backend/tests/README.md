@@ -1,6 +1,6 @@
 # 🚀 StockUp Testing Framework
 
-This suite provides a comprehensive testing environment for the StockUp backend, combining high-speed unit logic validation with robust API integration testing.
+This suite provides a comprehensive testing environment for the StockUp backend, combining high-speed unit logic validation, robust API integration testing, and simulated User Acceptance Testing (UAT) / load testing.
 
 ## 🏗️ Folder Structure & Layering
 
@@ -8,6 +8,7 @@ The suite is organized into two primary layers, each with its own configuration 
 
 * **`tests/unit/`**: Validates Domain Entities and Service logic. These tests are isolated from external dependencies (repositories, notification services) using **Mocks**.
 * **`tests/integration/`**: Full-cycle API tests. They interact with a live PostgreSQL instance (Port 5433) to verify the synergy between FastAPI routes, Services, and Database models.
+* **`tests/uat/`**: User Acceptance Testing (UAT), load testing and performance testing using **Locust**. Simulates realistic concurrent user scenarios (e.g. registration, inventory flows, receipt scanning) to validate performance and SLA thresholds.
 * **`tests/factories.py`**: Centralized data generation layer using the **Factory Pattern** to ensure consistent object creation across all testing layers.
 
 ## ⚙️ Configuration & Fixtures
@@ -23,6 +24,9 @@ This file defines dynamic fixtures (`any_user`, `any_home`, `any_product`, etc.)
 This file handles the heavy lifting for API and Database lifecycle management:
 * **Clean-Slate Strategy**: Manages a dedicated PostgreSQL session. To ensure total isolation, it utilizes a **Cascade Truncate** strategy after every test execution, wiping all tables while respecting foreign key constraints.
 * **FastAPI Overrides**: Automatically injects the isolated `db_session` into the application's dependencies and bypasses real authentication by overriding `get_current_user_id` with a fixed `auth_user` UUID.
+
+### 3. User Acceptance Testing Credentials (`tests/uat/credentials.json`)
+Allows loading a pool of user credentials for simulated load testing scenarios.
 
 ## 🛠️ Maintenance & Best Practices
 
@@ -42,8 +46,9 @@ class TestStockService:
 3.  **Leverage Factories**: Use the existing factory methods in `conftest.py` to seed data. This ensures that changes to model schemas only require a single update in the factory layer.
 
 ## 🚀 Execution Commands
-* **Setup docker container** `docker-compose up -d`
+* **Setup docker container**: `docker-compose up -d`
 * **Run the full suite**: `pytest`
 * **Unit layer only**: `pytest tests/unit`
 * **Integration layer only**: `pytest tests/integration`
+* **UAT / Load tests (Interactive)**: `cd tests/uat && locust` (then navigate to `http://localhost:8089`)
 * **Generate Coverage Report**: `pytest --cov=src --cov-report=html`

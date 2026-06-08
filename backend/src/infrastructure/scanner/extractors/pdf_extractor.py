@@ -37,7 +37,8 @@ def get_hf_client():
     if _hf_client_cache is None:
         try:
             app_logger.info("Initializing HuggingFace PDFExtractor Client...")
-            _hf_client_cache = Client("orioha/PDFExtractor")
+            hf_space = os.environ.get("HF_SPACE", "orioha/PDFExtractor")
+            _hf_client_cache = Client(hf_space)
         except Exception as e:
             app_logger.error(f"Failed to initialize HF Client: {e}")
             raise e
