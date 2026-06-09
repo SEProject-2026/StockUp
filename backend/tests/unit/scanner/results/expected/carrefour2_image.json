@@ -1,0 +1,50 @@
+{
+    "chain": "carrefour",
+    "items": [
+        {
+            "barcode": "3560070828708",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1507",
+            "quantity": 0.69,
+            "unit": "KG"
+        },
+        {
+            "barcode": "982355",
+            "quantity": 0.144,
+            "unit": "KG"
+        },
+        {
+            "barcode": "46020",
+            "quantity": 0.166,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290006664693",
+            "quantity": 4.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "1501",
+            "quantity": 0.815,
+            "unit": "KG"
+        },
+        {
+            "barcode": "1500",
+            "quantity": 0.335,
+            "unit": "KG"
+        },
+        {
+            "barcode": "7290006492432",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7290005427107",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

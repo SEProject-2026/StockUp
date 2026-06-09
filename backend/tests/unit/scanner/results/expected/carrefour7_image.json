@@ -1,0 +1,15 @@
+{
+    "chain": "carrefour",
+    "items": [
+        {
+            "barcode": "7290008752244",
+            "quantity": 4.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "4444",
+            "quantity": 1.0,
+            "unit": "UNIT"
+        }
+    ]
+}

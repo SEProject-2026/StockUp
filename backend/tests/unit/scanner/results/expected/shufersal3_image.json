@@ -1,0 +1,15 @@
+{
+    "chain": "shufersal",
+    "items": [
+        {
+            "barcode": "1902325",
+            "quantity": 7.0,
+            "unit": "UNIT"
+        },
+        {
+            "barcode": "7296073271260",
+            "quantity": 2.0,
+            "unit": "UNIT"
+        }
+    ]
+}

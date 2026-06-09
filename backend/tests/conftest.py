@@ -1,4 +1,22 @@
+import os
+import logging
 import pytest
+
+# Disable loguru logs
+os.environ["LOGURU_OFF"] = "true"
+try:
+    from loguru import logger
+    logger.disable("src")
+    logger.disable("tests")
+except ImportError:
+    pass
+
+# Disable standard python logging for libraries/services during tests
+logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
+logging.getLogger("uvicorn").setLevel(logging.ERROR)
+logging.getLogger("fastapi").setLevel(logging.ERROR)
+
 from tests.factories import (
     create_user_entity, 
     create_home_entity, 

@@ -18,8 +18,9 @@ CHAIN_HPS = {
     "514068980": "victory",
     "515163657": "mck",
     "512792714": "tivtaam",
-    "510931484": "osherad",
+    "513461053": "osherad",
     "511400265": "hazi-hinam",
+    "520036187": "carrefour"
 }
 
 def identify_chain(text: str) -> str:
@@ -32,18 +33,19 @@ def identify_chain(text: str) -> str:
                 
     # Fallback to pure text match if no valid HP is found or matched
     chain_names = {
-        "רמי לוי": "ramilevi",
+        "לוי רמי": "ramilevi",
         "שופרסל": "shufersal",
-        "מחסני השוק": "mck",
-        "אושר עד": "osherad",
+        "השוק מחסני": "mck",
+        "עד אושר": "osherad",
         "יוחננוף": "yohananof",
-        "טיב טעם": "tivtaam",
+        "טעם טיב": "tivtaam",
         "ויקטורי": "victory",
-        "חצי חינם": "hazi-hinam"
+        "חינם חצי": "hazi-hinam",
+        "carrefour": "carrefour"
     }
     
     for heb_name, eng_id in chain_names.items():
-        if heb_name in text:
+        if heb_name.lower() in text.lower():
             return eng_id
             
     return "Unknown Chain"

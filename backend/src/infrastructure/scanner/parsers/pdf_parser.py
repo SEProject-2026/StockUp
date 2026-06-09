@@ -8,7 +8,7 @@ ENABLE_DEBUG = os.environ.get("ENABLE_DEBUG", "False").lower() == "true"
 
 def _normalize_unit(unit: str) -> str:
     unit = unit.replace('"', '').replace("'", "").strip().lower()
-    if any(u in unit for u in ['גק', 'קג', 'קיג', 'ג"ק', 'ק"ג']):
+    if any(u in unit for u in ['גק', 'קג', 'קיג', 'ג"ק', 'ק"ג', 'קייג', 'גייק']):
         return "KG"
     return "UNIT"
 
@@ -19,7 +19,7 @@ def _extract_pdf_line_data(line: str, index: int, trace: List[str]) -> Optional[
         trace.append(f"L{index}: REJECTED - Promotion/Discount line detected: '{line[:30]}...'")
         return None
     
-    units_pattern = r'(\'יח|יח\'|חי|יח|יחידה|יחידות|ק"ג|ג"ק|קג|גק|קיג|ג"ק|`חי|`ח י|י ח|י\"ח|ח\"י)'
+    units_pattern = r'(\'יח|יח\'|חי|יח|יחידה|יחידות|ק"ג|ג"ק|קג|גק|קיג|ג"ק|`חי|`ח י|י ח|י\"ח|ח\"י| קייג| גייק)'
     unit_match = re.search(units_pattern, line)
     
     

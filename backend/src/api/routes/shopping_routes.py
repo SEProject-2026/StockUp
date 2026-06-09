@@ -1,7 +1,7 @@
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.db.database import get_db
 from src.services.shopping_list_service import ShoppingListService
@@ -24,10 +24,10 @@ router = APIRouter(prefix="/shopping-lists", tags=["Shopping List"])
 
 # --- Dependency Injection ---
 
-def get_shopping_list_service(db: Session = Depends(get_db)) -> ShoppingListService:
+def get_shopping_list_service(db: AsyncSession = Depends(get_db)) -> ShoppingListService:
     return AppContainer.get_shopping_list_service(db)
 
-def get_recommendation_service(db: Session = Depends(get_db)) -> RecommendationService:
+def get_recommendation_service(db: AsyncSession = Depends(get_db)) -> RecommendationService:
     return AppContainer.get_recommendation_service(db)
 
 ShoppingServiceDep = Annotated[ShoppingListService, Depends(get_shopping_list_service)]
@@ -44,17 +44,17 @@ async def create_list(
     app_logger.info(f"User {user_id} creating list '{request.name}' for home {request.home_id}")
     try:
         # Check if user belongs to home before creating
-        # We assume the service or a dedicated validator handles this check
-        new_list = await service.create_shopping_list(request.home_id, request.name)
+        new_list = await service.create_shopping_list(user_id, request.home_id, request.name)
         return GeneralResponse(
             status="success", 
             message="List created", 
             data=ShoppingListDTO.model_validate(new_list)
         )
-    except PermissionError as e:
+    except (ValueError, PermissionError) as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translated_message)
     except Exception as e:
+        app_logger.error(f"Error creating list: {e}", exc_info=True)
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translated_message)
 
@@ -66,8 +66,7 @@ async def get_home_lists(
     user_id: UUID = Depends(get_current_user_id)
 ):
     app_logger.info(f"User {user_id} accessing lists for home {home_id}")
-    # Authorization check should happen here or inside the service
-    lists = await service.get_all_shopping_lists_by_home(home_id)
+    lists = await service.get_all_shopping_lists_by_home(user_id, home_id)
     return GeneralResponse(status="success", data=[ShoppingListDTO.model_validate(l) for l in lists])
 
 
@@ -78,8 +77,7 @@ async def get_list(
     user_id: UUID = Depends(get_current_user_id)
 ):
     try:
-        shopping_list = await service.get_shopping_list(list_id)
-        # Verify user has access to the home associated with this list
+        shopping_list = await service.get_shopping_list(user_id, list_id)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(shopping_list))
     except ValueError as e:
         translated_message = translate_error(str(e))
@@ -96,7 +94,7 @@ async def add_item(
     app_logger.info(f"User {user_id} adding item to list {list_id}")
     try:
         updated = await service.add_item_to_list(
-            list_id, request.item_name, request.quantity, request.location
+            user_id, list_id, request.item_name, request.quantity, request.location
         )
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
@@ -112,7 +110,7 @@ async def get_recommendations(
 ):
     app_logger.info(f"User {user_id} requesting recommendations for list {list_id}")
     try:
-        shopping_list = await shopping_service.get_shopping_list(list_id)
+        shopping_list = await shopping_service.get_shopping_list(user_id, list_id)
         current_items = [item.item_name for item in shopping_list.items] if shopping_list.items else []
         
         recommendations = await recommendation_service.get_recommendations(
@@ -138,7 +136,7 @@ async def remove_item_from_list(
     """
     app_logger.info(f"User {user_id} is removing item '{item_name}' from list {list_id}")
     try:
-        updated_list = await service.remove_item_from_list(list_id, item_name)
+        updated_list = await service.remove_item_from_list(user_id, list_id, item_name)
         return GeneralResponse(
             status="success",
             message=f"Item '{item_name}' removed successfully",
@@ -158,7 +156,7 @@ async def update_quantity(
     user_id: UUID = Depends(get_current_user_id)
 ):
     try:
-        updated = await service.update_item_quantity(list_id, item_name, request.new_quantity)
+        updated = await service.update_item_quantity(user_id, list_id, item_name, request.new_quantity)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
         translated_message = translate_error(str(e))
@@ -176,7 +174,7 @@ async def enter_shopping_mode(
     """
     app_logger.info(f"User {user_id} is entering shopping mode for list {list_id}")
     try:
-        updated_list = await service.enter_shopping_mode(list_id)
+        updated_list = await service.enter_shopping_mode(user_id, list_id)
         return GeneralResponse(
             status="success", 
             message="Shopping mode activated",
@@ -195,7 +193,7 @@ async def check_bought(
     user_id: UUID = Depends(get_current_user_id)
 ):
     try:
-        updated = await service.check_item_as_bought(list_id, item_name)
+        updated = await service.check_item_as_bought(user_id, list_id, item_name)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
         translated_message = translate_error(str(e))
@@ -211,7 +209,7 @@ async def exit_mode(
 ):
     app_logger.info(f"User {user_id} finishing shopping for list {list_id}")
     try:
-        updated = await service.exit_shopping_mode(list_id, clear=request.clear)
+        updated = await service.exit_shopping_mode(user_id, list_id, clear=request.clear)
         return GeneralResponse(status="success", data=ShoppingListDTO.model_validate(updated))
     except ValueError as e:
         translated_message = translate_error(str(e))
@@ -225,5 +223,9 @@ async def delete_list(
     user_id: UUID = Depends(get_current_user_id)
 ):
     app_logger.info(f"User {user_id} deleting list {list_id}")
-    # Ensure authorization before deletion
-    await service.delete_shopping_list(list_id)
+    try:
+        await service.delete_shopping_list(user_id, list_id)
+        return GeneralResponse(status="success", message="List deleted")
+    except ValueError as e:
+        translated_message = translate_error(str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translated_message)

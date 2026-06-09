@@ -1,7 +1,7 @@
 from typing import Annotated 
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
-from sqlalchemy.orm import Session 
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.user.user import User
 from src.infrastructure import app_container
@@ -27,7 +27,7 @@ from src.api.routes.translate_notifications import translate_error
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-def get_user_service(db: Session = Depends(get_db)) -> UserService:
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
     return AppContainer.get_user_service(db)
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
@@ -61,32 +61,6 @@ async def register(
         raise HTTPException(status_code=400, detail=translated_message)
 
 
-# @router.post("/login", response_model=LoginResponse)
-# async def login(
-#     request: LoginRequest,
-#     user_service: UserServiceDep 
-# ):
-#     """
-#     Login and retrieve an access token.
-#     """
-#     app_logger.info(f"Login request received for email: {request.email}")
-#     try:
-#         user_entity, token = await user_service.login(request.email, request.password)
-        
-#         return LoginResponse(
-#             status="success",
-#             access_token=token,
-#             data=UserDTO.model_validate(user_entity)
-#         )
-    
-#     except ValueError:
-#         app_logger.warning(f"Login failed: Invalid credentials for email {request.email}")
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED, 
-#             detail="Invalid credentials"
-#         )
-
-
 @router.put("/update_name", response_model=GeneralResponse)
 async def update_name(
     request: UpdateNameRequest,
@@ -111,33 +85,6 @@ async def update_name(
         raise HTTPException(status_code=400, detail=translated_message)
 
 
-# @router.put("/password", response_model=GeneralResponse)
-# async def change_password(
-#     request: ChangePasswordRequest,
-#     user_service: UserServiceDep, 
-#     user_id: UUID = Depends(get_current_user_id)
-# ):
-#     """
-#     Change the authenticated user's password.
-#     Protected Route.
-#     """
-#     app_logger.info(f"Password change request received from user {user_id}")
-#     try:
-#         await user_service.change_password(
-#             user_id=user_id,
-#             current_password=request.current_password,
-#             new_password=request.new_password
-#         )
-        
-#         return GeneralResponse(
-#             status="success", 
-#             message="Password changed successfully"
-#         )
-        
-#     except ValueError as e:
-#         app_logger.warning(f"Password change failed for user {user_id} - Reason: {str(e)}")
-#         raise HTTPException(status_code=400, detail=str(e))
-
 class PushTokenUpdateDTO(BaseModel):
     push_token: str
 
@@ -154,3 +101,20 @@ async def update_push_token(
     except ValueError as e:
         translated_message = translate_error(str(e))
         raise HTTPException(status_code=400, detail=translated_message)
+
+@router.post("/logout", response_model=GeneralResponse)
+async def logout(
+    user_service: UserServiceDep, 
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Logout the user and clear their push token.
+    Protected Route.
+    """
+    app_logger.info(f"Logout request received from user {user_id}")
+    await user_service.logout(user_id)
+    
+    return GeneralResponse(
+        status="success", 
+        message="Logged out successfully"
+    )

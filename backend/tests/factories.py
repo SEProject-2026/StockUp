@@ -1,8 +1,9 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
+# Domain & Infrastructure imports
 from src.domain.user.user import User
 from src.domain.home.home import Home
 from src.domain.product.product import Product, ProductItem
@@ -11,29 +12,24 @@ from src.domain.enums import LocationType
 
 # --- Domain & Persistence Factories ---
 
-import uuid
-from typing import Optional
-from sqlalchemy.orm import Session
-# IMPORT YOUR ACTUAL SQLALCHEMY MODELS HERE
-from src.infrastructure.db.models import UserModel 
-from src.infrastructure.db.models import HomeModel
-# ... import others as needed
-
-import uuid
-from typing import Optional
-from sqlalchemy.orm import Session
 from src.infrastructure.db.models import UserModel, HomeModel
-from src.domain.user.user import User
-from src.domain.home.home import Home
 
-def create_user_entity(db: Optional[Session] = None, **kwargs) -> User:
+
+# ==========================================
+# 1. Domain & Persistence Factories (Async)
+# ==========================================
+
+def create_user_entity(db=None, **kwargs):
+    """
+    Creates a User. Supports Async DB for integration tests 
+    and Domain Entities for unit tests.
+    """
     user_id = kwargs.get("user_id", uuid.uuid4())
     email = kwargs.get("email", f"user_{uuid.uuid4().hex[:6]}@test.com")
     name = kwargs.get("name", "Test User")
     push_token = kwargs.get("push_token", "mock_token_123")
 
     if db:
-        # Create SQLAlchemy Model for Integration Tests
         db_user = UserModel(
             id=str(user_id),
             email=email,
@@ -41,10 +37,8 @@ def create_user_entity(db: Optional[Session] = None, **kwargs) -> User:
             push_token=push_token
         )
         db.add(db_user)
-        db.flush()
-        return db_user # SQLAlchemy models are data-compatible with Domain Entities in most flows
+        return db_user 
 
-    # Return pure Domain Entity for Unit Tests
     return User(
         id=user_id,
         email=email,
@@ -52,17 +46,16 @@ def create_user_entity(db: Optional[Session] = None, **kwargs) -> User:
         push_token=push_token
     )
 
-def create_home_entity(db: Optional[Session] = None, **kwargs) -> Home:
+def create_home_entity(db=None, admin_user=None, requesting_users=None, **kwargs):
+    """
+    Creates a Home with optional admin and join requests.
+    """
     home_id = kwargs.get("home_id", uuid.uuid4())
     name = kwargs.get("name", "Test Home")
-    admin_id = kwargs.get("admin_user_id", uuid.uuid4())
+    admin_id = admin_user.id if admin_user else kwargs.get("admin_user_id", uuid.uuid4())
     join_code = kwargs.get("join_code", uuid.uuid4().hex[:8].upper())
-    requesting_user_ids = kwargs.get("requesting_user_ids", [])
 
     if db:
-        # Fetch the admin user using a string ID for Postgres compatibility
-        admin_user = db.query(UserModel).filter(UserModel.id == str(admin_id)).first()
-        
         db_home = HomeModel(
             id=str(home_id),
             name=name,
@@ -71,30 +64,28 @@ def create_home_entity(db: Optional[Session] = None, **kwargs) -> Home:
             expiration_range=kwargs.get("expiration_range", 7)
         )
         
-        # Link the admin to the membership association table
         if admin_user:
             db_home.users.append(admin_user)
             
-        # Link applicants to the join requests association table
-        for r_id in requesting_user_ids:
-            r_user = db.query(UserModel).filter(UserModel.id == str(r_id)).first()
-            if r_user:
-                db_home.join_requests.append(r_user)
-
+        if requesting_users:
+            for u in requesting_users:
+                db_home.join_requests.append(u)
+                
         db.add(db_home)
-        db.flush()
         return db_home
 
-    # Domain Home uses admin_id (mapped as user_id in the domain layer)
     return Home(user_id=admin_id, name=name)
 
 def create_product_entity(
-    db: Optional[Session] = None,
+    db=None,
     home_id: Optional[uuid.UUID] = None,
     name: str = "Test Product",
     barcode: Optional[str] = None,
     add_item: bool = False
 ) -> Product:
+    """
+    Creates a Product. If db is provided, it handles async persistence.
+    """
     product = Product(
         id=uuid.uuid4(),
         home_id=home_id or uuid.uuid4(),
@@ -106,14 +97,16 @@ def create_product_entity(
         
     if db:
         db.add(product)
-        db.flush()
     return product
 
 def create_shopping_list_entity(
-    db: Optional[Session] = None,
+    db=None,
     home_id: Optional[uuid.UUID] = None,
     name: str = "Weekly List"
 ) -> ShoppingList:
+    """
+    Creates a ShoppingList with async DB support.
+    """
     sl = ShoppingList(
         home_id=home_id or uuid.uuid4(),
         name=name,
@@ -121,10 +114,11 @@ def create_shopping_list_entity(
     )
     if db:
         db.add(sl)
-        db.flush()
     return sl
 
-# --- API Payload Helpers (For Integration Tests) ---
+# ==========================================
+# 2. API Payload Helpers (Synchronous)
+# ==========================================
 
 def create_register_payload(**kwargs) -> dict:
     return {
